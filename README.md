@@ -38,6 +38,7 @@ iptables-nft nftables dnsmasq bridge-utils ovmf swtpm	 \
 dmidecode  gpu-passthrough-manager mozillavpn 		 \
 spotify-launcher spicetify-cli xwaylandvideobridge-git   \
 xdg-desktop-portal-hyprland	 			 \
+```
 
 ### Gaming on Arch
 
