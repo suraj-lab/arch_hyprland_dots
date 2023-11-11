@@ -27,7 +27,7 @@ ttf-fantasque-nerd noto-fonts noto-fonts-emoji ttf-comfortaa   \
 ttf-jetbrains-mono-nerd ttf-icomoon-feather ttf-iosevka-nerd   \
 adobe-source-code-pro-fonts brightnessctl gnome-disk-utility   \
 qt5-wayland qt6-wayland ttf-font-awesome udiskie adwaita-dark
-ttf-meslo-nerd-font-powerlevel10k			       \
+ttf-meslo-nerd-font-powerlevel10k leafpad			       \
 
 ```
 
