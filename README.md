@@ -52,5 +52,5 @@ paru -S steam gamemode webcord mangohud goverlay	 \
 ### Work related
 
 ```bash
-paru -S icaclient webex-bin
+paru -S icaclient webex-bin zoom
 ```
