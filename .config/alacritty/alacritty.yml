@@ -58,6 +58,10 @@ colors:
     white: '0xeec49a'
 theme: Garuda.dr460nized
 
+font:
+  normal:
+    family: "MesloLGS NF"
+
 # Import additional configuration files
 #
 # Imports are loaded in order, skipping all missing files, with the importing
