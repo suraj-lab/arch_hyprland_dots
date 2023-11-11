@@ -26,7 +26,8 @@ ttf-nerd-fonts-symbols-common otf-firamono-nerd inter-font     \
 ttf-fantasque-nerd noto-fonts noto-fonts-emoji ttf-comfortaa   \
 ttf-jetbrains-mono-nerd ttf-icomoon-feather ttf-iosevka-nerd   \
 adobe-source-code-pro-fonts brightnessctl gnome-disk-utility   \
-qt5-wayland qt6-wayland ttf-font-awesome udiskie adwaita-dark  \
+qt5-wayland qt6-wayland ttf-font-awesome udiskie adwaita-dark
+ttf-meslo-nerd-font-powerlevel10k			       \
 
 ```
 
@@ -45,7 +46,7 @@ xdg-desktop-portal-hyprland	 			 \
 ```bash
 paru -R amdvlk lib32-amdvlk 				 \
 paru -S vulkan-radeon lib32-vulkan-radeon 		 \
-paru -S steam gamemode 					 \
+paru -S steam gamemode webcord mangohud goverlay				 \
 ```
 
 ### Work related
