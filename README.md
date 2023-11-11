@@ -46,7 +46,7 @@ xdg-desktop-portal-hyprland	 			 \
 ```bash
 paru -R amdvlk lib32-amdvlk 				 \
 paru -S vulkan-radeon lib32-vulkan-radeon 		 \
-paru -S steam gamemode webcord mangohud goverlay				 \
+paru -S steam gamemode webcord mangohud goverlay	 \
 ```
 
 ### Work related
