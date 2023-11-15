@@ -9,7 +9,9 @@
     "modules-left": [
         "clock",
         "custom/weather",
-	"custom/exit"
+	"custom/exit",
+	"custom/spotify",
+	"custom/steam"
     ],
     "modules-center": ["hyprland/workspaces"],
     "modules-right": [
@@ -56,12 +58,24 @@
 
     "custom/exit": {
         "format": "",
-        "on-click": "wlogout",
+        "on-click": "wlogout -T 200 -B 200",
         "tooltip": false
     },
     "tray": {
         "icon-size": 13,
         "spacing": 10
+    },
+    "custom/spotify": {
+	"format" : "",
+	"on-click": "spotify-launcher",
+	"icon-size": 13,
+	"spacing": 10
+    },
+    "custom/steam": {
+	"format" : "",
+	"on-click" : "steam",
+	"icon-size" : 13,
+	"spacing" : 10
     },
     "clock": {
         "format": "{: %R   %d/%m}",

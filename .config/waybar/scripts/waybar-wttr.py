@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-city = "London"
+city = "london"
 import json
 import requests
 from datetime import datetime
