@@ -9,10 +9,9 @@
 
 window#waybar {
     background: rgba(21, 18, 27, 0);
-    color: #ffffff;
-    transition-property: background-color;
-    transition-duration: .5s;
-
+    color: #eeeeef;
+    font-size: 14px;
+    font-family: Cartograph CF Nerd Font, monospace;
 }
 
 window#waybar.hidden {
@@ -29,13 +28,13 @@ tooltip {
 
 #workspaces button {
     padding: 0 5px;
-    color: #313244;
+    color: #eeeeef;
     background-color: transparent;
 
 }
 
 #workspaces button.active {
-    color: #a6adc8;
+    color: #fa5aa4;
 }
 
 #workspaces button.focused {
@@ -63,18 +62,24 @@ tooltip {
 #clock,
 #battery,
 #pulseaudio,
-#network,
+#cpu,
+#temperature,
+#memory,
 #workspaces,
 #tray,
-#custom-exit,
+#custom-powermenu,
 #custom-spotify,
 #custom-steam,
 #backlight {
-    background: #1e1e2e;
+    background: #303643;
     padding: 0px 10px;
     margin: 3px 0px;
     margin-top: 10px;
-    border: 1px solid #181825;
+    border: 1px solid #000000;
+}
+
+#window {
+    color: #929db1;
 }
 
 #tray {
@@ -83,7 +88,6 @@ tooltip {
 }
 
 #workspaces {
-    background: #1e1e2e;
     border-radius: 10px;
     margin-left: 10px;
     padding-right: 0px;
@@ -94,7 +98,6 @@ tooltip {
     color: #89dceb;
     border-radius: 10px 0px 0px 10px;
     border-right: 0px;
-    margin-left: 10px;
 }
 
 #custom-language {
@@ -119,7 +122,6 @@ tooltip {
 #clock {
     color: #fab387;
     border-radius: 10px 0px 0px 10px;
-    margin-left: 5px;
     border-right: 0px;
 }
 
@@ -151,27 +153,52 @@ tooltip {
 }
 
 #custom-weather {
-    border-radius: 0px 0px 0px 0px;
-    border-left: 0px;
-    border-right: 0px;
-    margin-left: 0px;
-    
-}
-
-#custom-exit {
     border-radius: 0px 10px 10px 0px;
     border-left: 0px;
     border-right: 0px;
-    margin-left: 0px;
-    padding-right: 13px;
+    
 }
+
+#custom-powermenu {
+    color: #e06c75;
+    border-radius: 10px;
+    border-left: 0px;
+    border-right: 0px;
+    margin-right: 10px;
+    padding-right: 13px;
+    padding-left: 8px;
+}
+
 #custom-spotify {
     border-radius: 10px;
     margin-left: 5px;
     padding-left: 5px;
 }
+
 #custom-steam {
     border-radius: 10px;
     margin-left: 5px;
     padding-left: 5px;
+}
+
+#cpu {
+    color: #61afef;
+    border-radius: 0px 10px 10px 0px;
+    margin-right: 10px;
+    border-left: 0px;
+    border-right: 0px;
+  }
+  
+  #temperature {
+    color: #98c379;
+    border-radius: 10px 0px 0px 10px;
+    border-left: 0px;
+    border-right: 0px;
+  }
+  
+  #memory {
+    color: #e5c07b;
+    border-left: 0px;
+    border-right: 0px;
+  
 }
