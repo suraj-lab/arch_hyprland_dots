@@ -46,11 +46,11 @@
     },
     "custom/updates": {
         "format": " {}",
-        "interval": 7200,                     // every two hours
-        "exec": "i=$(checkupdates); echo \"$i\" |wc -l; echo \"$i\" |column -t |tr '\n' '\r'",       // # of updates and tooltip details
-        "exec-if": "exit 0",                  // always run; consider advanced run conditions
-        "on-click": "alacritty -e paru", // update system
-        "signal": 8
+        "interval": 3600,                     // every two hours
+        "exec": "exec $HOME/.config/waybar/scripts/checkupdate.sh"       // # of updates and tooltip details
+        // #"exec": "i=$(checkupdates); echo \"$i\" |wc -l; echo \"$i\" |column -t |tr '\n' '\r'",       // # of updates and tooltip details
+        // #"exec-if": "exit 0",                  // always run; consider advanced run conditions
+        // #on-click": "alacritty -e paru", // update system
     },
    "custom/weather" : {
         "tooltip" : true,

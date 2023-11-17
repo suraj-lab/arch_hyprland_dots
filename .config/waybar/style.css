@@ -202,3 +202,7 @@ tooltip {
     border-right: 0px;
   
 }
+   #network {
+    color: #c678dd;
+    min-width: 200px;
+}
