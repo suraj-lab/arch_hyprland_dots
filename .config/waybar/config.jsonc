@@ -47,7 +47,7 @@
     "custom/updates": {
         "format": " {}",
         "interval": 3600,                     // every two hours
-        "exec": "exec $HOME/.config/waybar/scripts/checkupdate.sh"       // # of updates and tooltip details
+        "exec": "~/.config/waybar/scripts/checkupdate.sh"       // # of updates and tooltip details
         // #"exec": "i=$(checkupdates); echo \"$i\" |wc -l; echo \"$i\" |column -t |tr '\n' '\r'",       // # of updates and tooltip details
         // #"exec-if": "exit 0",                  // always run; consider advanced run conditions
         // #on-click": "alacritty -e paru", // update system
@@ -87,7 +87,7 @@
         "exec": "/usr/bin/python3 ~/.config/waybar/scripts/mediaplayer.py  --player spotify",
         "format": "{}  ",
         "return-type": "json",
-        "on-click": "playerctl play-pause",
+        "on-click": "spotify-launcher",
         "on-scroll-up": "playerctl next",
         "on-scroll-down": "playerctl previous"
     },
