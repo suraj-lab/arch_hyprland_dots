@@ -68,7 +68,8 @@ tooltip {
 #workspaces,
 #tray,
 #custom-powermenu,
-#custom-spotify,
+#custom-spotifystart,
+#custom-spotifyplayer,
 #custom-steam,
 #backlight {
     background: #253452;
@@ -169,9 +170,20 @@ tooltip {
     padding-left: 8px;
 }
 
-#custom-spotify {
+#custom-spotifystart {
     color: #07b307;
     border-radius: 10px;
+    border-left: 0px;
+    border-right: 0px;
+    margin-left: 5px;
+    padding-left: 5px;
+}
+
+#custom-spotifyplayer {
+    color: #07b307;
+    border-radius: 10px;
+    border-left: 0px;
+    border-right: 0px;
     margin-left: 5px;
     padding-left: 5px;
 }

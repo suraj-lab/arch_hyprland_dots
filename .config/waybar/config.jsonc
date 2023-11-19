@@ -8,8 +8,9 @@
     "height": 0,
     "modules-left": [
         "hyprland/workspaces",
-	    "custom/spotify",
-	    "custom/steam"
+        "custom/steam",
+        "custom/spotifystart",
+	    "custom/spotifyplayer"
     ],
 
     "modules-center": [
@@ -83,9 +84,13 @@
         "format": " {usage}%",
         "tooltip": "false"
     },
-    "custom/spotify": {
+    "custom/spotifystart": {
+        "format": "",
+        "on-click": "spotify-launcher",
+    },
+    "custom/spotifyplayer": {
         "exec": "/usr/bin/python3 ~/.config/waybar/scripts/mediaplayer.py  --player spotify",
-        "format": "  {}",
+        "format": "{}",
         "escape": true,
         "return-type": "json",
         "max-length": 40,
