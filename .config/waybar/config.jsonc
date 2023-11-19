@@ -84,10 +84,12 @@
         "tooltip": "false"
     },
     "custom/spotify": {
-	"format" : "",
-	"on-click": "spotify-launcher",
-	"icon-size": 13,
-	"spacing": 10
+        "exec": "/usr/bin/python3 ~/.config/waybar/scripts/mediaplayer.py  --player spotify",
+        "format": "{}  ",
+        "return-type": "json",
+        "on-click": "playerctl play-pause",
+        "on-scroll-up": "playerctl next",
+        "on-scroll-down": "playerctl previous"
     },
     "custom/steam": {
 	"format" : "",
