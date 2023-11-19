@@ -85,11 +85,14 @@
     },
     "custom/spotify": {
         "exec": "/usr/bin/python3 ~/.config/waybar/scripts/mediaplayer.py  --player spotify",
-        "format": "{}  ",
+        "format": "  {}",
+        "escape": true,
         "return-type": "json",
+        "max-length": 40,
         "on-click": "spotify-launcher",
-        "on-scroll-up": "playerctl next",
-        "on-scroll-down": "playerctl previous"
+        "on-click-right": "playerctl -p spotify play-pause",
+        "on-scroll-up" : "playerctl -p spotify next",
+        "on-scroll-down" : "playerctl -p spotify previous",
     },
     "custom/steam": {
 	"format" : "",
