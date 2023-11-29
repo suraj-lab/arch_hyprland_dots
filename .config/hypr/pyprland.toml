@@ -1,0 +1,17 @@
+[pyprland]
+plugins = [
+    "scratchpads"
+]
+
+[scratchpads.volume]
+command = "pavucontrol"
+animation = "fromRight"
+unfocus = "hide"
+size = "40% 90%"
+move = "200% 5%"
+
+[scratchpads.spotify]
+command = "spotify-launcher"
+animation = "fromTop"
+unfocus = "hide"
+lazy = "true"
