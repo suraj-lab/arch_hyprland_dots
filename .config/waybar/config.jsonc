@@ -86,7 +86,7 @@
     },
     "custom/spotifystart": {
         "format": "",
-        "on-click": "spotify-launcher",
+        "on-click": "pypr toggle spotify && hyprctl dispatch bringactivetotop",
     },
     "custom/spotifyplayer": {
         "exec": "/usr/bin/python3 ~/.config/waybar/scripts/mediaplayer.py  --player spotify",
@@ -94,8 +94,7 @@
         "escape": true,
         "return-type": "json",
         "max-length": 40,
-        "on-click": "spotify-launcher",
-        "on-click-right": "playerctl -p spotify play-pause",
+        "on-click": "playerctl -p spotify play-pause",
         "on-scroll-up" : "playerctl -p spotify next",
         "on-scroll-down" : "playerctl -p spotify previous",
     },
@@ -125,7 +124,7 @@
         "format": "{icon} {volume}%",
         "tooltip": false,
         "format-muted": " Muted",
-        "on-click": "pavucontrol",
+        "on-click": "pypr toggle volume && hyprctl dispatch bringactivetotop",
         "on-scroll-up": "pamixer  -i 2",
         "on-scroll-down": "pamixer -d 2",
         "scroll-step": 5,
