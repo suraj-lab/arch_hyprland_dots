@@ -40,18 +40,18 @@ mako pacman-contrib
 ```bash
 paru -S qemu-full virt-manager virt-viewer vde2 ebtables \
 iptables-nft nftables dnsmasq bridge-utils ovmf swtpm	 \
-dmidecode  gpu-passthrough-manager mozillavpn 		     \
+dmidecode gpu-passthrough-manager mozillavpn 		 \
 spotify-launcher spicetify-cli xwaylandvideobridge-git   \
-xdg-desktop-portal-hyprland mpv ani-cli	obs-studio	     \
+xdg-desktop-portal-hyprland mpv ani-cli	obs-studio	 \
 looking-glass obs-plugin-looking-glass                   \
 ```
 
 ### Gaming on Arch
 
 ```bash
-paru -R amdvlk lib32-amdvlk 				            \
-paru -S vulkan-radeon lib32-vulkan-radeon 		        \
-paru -S steam gamemode webcord mangohud goverlay	    \
+paru -R amdvlk lib32-amdvlk 				  \
+paru -S vulkan-radeon lib32-vulkan-radeon 		  \
+paru -S steam gamemode webcord mangohud goverlay	  \
 ```
 
 ### Work related
