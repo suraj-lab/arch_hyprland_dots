@@ -1,7 +1,7 @@
 # arch_hyprland_dots
 This is my in progress dotfiles for me home config of arch. This is for hyprland but I will be making a repository for Qtile for learning.
 
-[Demo Video](https://github.com/suraj-lab/arch_hyprland_dots/blob/master/.config/demo.mkv)
+[Demo Video][![Video](https://www.youtube.com/watch?v=vaMaudCnLJ8/maxresdefault.jpg)](https://www.youtube.com/watch?v=vaMaudCnLJ8)
 
 
 ## Initial installation
