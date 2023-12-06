@@ -19,11 +19,11 @@ makepkg -si
 ### Dependencies
 
 ```bash
-paru -S hyprland polkit-kde-agent ffmpeg viewnior wofi         \
-pavucontrol thunar wl-clipboard wf-recorder swaybg swww        \
-waypaper grimblast-git ffmpegthumbnailer tumbler playerctl     \
-wl-paste thunar-archive-plugin alacritty waybar wlogout        \
-swaylock-effects wlsunset sddm-git pamixer cliphist            \
+paru -S hyprland pyprland polkit-kde-agent ffmpeg viewnior      \
+pavucontrol thunar wl-clipboard wf-recorder swww wofi 	       \
+grimblast-git ffmpegthumbnailer tumbler playerctl              \
+thunar-archive-plugin alacritty waybar wlogout                 \
+swaylock-effects wlsunset sddm pamixer cliphist                \
 nwg-look-bin nordic-theme papirus-icon-theme dunst otf-sora    \
 ttf-nerd-fonts-symbols-common otf-firamono-nerd inter-font     \
 ttf-fantasque-nerd noto-fonts noto-fonts-emoji ttf-comfortaa   \
