@@ -1,6 +1,6 @@
 [pyprland]
 plugins = [
-    "scratchpads"
+    "scratchpads",
 ]
 
 [scratchpads.volume]
@@ -14,4 +14,11 @@ move = "200% 5%"
 command = "spotify-launcher"
 animation = "fromTop"
 unfocus = "hide"
+size = "75% 65%"
 lazy = "true"
+
+[scratchpads.term]
+command = "alacritty --class alacritty-dropterm"
+size = "65% 55%"
+position = "25% 35%"
+margin = 50
