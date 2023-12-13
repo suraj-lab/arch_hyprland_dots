@@ -20,5 +20,5 @@ lazy = "true"
 [scratchpads.term]
 command = "alacritty --class alacritty-dropterm"
 size = "65% 55%"
-position = "25% 35%"
+position = "20% 20%"
 margin = 50
