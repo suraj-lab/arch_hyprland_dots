@@ -18,7 +18,7 @@ size = "75% 65%"
 lazy = "true"
 
 [scratchpads.term]
-command = "alacritty --class alacritty-dropterm"
+command = "kitty --class kitty-dropterm"
 size = "65% 55%"
 position = "20% 20%"
 margin = 50
