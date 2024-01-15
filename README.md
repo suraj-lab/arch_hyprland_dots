@@ -22,7 +22,7 @@ makepkg -si
 paru -S hyprland pyprland polkit-kde-agent ffmpeg viewnior     \
 pavucontrol thunar wl-clipboard wf-recorder swww wofi 	       \
 grimblast-git ffmpegthumbnailer tumbler playerctl              \
-thunar-archive-plugin alacritty waybar wlogout                 \
+thunar-archive-plugin kitty waybar wlogout                     \
 swaylock-effects wlsunset sddm pamixer cliphist                \
 nwg-look-bin nordic-theme papirus-icon-theme dunst otf-sora    \
 ttf-nerd-fonts-symbols-common otf-firamono-nerd inter-font     \
@@ -49,9 +49,9 @@ looking-glass obs-plugin-looking-glass                   \
 ### Gaming on Arch
 
 ```bash
-paru -R amdvlk lib32-amdvlk 				  \
-paru -S vulkan-radeon lib32-vulkan-radeon 		  \
-paru -S steam gamemode webcord mangohud goverlay	  \
+paru -R amdvlk lib32-amdvlk 				              \
+paru -S vulkan-radeon lib32-vulkan-radeon 		          \
+paru -S steam gamemode webcord mangohud goverlay lutris	  \
 ```
 
 ### Work related
