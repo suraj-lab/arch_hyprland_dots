@@ -31,7 +31,7 @@ ttf-jetbrains-mono-nerd ttf-icomoon-feather ttf-iosevka-nerd   \
 adobe-source-code-pro-fonts brightnessctl gnome-disk-utility   \
 qt5-wayland qt6-wayland ttf-font-awesome udiskie adwaita-dark  \
 ttf-meslo-nerd-font-powerlevel10k leafpad firefox git neofetch \
-mako pacman-contrib
+mako pacman-contrib oh-my-posh
 
 ```
 
