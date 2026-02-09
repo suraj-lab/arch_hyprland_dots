@@ -1,221 +1,119 @@
 * {
-    border: none;
-    border-radius: 0;
     font-family: Cartograph CF Nerd Font, monospace;
     font-weight: bold;
     font-size: 14px;
-    min-height: 0;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    text-shadow: none;
 }
 
 window#waybar {
-    background: rgba(21, 18, 27, 0);
-    color: #eeeeef;
-    font-size: 14px;
-    font-family: Cartograph CF Nerd Font, monospace;
-}
-
-window#waybar.hidden {
-    opacity: 0.2;
+    margin: 8px 12px;
+    border-radius: 10px;
+    background: rgba(15, 12, 20, 0.75);
+    border-bottom: 1px solid rgba(198, 120, 221, 0.25);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 tooltip {
-    background: #1e1e2e;
-    border-radius: 10px;
-    border-width: 2px;
-    border-style: solid;
-    border-color: #11111b;
+    background: rgba(15, 12, 20, 0.85);
+    border-radius: 6px;
+    border: 1px solid rgba(198, 120, 221, 0.3);
+    color: #eeeeef;
 }
 
 #workspaces button {
-    padding: 0 5px;
-    color: #eeeeef;
-    background-color: transparent;
-
+    font-size: 16px;
+    padding: 2px 6px;
+    margin: 0 4px;
+    color: rgba(255, 255, 255, 0.4);
+    background: transparent;
+    transition: all 0.2s ease-in-out;
 }
 
-#workspaces button.active {
-    color: #fa5aa4;
-}
-
-#workspaces button.focused {
-    background-color: #64727D;
-    box-shadow: inset 0 -3px #ffffff;
-    border-radius: 10px;
-}
-
+#workspaces button.active,
+#workspaces button:hover,
 #workspaces button.urgent {
-    background-color: #eb4d4b;
-    border-radius: 10px;
+    color: #00ffea;
+    background: rgba(0, 255, 234, 0.1);
+    border-radius: 4px;
+    box-shadow: 0 0 6px rgba(0, 255, 234, 0.5);
+    border: 1px solid rgba(0, 255, 234, 0.5);
 }
 
-#workspaces button:hover {
-    background: #11111b;
-    color: #cdd6f4;
-    border-radius: 10px;
+.drawer-child {
+    padding: 2px 6px;
+    margin: 2px;
+    background-color: rgba(30, 20, 40, 0.5);
+    color: #eeeeef;
+    border-radius: 4px;
+    transition: all 0.2s ease-in-out;
+    border: 1px solid rgba(198, 120, 221, 0.2);
 }
 
-#custom-language,
-#custom-updates,
-#custom-caffeine,
-#custom-weather,
-#window,
-#clock,
-#battery,
-#pulseaudio,
+.drawer-child:hover {
+    background-color: rgba(198, 120, 221, 0.2);
+    box-shadow: 0 0 8px rgba(198, 120, 221, 0.4);
+    border: 1px solid rgba(198, 120, 221, 0.4);
+}
+
 #cpu,
-#temperature,
 #memory,
-#workspaces,
-#tray,
-#custom-powermenu,
-#custom-spotifystart,
+#temperature,
+#gamemode,
+#custom-sysinfo,
 #custom-spotifyplayer,
+#custom-spotifystart,
+#custom-spotify-play,
+#custom-spotify-next,
+#custom-spotify-prev,
 #custom-steam,
-#backlight {
-    background: #253452;
-    padding: 0px 10px;
-    margin: 3px 0px;
-    margin-top: 10px;
-    border: 1px solid #000000;
+#custom-updates,
+#tray,
+#custom-weather,
+#pulseaudio,
+#pulseaudio.microphone,
+#clock,
+#custom-powermenu,
+#custom-arrow-left,
+#custom-arrow-right {
+    margin: 2px 3px;
+    padding: 2px 5px;
+    background: rgba(30, 20, 40, 0.4);
+    color: #eeeeef;
+    border-radius: 4px;
+    transition: all 0.2s ease-in-out;
+    border: 1px solid rgba(198, 120, 221, 0.2);
 }
 
-#window {
-    color: #929db1;
+#custom-arrow-left,
+#custom-arrow-right {
+    background: transparent;
+    color: rgba(198, 120, 221, 0.5);
+    padding: 0px 4px;
+    border: none;
 }
+
+#custom-spotifyplayer,
+#custom-spotifystart,
+#custom-spotify-play,
+#custom-spotify-next,
+#custom-spotify-prev { color: #0adb9d; }
+
+#cpu { color: #ff6ec7; }
+#memory { color: #ff9f43; }
+#temperature { color: #39ff14; }
+#clock { color: #fafafa; }
+#pulseaudio { color: #00ffea; }
+#pulseaudio.microphone { color: #c678dd; }
+#custom-updates { color: #f50057; }
+#custom-weather { color: #40e0d0; }
+#custom-powermenu { color: #ffffff; }
+#custom-lock,
+#custom-logout,
+#custom-reboot { color: #ff3c3c; }
 
 #tray {
-    border-radius: 10px;
-    margin-right: 10px;
-}
-
-#workspaces {
-    border-radius: 10px;
-    margin-left: 10px;
-    padding-right: 0px;
-    padding-left: 5px;
-}
-
-#custom-caffeine {
-    color: #89dceb;
-    border-radius: 10px 0px 0px 10px;
-    border-right: 0px;
-}
-
-#custom-language {
-    color: #f38ba8;
-    border-left: 0px;
-    border-right: 0px;
-}
-
-#custom-updates {
-    color: #f5c2e7;
-    border-radius: 10px 0px 0px 10px;
-    border-left: 0px;
-    border-right: 0px;
-}
-
-#window {
-    border-radius: 10px;
-    margin-left: 60px;
-    margin-right: 60px;
-}
-
-#clock {
-    color: #fab387;
-    border-radius: 10px 0px 0px 10px;
-    border-right: 0px;
-}
-
-#network {
-    color: #f9e2af;
-    border-left: 0px;
-    border-right: 0px;
-}
-
-#pulseaudio {
-    color: #89b4fa;
-    border-left: 0px;
-    border-right: 0px;
-}
-
-#pulseaudio.microphone {
-    color: #cba6f7;
-    border-radius: 0px 10px 10px 0px;
-    border-left: 0px;
-    border-right: 0px;
-    margin-right: 5px;
-}
-
-#battery {
-    color: #a6e3a1;
-    border-radius: 0 10px 10px 0;
-    margin-right: 10px;
-    border-left: 0px;
-}
-
-#custom-weather {
-    border-radius: 0px 10px 10px 0px;
-    border-left: 0px;
-    border-right: 0px;
-    
-}
-
-#custom-powermenu {
-    color: #e06c75;
-    border-radius: 10px;
-    border-left: 0px;
-    border-right: 0px;
-    margin-right: 10px;
-    padding-right: 13px;
-    padding-left: 8px;
-}
-
-#custom-spotifystart {
-    color: #07b307;
-    border-radius: 10px;
-    border-left: 0px;
-    border-right: 0px;
-    margin-left: 5px;
-    padding-left: 5px;
-}
-
-#custom-spotifyplayer {
-    color: #07b307;
-    border-radius: 10px;
-    border-left: 0px;
-    border-right: 0px;
-    margin-left: 5px;
-    padding-left: 5px;
-}
-
-#custom-steam {
-    border-radius: 10px;
-    margin-left: 5px;
-    padding-left: 5px;
-}
-
-#cpu {
-    color: #61afef;
-    border-radius: 0px 10px 10px 0px;
-    margin-right: 10px;
-    border-left: 0px;
-    border-right: 0px;
-  }
-  
-  #temperature {
-    color: #98c379;
-    border-radius: 10px 0px 0px 10px;
-    border-left: 0px;
-    border-right: 0px;
-  }
-  
-  #memory {
-    color: #e5c07b;
-    border-left: 0px;
-    border-right: 0px;
-  
-}
-   #network {
-    color: #c678dd;
-    min-width: 200px;
+    margin-right: 6px;
 }

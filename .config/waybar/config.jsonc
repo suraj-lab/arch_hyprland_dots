@@ -6,70 +6,100 @@
     "passthrough": false,
     "gtk-layer-shell": true,
     "height": 0,
+
     "modules-left": [
         "hyprland/workspaces",
-        "custom/steam",
-        "custom/spotifystart",
-	    "custom/spotifyplayer"
+        "group/sysinfo"
     ],
 
     "modules-center": [
-    "clock",
-    "custom/weather",
+        "group/spotify",
+        "clock",
+        "group/info"
     ],
 
     "modules-right": [
         "tray",
-        "temperature",
-        "memory",
-        "cpu",
-        "custom/updates",
-        "pulseaudio",
-        "pulseaudio#microphone",
+        "group/menu",
         "custom/powermenu"
     ],
 
-    "hyprland/window": {
-        "format": "{}"
-    },
-    "hyprland/workspaces": {
-        "disable-scroll": true,
-        "all-outputs": true,
-        "on-click": "activate",
-        //"format": "{icon}",
-        "persistent-workspaces": {
-            "1": [],
-            "2": [],
-            "3": [],
-            "4": [],
-            "5": []
-        }
-    },
-    "custom/updates": {
-        "format": " {}",
-        "interval": 3600,                     // every two hours
-        "exec": "~/.config/waybar/scripts/checkupdate.sh"       // # of updates and tooltip details
-        // #"exec": "i=$(checkupdates); echo \"$i\" |wc -l; echo \"$i\" |column -t |tr '\n' '\r'",       // # of updates and tooltip details
-        // #"exec-if": "exit 0",                  // always run; consider advanced run conditions
-        // #on-click": "alacritty -e paru", // update system
-    },
-   "custom/weather" : {
-        "tooltip" : true,
-        "format" : "{}",
-        "interval" : 30,
-        "exec" : "~/.config/waybar/scripts/waybar-wttr.py",
-        "return-type" : "json"
+    "group/spotify": {
+        "orientation": "inherit",
+        "drawer": {
+            "transition-duration": 300,
+            "children-class": "drawer-child",
+            "transition-left-to-right": true,
+            "click-to-reveal": false
+        },
+        "modules": [
+            "custom/arrow-left",
+            "custom/spotifyplayer",
+            "custom/spotifystart"
+            
+        ]
     },
 
-    "custom/powermenu": {
-        "format": "",
-        "on-click": "wlogout -T 200 -B 200",
+    
+    "custom/spotifystart": {
+    "format": "",
+    "on-click": "pypr toggle spotify",
+    "tooltip": false
+    },
+
+
+    "custom/spotifyplayer": {
+        "exec": "/usr/bin/python3 ~/.config/waybar/scripts/mediaplayer.py  --player spotify",
+        "format": "{}",
+        "escape": true,
+        "return-type": "json",
+        "max-length": 40,
+        "on-click": "playerctl -p spotify play-pause",
+        "on-scroll-up" : "playerctl -p spotify next",
+        "on-scroll-down" : "playerctl -p spotify previous",
+    },
+
+
+    "group/info": {
+    "orientation": "inherit",
+    "drawer": { "transition-duration": 300, "transition-left-to-right": false },
+    "modules": [
+      "custom/arrow-right",
+      "custom/weather"
+      
+    ]
+  },
+
+
+    "custom/weather": {
+    "format": "{}°",
+    "tooltip": true,
+    "interval": 3600,
+    "exec": "wttrbar",
+    "return-type": "json"
+    },
+
+    "group/sysinfo": {
+        "orientation": "inherit",
+        "drawer": {
+            "transition-duration": 300,
+            "children-class": "drawer-child",
+            "transition-left-to-right": false,
+            "click-to-reveal": false
+        },
+        "modules": [
+            "custom/arrow-right",
+            "cpu",
+            "memory",
+            "temperature"
+        ]
+    },
+
+    "custom/sysinfo": {
+        "format": "? System",
         "tooltip": false
     },
-    "tray": {
-        "icon-size": 13,
-        "spacing": 10
-    },
+
     "temperature": {
         "format": "{icon} {temperatureC}°C",
         "hwmon-path": "/sys/class/hwmon/hwmon2/temp1_input",
@@ -84,47 +114,65 @@
         "format": " {usage}%",
         "tooltip": "false"
     },
-    "custom/spotifystart": {
-        "format": "",
-        "on-click": "pypr toggle spotify && hyprctl dispatch bringactivetotop",
-    },
-    "custom/spotifyplayer": {
-        "exec": "/usr/bin/python3 ~/.config/waybar/scripts/mediaplayer.py  --player spotify",
-        "format": "{}",
-        "escape": true,
+
+    "gamemode": {
+        "format": " {icon}",
         "return-type": "json",
-        "max-length": 40,
-        "on-click": "playerctl -p spotify play-pause",
-        "on-scroll-up" : "playerctl -p spotify next",
-        "on-scroll-down" : "playerctl -p spotify previous",
+        "interval": 5,
+        "glyph": "",
+        "hide-not-running": true,
+        "use-icon": true,
+        "exec": "gamemoded -s | grep -q 'active' && echo '{\"icon\":\"ON\",\"class\":\"ON\"}' || echo '{\"icon\":\"OFF\",\"class\":\"OFF\"}'",
+        "tooltip": true,
+        "tooltip-format": "GameMode is {icon}",
+        "on-click": "notify-send \"GameMode Status\" \"$(gamemoded -s)\""
     },
-    "custom/steam": {
-	"format" : "",
-	"on-click" : "steam",
-	"icon-size" : 13,
-	"spacing" : 10
-    },
-    "clock": {
-        "format": "{: %R   %d/%m}",
-        "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>"
-    },
-    "battery": {
-        "states": {
-            "good": 95,
-            "warning": 30,
-            "critical": 20
+
+    "group/menu": {
+        "orientation": "inherit",
+        "drawer": {
+            "transition-duration": 300,
+            "children-class": "drawer-child",
+            "transition-left-to-right": true,
+            "click-to-reveal": false
         },
-        "format": "{icon} {capacity}%",
-        "format-charging": " {capacity}%",
-        "format-plugged": " {capacity}%",
-        "format-alt": "{time} {icon}",
-        "format-icons": ["", "", "", "", "", "", "", "", "", "", ""]
+        "modules": [
+            "custom/arrow-left",
+            "gamemode",
+            "pulseaudio",
+            "pulseaudio#microphone"
+        ]
     },
+
+    "custom/powermenu": {
+        "format": "",
+        "on-click": "wlogout -T 200 -B 200",
+        "tooltip": false
+    },
+    
+
+    "custom/steam": {
+        "format": "",
+        "on-click": "steam",
+        "icon-size": 13,
+        "spacing": 10
+    },
+
+    "custom/arrow-left": { "format": "&lt;", "tooltip": false },
+    "custom/arrow-right": { "format": ">", "tooltip": false },
+
+    "hyprland/workspaces": {
+        "disable-scroll": true,
+        "all-outputs": true,
+        "on-click": "activate",
+        "persistent-workspaces": { "1": [], "2": [], "3": [], "4": [], "5": [] }
+    },
+
     "pulseaudio": {
         "format": "{icon} {volume}%",
         "tooltip": false,
         "format-muted": " Muted",
-        "on-click": "pypr toggle volume && hyprctl dispatch bringactivetotop",
+        "on-click": "pypr toggle volume",
         "on-scroll-up": "pamixer  -i 2",
         "on-scroll-down": "pamixer -d 2",
         "scroll-step": 5,
@@ -146,5 +194,37 @@
         "on-scroll-up": "pamixer --default-source -i 2",
         "on-scroll-down": "pamixer --default-source -d 2",
         "scroll-step": 5
-    }
+    },
+
+    "clock": {
+	"format": "{:%H:%M}  ",
+	"format-alt": "{:%A, %B %d, %Y (%R)}  ",
+	"tooltip-format": "<tt><small>{calendar}</small></tt>",
+	"calendar": {
+		"mode"          : "year",
+		"mode-mon-col"  : 3,
+		"weeks-pos"     : "right",
+		"on-scroll"     : 1,
+		"on-click-right": "mode",
+		"format": {
+			"months":     "<span color='#ffead3'><b>{}</b></span>",
+			"days":       "<span color='#ecc6d9'><b>{}</b></span>",
+			"weeks":      "<span color='#99ffdd'><b>W{}</b></span>",
+			"weekdays":   "<span color='#ffcc66'><b>{}</b></span>",
+			"today":      "<span color='#ff6699'><b><u>{}</u></b></span>"
+		}
+	},
+	"actions": {
+		"on-click-right": "mode",
+		"on-click-forward": "tz_up",
+		"on-click-backward": "tz_down",
+		"on-scroll-up": "shift_up",
+		"on-scroll-down": "shift_down"
+	    }
+
+    
+    },
+    "tray": { "icon-size": 21, "spacing": 10 }
+
+    
 }
