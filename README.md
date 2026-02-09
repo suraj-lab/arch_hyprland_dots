@@ -44,6 +44,8 @@ dmidecode gpu-passthrough-manager mozillavpn 		     \
 spotify-launcher spicetify-cli xwaylandvideobridge-git   \
 xdg-desktop-portal-hyprland mpv ani-cli	obs-studio	     \
 looking-glass obs-plugin-looking-glass                   \
+rocm-core rocm-hip-runtime rocm-hip-sdk rocminfo         \
+hip-runtime-amd                                          \
 ```
 
 ### Gaming on Arch
