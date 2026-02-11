@@ -20,7 +20,7 @@ start_vm() {
 
 # Function to start the Looking Glass client
 start_looking_glass() {
-    looking-glass-client -m 97 &
+    looking-glass-client &
 }
 
 # Main script logic
