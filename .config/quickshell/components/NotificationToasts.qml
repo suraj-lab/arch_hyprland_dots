@@ -27,9 +27,13 @@ Item {
                 property int  savedId:      model.notifId
                 property int  savedTimeout: model.toastTimeout
                 property int  toastUrgency: model.urgency
+                property bool dismissing:   false
 
                 width: 360
-                height: toastRect.height
+                height: dismissing ? 0 : toastRect.height
+                clip: true
+
+                Behavior on height { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
 
                 // Slide-in from the right
                 opacity: 0
@@ -42,8 +46,27 @@ Item {
                 Timer {
                     property int tid: toastDelegate.savedId
                     interval: toastDelegate.savedTimeout
-                    running:  toastDelegate.savedTimeout > 0
-                    onTriggered: root.removeToast(tid)
+                    running:  toastDelegate.savedTimeout > 0 && !toastDelegate.dismissing
+                    onTriggered: toastDelegate.startDismiss()
+                }
+
+                // Dismiss animation delay — remove from model after slide-out finishes
+                Timer {
+                    id: dismissTimer
+                    interval: 300
+                    onTriggered: {
+                        var sid = toastDelegate.savedId
+                        root.removeToast(sid)
+                        if (root.dismissFunc) root.dismissFunc(sid)
+                    }
+                }
+
+                function startDismiss() {
+                    if (dismissing) return
+                    dismissing = true
+                    opacity = 0
+                    x = 60
+                    dismissTimer.start()
                 }
 
                 readonly property color urgencyColor:
@@ -53,7 +76,7 @@ Item {
                 readonly property string iconChar: {
                     var n = (model.appName || "").toLowerCase()
                     if (n.indexOf("firefox")    >= 0 || n.indexOf("chromium") >= 0) return "\uf738"
-                    if (n.indexOf("discord")    >= 0) return "\uf392"
+                    if (n.indexOf("discord")    >= 0 || n.indexOf("webcord")  >= 0) return "\uf392"
                     if (n.indexOf("spotify")    >= 0) return "\uf1bc"
                     if (n.indexOf("telegram")   >= 0) return "\uf2c6"
                     if (n.indexOf("slack")      >= 0) return "\uf198"
@@ -64,6 +87,10 @@ Item {
                     if (n.indexOf("update")     >= 0 || n.indexOf("system") >= 0) return "\uf013"
                     return "\uf0f3"
                 }
+
+                // ── Album art thumbnail (for MPRIS toasts) ────────────────
+                property string artUrl: model.body && model.body.indexOf("art:") === 0
+                                        ? model.body.substring(4) : ""
 
                 Rectangle {
                     id: toastRect
@@ -109,7 +136,23 @@ Item {
                         anchors.margins: 12; anchors.leftMargin: 16
                         spacing: 8
 
+                        // Album art thumbnail (only for MPRIS/media toasts)
+                        Rectangle {
+                            visible: toastDelegate.artUrl !== ""
+                            width: 40; height: 40; radius: 6
+                            color: Theme.surface; clip: true
+                            Layout.alignment: Qt.AlignTop
+                            Image {
+                                anchors.fill: parent
+                                source: toastDelegate.artUrl
+                                fillMode: Image.PreserveAspectCrop
+                                asynchronous: true
+                            }
+                        }
+
+                        // Icon (hidden when art is shown)
                         Text {
+                            visible: toastDelegate.artUrl === ""
                             text: toastDelegate.iconChar
                             font.pixelSize: 15; font.family: Theme.fontFamily
                             color: toastDelegate.urgencyColor
@@ -132,7 +175,7 @@ Item {
                                 visible: text !== ""
                             }
                             Text {
-                                text: model.body
+                                text: toastDelegate.artUrl === "" ? model.body : ""
                                 font.pixelSize: Theme.fontSm
                                 font.family: Theme.fontFamily; color: Theme.textDim
                                 elide: Text.ElideRight; Layout.fillWidth: true
@@ -153,13 +196,7 @@ Item {
                             MouseArea {
                                 id: xHover; anchors.fill: parent; hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
-                                onClicked: {
-                                    var sid = toastDelegate.savedId
-                                    root.removeToast(sid)
-                                    // dismissFunc is shell.qml's dismissNotif —
-                                    // also removes from history and calls n.close()
-                                    if (root.dismissFunc) root.dismissFunc(sid)
-                                }
+                                onClicked: toastDelegate.startDismiss()
                             }
                         }
                     }

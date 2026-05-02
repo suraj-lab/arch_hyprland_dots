@@ -4,50 +4,59 @@ import Quickshell
 import Quickshell.Hyprland
 import "../theme"
 
-RowLayout {
-    spacing: 4
+Row {
+    id: root
+    property color barAccent: "#00ffea"
+    spacing: 3
     property string screenName: ""
 
     Repeater {
         model: [1, 2, 3, 4, 5]
 
-        Rectangle {
+        Item {
             required property int modelData
+
+            // Full bar-height hit area, pill centered inside
+            width: pill.width
+            height: Theme.barHeight - Theme.barPadding * 2
 
             property var ws: {
                 Hyprland.workspaces.count
                 return Hyprland.workspaces.values.find(w =>
                     w.id === modelData &&
-                    (screenName === "" || (w.monitor && w.monitor.name === screenName))
+                    (root.screenName === "" || (w.monitor && w.monitor.name === root.screenName))
                 ) ?? null
             }
 
-            width: Theme.wsSize; height: Theme.wsSize
-            radius: Theme.wsRadius
+            Rectangle {
+                id: pill
+                anchors.verticalCenter: parent.verticalCenter
 
-            color: ws && ws.focused  ? Theme.accent
-                 : ws && ws.active   ? Theme.wsActive
-                 : ws && ws.toplevels.count > 0 ? Theme.wsOccupied
-                 : "transparent"
+                height: 10
+                radius: 5
 
-            border.color: ws && ws.focused ? Theme.accentGlow : Theme.border
-            border.width: 1
+                width: ws && ws.focused  ? 32
+                     : ws && ws.active   ? 22
+                     : ws && ws.toplevels.count > 0 ? 16
+                     : 10
 
-            Behavior on color       { ColorAnimation  { duration: Theme.animMedium } }
-            Behavior on border.color { ColorAnimation { duration: Theme.animMedium } }
+                color: ws && ws.focused  ? root.barAccent
+                     : ws && ws.active   ? Theme.wsActive
+                     : ws && ws.toplevels.count > 0 ? Theme.wsOccupied
+                     : "transparent"
 
-            scale: ws && ws.focused ? 1.1 : (hover.containsMouse ? 1.05 : 1.0)
-            Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutBack } }
+                border.color: ws && ws.focused ? Qt.rgba(root.barAccent.r, root.barAccent.g, root.barAccent.b, 0.45)
+                            : ws && ws.toplevels.count > 0 ? Theme.borderLight
+                            : Theme.borderMuted
+                border.width: 1
 
-            Text {
-                anchors.centerIn: parent
-                text: parent.modelData
-                color: parent.ws && parent.ws.focused ? Theme.textDark : Theme.text
-                font.pixelSize: Theme.fontBar
-                font.bold: true
-                font.family: Theme.fontFamily
-                Behavior on color { ColorAnimation { duration: Theme.animMedium } }
+                Behavior on width       { NumberAnimation { duration: 300; easing.type: Easing.OutBack } }
+                Behavior on color       { ColorAnimation  { duration: Theme.animMedium } }
+                Behavior on border.color { ColorAnimation { duration: Theme.animMedium } }
             }
+
+            scale: hover.containsMouse ? 1.15 : 1.0
+            Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutBack } }
 
             MouseArea {
                 id: hover

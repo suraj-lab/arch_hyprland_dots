@@ -1,3 +1,4 @@
+//@ pragma Env QT_IMAGEIO_MAXALLOC=512
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
@@ -5,6 +6,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Hyprland
 import Quickshell.Services.Notifications
+import Quickshell.Services.Mpris
 import "theme"
 import "components"
 
@@ -30,6 +32,96 @@ ShellRoot {
     Component.onCompleted: {
         globalToastModel = toastModelInst
         globalNotifModel = notifHistoryModel
+        accentReadProc.running = true   // read cached accents on startup
+    }
+
+    // ── Per-monitor dynamic accent colors from wallpaper ──────────────────
+    property var monitorAccents: ({})       // { "DP-2": "#ab12cd", ... }
+    property color globalAccent: "#00ffea"  // fallback from generic accent file
+
+    function accentFor(screenName) {
+        return monitorAccents[screenName] || globalAccent
+    }
+
+    IpcHandler {
+        target: "accent"
+        function update() { accentReadProc.running = true }
+    }
+
+    Process {
+        id: accentReadProc
+        command: ["bash", "-c",
+            "cd \"$HOME/.cache/quickshell\" 2>/dev/null || exit 0; " +
+            "[ -f accent ] && echo \"ALL=$(cat accent)\"; " +
+            "for f in accent-*; do [ -f \"$f\" ] && echo \"${f#accent-}=$(cat \"$f\")\"; done"
+        ]
+        stdout: SplitParser {
+            onRead: function(line) {
+                var eq = line.indexOf("=")
+                if (eq < 0) return
+                var key = line.substring(0, eq).trim()
+                var hex = line.substring(eq + 1).trim()
+                if (!hex.match(/^#[0-9a-fA-F]{6}$/)) return
+
+                if (key === "ALL") {
+                    shellRoot.globalAccent = hex
+                    Theme.accent = hex
+                } else {
+                    var m = Object.assign({}, shellRoot.monitorAccents)
+                    m[key] = hex
+                    shellRoot.monitorAccents = m
+                }
+            }
+        }
+    }
+
+    // ── MPRIS track change toasts ────────────────────────────────────────
+    property string _lastTrackKey: ""
+    property int _mprisToastId: -1
+
+    Connections {
+        target: Mpris.players
+        function onValuesChanged() { shellRoot.checkTrackChange() }
+    }
+
+    Timer {
+        id: trackCheckTimer
+        interval: 2000; running: true; repeat: true
+        onTriggered: shellRoot.checkTrackChange()
+    }
+
+    function checkTrackChange() {
+        try {
+            var players = Mpris.players.values
+            if (!players || players.length === 0) return
+            var active = null
+            for (var i = 0; i < players.length; i++) {
+                var p = players[i]
+                if (p && p.playbackState === MprisPlaybackState.Playing) {
+                    active = p; break
+                }
+            }
+            if (!active || !active.trackTitle) return
+
+            var key = (active.identity || "") + "|" + active.trackTitle + "|" + (active.trackArtist || "")
+            if (key === _lastTrackKey) return
+            var isFirst = _lastTrackKey === ""
+            _lastTrackKey = key
+
+            if (isFirst) return
+
+            if (toastModelInst.count >= 4) toastModelInst.remove(0)
+            var artUrl = active.trackArtUrl || ""
+            var tid = shellRoot._mprisToastId--
+            toastModelInst.append({
+                notifId:      tid,
+                appName:      active.identity || "Media",
+                summary:      active.trackTitle,
+                body:         artUrl ? "art:" + artUrl : (active.trackArtist || ""),
+                urgency:      0,
+                toastTimeout: 3000
+            })
+        } catch(e) {}
     }
 
     // All notification logic lives here — notifServerInst id is in scope.
@@ -110,6 +202,16 @@ ShellRoot {
         shellRoot.notifMap = {}
     }
 
+    // ── App launcher state ──────────────────────────────────────────────────
+    property bool launcherOpen: false
+
+    // ── Wallpaper picker state ─────────────────────────────────────────────
+    property bool wallpickerOpen: false
+
+    // ── Screenshot state ──────────────────────────────────────────────────
+    property string screenshotMode: ""   // "" | "area" | "screen"
+    property var screenshotScreen: null
+
     // ── Session overlay state + processes ──────────────────────────────────
     property bool sessionOpen: false
 
@@ -128,6 +230,9 @@ ShellRoot {
             required property ShellScreen modelData
             screen: modelData
 
+            property color screenAccent: shellRoot.accentFor(modelData.name)
+            Behavior on screenAccent { ColorAnimation { duration: 500 } }
+
             anchors { top: true; left: true; right: true }
             margins {
                 top:   Theme.barMarginTop
@@ -138,11 +243,18 @@ ShellRoot {
             color: "transparent"
 
             Rectangle {
+                id: barRect
                 anchors.fill: parent
                 radius: 10
                 color: Theme.barBg
-                border.color: Theme.border
+                border.color: Qt.rgba(barPanel.screenAccent.r, barPanel.screenAccent.g, barPanel.screenAccent.b, 0.25)
                 border.width: 1
+                Behavior on border.color { ColorAnimation { duration: 500 } }
+
+                // Bar startup fade-in (opacity only — anchors.fill controls position)
+                opacity: 0
+                Component.onCompleted: opacity = 1
+                Behavior on opacity { NumberAnimation { duration: 500; easing.type: Easing.OutCubic } }
             }
 
             Item {
@@ -154,27 +266,36 @@ ShellRoot {
                     spacing: Theme.barSpacing
                     Workspaces {
                         screenName: barPanel.modelData.name
+                        barAccent: barPanel.screenAccent
                         anchors.verticalCenter: parent.verticalCenter
                     }
                     SysInfo { anchors.verticalCenter: parent.verticalCenter }
                 }
 
                 // ── CENTER ─────────────────────────────────────────────────
-                BarClock { anchors.centerIn: parent }
+                BarClock {
+                    id: barClock
+                    anchors.centerIn: parent
+                    barAccent: barPanel.screenAccent
+                    onPopupOpenChanged: if (popupOpen) { volChip.popupOpen = false; notifChip.popupOpen = false; ccChip.popupOpen = false }
+                }
 
                 // ── RIGHT ──────────────────────────────────────────────────
                 Row {
                     anchors { right: parent.right; top: parent.top; bottom: parent.bottom }
                     spacing: Theme.barSpacing
                     TrayArea    { anchors.verticalCenter: parent.verticalCenter }
-                    Volume      { anchors.verticalCenter: parent.verticalCenter }
-                    Microphone  { anchors.verticalCenter: parent.verticalCenter }
-                    GameMode    { anchors.verticalCenter: parent.verticalCenter }
+                    Volume      {
+                        id: volChip; anchors.verticalCenter: parent.verticalCenter; barAccent: barPanel.screenAccent
+                        onPopupOpenChanged: if (popupOpen) { barClock.popupOpen = false; notifChip.popupOpen = false; ccChip.popupOpen = false }
+                    }
+                    Microphone  { anchors.verticalCenter: parent.verticalCenter; barAccent: barPanel.screenAccent }
+                    GameMode    { anchors.verticalCenter: parent.verticalCenter; barAccent: barPanel.screenAccent }
 
-                    // Explicit shellRoot.xxx — avoids the same-name scope ambiguity
-                    // that makes bare `notifServer: notifServer` resolve to undefined.
                     NotificationCenter {
+                        id: notifChip
                         anchors.verticalCenter: parent.verticalCenter
+                        barAccent: barPanel.screenAccent
                         notifModel:          shellRoot.globalNotifModel
                         externalUnreadCount: shellRoot.notifUnreadCount
                         dndEnabled:          shellRoot.dndEnabled
@@ -182,17 +303,145 @@ ShellRoot {
                         onDismissRequested:  function(id) { shellRoot.dismissNotif(id) }
                         onClearAllRequested: shellRoot.clearAllNotifs()
                         onDndToggled:        shellRoot.dndEnabled = !shellRoot.dndEnabled
+                        onPopupOpenChanged: if (popupOpen) { barClock.popupOpen = false; volChip.popupOpen = false; ccChip.popupOpen = false }
                     }
                     ControlCenter {
+                        id: ccChip
                         anchors.verticalCenter: parent.verticalCenter
+                        barAccent: barPanel.screenAccent
                         dndEnabled:   shellRoot.dndEnabled
                         onDndToggled: shellRoot.dndEnabled = !shellRoot.dndEnabled
+                        onPopupOpenChanged: if (popupOpen) { barClock.popupOpen = false; volChip.popupOpen = false; notifChip.popupOpen = false }
                     }
                     PowerMenu {
                         anchors.verticalCenter: parent.verticalCenter
                         onClicked: sessionOpen = !sessionOpen
                     }
                 }
+            }
+        }
+    }
+
+    // ── App launcher overlay (focused monitor only) ─────────────────────────
+    // Capture which screen was focused when launcher opens
+    property var launcherScreen: null
+
+    IpcHandler {
+        target: "launcher"
+        function toggle() {
+            if (!shellRoot.launcherOpen) {
+                // Capture focused monitor before opening
+                shellRoot.launcherScreen = Hyprland.focusedMonitor != null
+                    ? Hyprland.focusedMonitor.name : null
+            }
+            shellRoot.launcherOpen = !shellRoot.launcherOpen
+        }
+    }
+
+    Variants {
+        model: Quickshell.screens
+
+        PanelWindow {
+            required property ShellScreen modelData
+            screen: modelData
+            visible: shellRoot.launcherOpen
+                     && shellRoot.launcherScreen != null
+                     && modelData.name === shellRoot.launcherScreen
+
+            anchors { top: true; bottom: true; left: true; right: true }
+            color: "transparent"
+            exclusionMode: ExclusionMode.Ignore
+            WlrLayershell.layer: WlrLayer.Overlay
+            WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+            WlrLayershell.namespace: "quickshell-launcher"
+
+            AppLauncher {
+                anchors.fill: parent
+                barAccent: shellRoot.accentFor(shellRoot.launcherScreen || "")
+                launcherVisible: shellRoot.launcherOpen
+                onCloseRequested: shellRoot.launcherOpen = false
+            }
+        }
+    }
+
+    // ── Wallpaper picker overlay (focused monitor only) ──────────────────────
+    property var wallpickerScreen: null
+
+    IpcHandler {
+        target: "wallpicker"
+        function toggle() {
+            if (!shellRoot.wallpickerOpen) {
+                shellRoot.wallpickerScreen = Hyprland.focusedMonitor != null
+                    ? Hyprland.focusedMonitor.name : null
+            }
+            shellRoot.wallpickerOpen = !shellRoot.wallpickerOpen
+        }
+    }
+
+    Variants {
+        model: Quickshell.screens
+
+        PanelWindow {
+            required property ShellScreen modelData
+            screen: modelData
+            visible: shellRoot.wallpickerOpen
+                     && shellRoot.wallpickerScreen != null
+                     && modelData.name === shellRoot.wallpickerScreen
+
+            anchors { top: true; bottom: true; left: true; right: true }
+            color: "transparent"
+            exclusionMode: ExclusionMode.Ignore
+            WlrLayershell.layer: WlrLayer.Overlay
+            WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+            WlrLayershell.namespace: "quickshell-wallpicker"
+
+            WallpaperPicker {
+                anchors.fill: parent
+                barAccent: shellRoot.accentFor(shellRoot.wallpickerScreen || "")
+                pickerVisible: shellRoot.wallpickerOpen
+                onCloseRequested: shellRoot.wallpickerOpen = false
+            }
+        }
+    }
+
+    // ── Screenshot overlay (focused monitor only) ────────────────────────────
+    IpcHandler {
+        target: "screenshot"
+        function area() {
+            shellRoot.screenshotScreen = Hyprland.focusedMonitor != null
+                ? Hyprland.focusedMonitor.name : null
+            shellRoot.screenshotMode = "area"
+        }
+        function screen() {
+            shellRoot.screenshotScreen = Hyprland.focusedMonitor != null
+                ? Hyprland.focusedMonitor.name : null
+            shellRoot.screenshotMode = "screen"
+        }
+    }
+
+    Variants {
+        model: Quickshell.screens
+
+        PanelWindow {
+            required property ShellScreen modelData
+            screen: modelData
+            visible: shellRoot.screenshotMode !== ""
+                     && shellRoot.screenshotScreen != null
+                     && modelData.name === shellRoot.screenshotScreen
+
+            anchors { top: true; bottom: true; left: true; right: true }
+            color: "transparent"
+            exclusionMode: ExclusionMode.Ignore
+            WlrLayershell.layer: WlrLayer.Overlay
+            WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+            WlrLayershell.namespace: "quickshell-screenshot"
+
+            ScreenshotOverlay {
+                anchors.fill: parent
+                barAccent: shellRoot.accentFor(shellRoot.screenshotScreen || "")
+                mode: shellRoot.screenshotMode
+                screenName: modelData.name
+                onCloseRequested: shellRoot.screenshotMode = ""
             }
         }
     }
@@ -211,6 +460,7 @@ ShellRoot {
             exclusionMode: ExclusionMode.Ignore
             WlrLayershell.layer: WlrLayer.Overlay
             WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+            WlrLayershell.namespace: "quickshell-session"
 
             Rectangle {
                 id: backdrop
@@ -338,7 +588,10 @@ ShellRoot {
                      && Hyprland.focusedMonitor !== null
                      && Hyprland.focusedMonitor.name === modelData.name
 
-            OSD { id: osdItem }
+            OSD {
+                id: osdItem
+                barAccent: shellRoot.accentFor(modelData.name)
+            }
         }
     }
 

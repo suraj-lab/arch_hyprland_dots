@@ -10,11 +10,15 @@ import "../theme"
 
 Item {
     id: root
+    scale: bellMouse.containsMouse ? 1.08 : 1.0
+    Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutBack } }
+    property color barAccent: "#00ffea"
 
     // Passed from shellRoot.globalNotifModel — a ListModel with roles:
     // notifId, appName, summary, body, urgency, notifTime
     property var  notifModel:          null
     property int  externalUnreadCount: 0
+    onExternalUnreadCountChanged: if (externalUnreadCount > 0) badgeBounce.restart()
     property bool dndEnabled:          false
     property bool popupOpen:           false
 
@@ -43,7 +47,7 @@ Item {
                 text: "\uf0f3"
                 font.pixelSize: Theme.fontIcon
                 font.family:    Theme.fontFamily
-                color: bellMouse.containsMouse      ? Theme.accent
+                color: bellMouse.containsMouse      ? root.barAccent
                      : root.externalUnreadCount > 0 ? Theme.purple
                      :                                Theme.textDim
                 anchors.verticalCenter: parent.verticalCenter
@@ -51,11 +55,20 @@ Item {
             }
 
             Rectangle {
+                id: badge
                 visible: root.externalUnreadCount > 0
+                scale: 1.0
                 width:   Math.max(16, badgeText.implicitWidth + 6)
                 height:  14; radius: 7
                 color:   Theme.error
                 anchors.verticalCenter: parent.verticalCenter
+
+                SequentialAnimation {
+                    id: badgeBounce
+                    NumberAnimation { target: badge; property: "scale"; to: 1.4; duration: 120; easing.type: Easing.OutQuad }
+                    NumberAnimation { target: badge; property: "scale"; to: 1.0; duration: 200; easing.type: Easing.OutBack }
+                }
+
                 Text {
                     id: badgeText
                     anchors.centerIn: parent
@@ -80,20 +93,22 @@ Item {
     }
 
     // ── Focus grab ───────────────────────────────────────────────────────────
+    property bool _grabReady: false
+
     HyprlandFocusGrab {
         id: notifGrab
         windows: [notifPopup]
-        active: false
+        active: popupOpen && root._grabReady
         onCleared: popupOpen = false
     }
     Timer {
         id: notifGrabDelay
         interval: 50
-        onTriggered: notifGrab.active = popupOpen
+        onTriggered: root._grabReady = true
     }
     onPopupOpenChanged: {
         if (popupOpen) notifGrabDelay.restart()
-        else { notifGrabDelay.stop(); notifGrab.active = false }
+        else { root._grabReady = false; notifGrabDelay.stop() }
     }
 
     // ── Popup panel ──────────────────────────────────────────────────────────
@@ -112,6 +127,12 @@ Item {
             anchors.fill: parent; color: "transparent"
             border.color: Theme.border; border.width: 1
             radius: Theme.popupRadius; clip: true
+
+            scale: popupOpen ? 1.0 : 0.95
+            opacity: popupOpen ? 1.0 : 0.0
+            transformOrigin: Item.Top
+            Behavior on scale { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+            Behavior on opacity { NumberAnimation { duration: 150 } }
 
             ColumnLayout {
                 id: panelCol

@@ -29,8 +29,8 @@ QtObject {
     readonly property color trackBg:        Qt.rgba(255/255, 255/255, 255/255, 0.1)
     readonly property color mutedSlider:    Qt.rgba(205/255, 214/255, 244/255, 0.3)
 
-    // Accents — your Waybar palette
-    readonly property color accent:     "#00ffea"   // cyan
+    // Accents — your Waybar palette (accent is dynamic, set from wallpaper)
+    property color accent:     "#00ffea"   // cyan default, overwritten by wallpaper extraction
     readonly property color purple:     "#c678dd"
     readonly property color pink:       "#ff6ec7"   // CPU
     readonly property color media:      "#0adb9d"   // Spotify/teal
@@ -47,7 +47,7 @@ QtObject {
     // Workspace
     readonly property color wsActive:   Qt.rgba(198/255, 120/255, 221/255, 0.25)
     readonly property color wsOccupied: Qt.rgba(255/255, 255/255, 255/255, 0.08)
-    readonly property color accentGlow: Qt.rgba(0, 255/255, 234/255, 0.45)
+    property color accentGlow: Qt.rgba(accent.r, accent.g, accent.b, 0.45)
 
     // Error states
     readonly property color errorBg:     Qt.rgba(243/255, 139/255, 168/255, 0.2)
@@ -74,6 +74,17 @@ QtObject {
     readonly property int osdRadius:     24
     readonly property int osdBottomMargin: 80
     readonly property int osdHideDelay:  2000
+
+    // Launcher
+    readonly property int launcherWidth:     680
+    readonly property int launcherHeight:    560
+    readonly property int launcherIconSize:  48
+    readonly property int launcherCols:      5
+
+    // Wallpaper picker
+    readonly property int wallpickerWidth:   720
+    readonly property int wallpickerHeight:  560
+    readonly property int wallpickerCols:    4
 
     // Animations
     readonly property int animFast:     80

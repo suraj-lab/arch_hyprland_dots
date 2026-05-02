@@ -4,6 +4,7 @@ import "../theme"
 
 Item {
     id: root
+    property color barAccent: "#00ffea"
     implicitWidth: label.implicitWidth
     implicitHeight: label.implicitHeight
 
@@ -14,7 +15,7 @@ Item {
     Text {
         id: label
         text: "\uf11b"
-        color: Theme.accent
+        color: root.barAccent
         font.pixelSize: Theme.fontIcon
         font.family: Theme.fontFamily
     }

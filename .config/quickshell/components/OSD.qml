@@ -5,6 +5,7 @@ import "../theme"
 
 Item {
     id: root
+    property color barAccent: "#00ffea"
     anchors.fill: parent
 
     // ── State ──────────────────────────────────────────────────────────────
@@ -74,9 +75,12 @@ Item {
         border.width: 1
         opacity: osdVisible ? 1.0 : 0.0
         visible: opacity > 0
+        scale: osdVisible ? 1.0 : 0.85
+        transformOrigin: Item.Bottom
 
         Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
         Behavior on anchors.bottomMargin { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
+        Behavior on scale { NumberAnimation { duration: 250; easing.type: Easing.OutBack } }
 
         RowLayout {
             anchors {
@@ -94,7 +98,7 @@ Item {
                     if (root.volume > 0) return "\uf027"
                     return "\uf026"
                 }
-                color: root.muted ? Theme.error : Theme.accent
+                color: root.muted ? Theme.error : root.barAccent
                 font.pixelSize: 18
                 font.family: Theme.fontFamily
             }
@@ -110,7 +114,7 @@ Item {
                     width: parent.width * Math.min(1.0, root.muted ? 0 : root.volume)
                     height: parent.height
                     radius: 3
-                    color: root.muted ? Theme.error : Theme.accent
+                    color: root.muted ? Theme.error : root.barAccent
                     Behavior on width { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
                     Behavior on color { ColorAnimation { duration: 150 } }
                 }
@@ -119,7 +123,7 @@ Item {
             // Percentage
             Text {
                 text: root.muted ? "Muted" : Math.round(root.volume * 100) + "%"
-                color: root.muted ? Theme.error : Theme.accent
+                color: root.muted ? Theme.error : root.barAccent
                 font.pixelSize: Theme.fontBar
                 font.bold: true
                 font.family: Theme.fontFamily
