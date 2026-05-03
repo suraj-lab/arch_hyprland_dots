@@ -19,7 +19,7 @@ makepkg -si
 ### Dependencies
 
 ```bash
-paru -S hyprland pyprland hyprlock polkit-kde-agent viewnior       \
+paru -S hyprland hyprlock polkit-kde-agent viewnior       \
 pavucontrol thunar thunar-archive-plugin wl-clipboard              \
 wf-recorder wofi grimblast-git ffmpegthumbnailer tumbler           \
 playerctl kitty waybar wlogout-git swaylock-effects-git            \
