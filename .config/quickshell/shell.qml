@@ -277,7 +277,7 @@ ShellRoot {
                     id: barClock
                     anchors.centerIn: parent
                     barAccent: barPanel.screenAccent
-                    onPopupOpenChanged: if (popupOpen) { volChip.popupOpen = false; notifChip.popupOpen = false; ccChip.popupOpen = false }
+                    onPopupOpenChanged: if (popupOpen) unifiedPanel.close()
                 }
 
                 // ── RIGHT ──────────────────────────────────────────────────
@@ -285,9 +285,11 @@ ShellRoot {
                     anchors { right: parent.right; top: parent.top; bottom: parent.bottom }
                     spacing: Theme.barSpacing
                     TrayArea    { anchors.verticalCenter: parent.verticalCenter }
-                    Volume      {
-                        id: volChip; anchors.verticalCenter: parent.verticalCenter; barAccent: barPanel.screenAccent
-                        onPopupOpenChanged: if (popupOpen) { barClock.popupOpen = false; notifChip.popupOpen = false; ccChip.popupOpen = false }
+                    Volume {
+                        id: volChip
+                        anchors.verticalCenter: parent.verticalCenter
+                        barAccent: barPanel.screenAccent
+                        onChipClicked: { barClock.popupOpen = false; unifiedPanel.open("sound") }
                     }
                     Microphone  { anchors.verticalCenter: parent.verticalCenter; barAccent: barPanel.screenAccent }
                     GameMode    { anchors.verticalCenter: parent.verticalCenter; barAccent: barPanel.screenAccent }
@@ -296,27 +298,36 @@ ShellRoot {
                         id: notifChip
                         anchors.verticalCenter: parent.verticalCenter
                         barAccent: barPanel.screenAccent
-                        notifModel:          shellRoot.globalNotifModel
                         externalUnreadCount: shellRoot.notifUnreadCount
                         dndEnabled:          shellRoot.dndEnabled
-                        onPanelOpened:       shellRoot.notifUnreadCount = 0
-                        onDismissRequested:  function(id) { shellRoot.dismissNotif(id) }
-                        onClearAllRequested: shellRoot.clearAllNotifs()
-                        onDndToggled:        shellRoot.dndEnabled = !shellRoot.dndEnabled
-                        onPopupOpenChanged: if (popupOpen) { barClock.popupOpen = false; volChip.popupOpen = false; ccChip.popupOpen = false }
+                        onChipClicked: { barClock.popupOpen = false; unifiedPanel.open("notifs") }
+                        onPanelOpened: shellRoot.notifUnreadCount = 0
                     }
                     ControlCenter {
                         id: ccChip
                         anchors.verticalCenter: parent.verticalCenter
                         barAccent: barPanel.screenAccent
-                        dndEnabled:   shellRoot.dndEnabled
-                        onDndToggled: shellRoot.dndEnabled = !shellRoot.dndEnabled
-                        onPopupOpenChanged: if (popupOpen) { barClock.popupOpen = false; volChip.popupOpen = false; notifChip.popupOpen = false }
+                        onChipClicked: { barClock.popupOpen = false; unifiedPanel.open("system") }
                     }
                     PowerMenu {
                         anchors.verticalCenter: parent.verticalCenter
                         onClicked: sessionOpen = !sessionOpen
                     }
+                }
+
+                // Unified panel — anchored to bottom-right, outside the Row
+                UnifiedPanel {
+                    id: unifiedPanel
+                    anchors { right: parent.right; bottom: parent.bottom; bottomMargin: -8 }
+                    parentWindow: barPanel
+                    barAccent: barPanel.screenAccent
+                    notifModel:  shellRoot.globalNotifModel
+                    dndEnabled:  shellRoot.dndEnabled
+                    onDismissRequested:  function(id) { shellRoot.dismissNotif(id) }
+                    onClearAllRequested: shellRoot.clearAllNotifs()
+                    onDndToggled:        shellRoot.dndEnabled = !shellRoot.dndEnabled
+                    onPanelOpened:       shellRoot.notifUnreadCount = 0
+                    onPanelOpenChanged:  if (panelOpen) barClock.popupOpen = false
                 }
             }
         }
