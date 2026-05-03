@@ -19,45 +19,47 @@ makepkg -si
 ### Dependencies
 
 ```bash
-paru -S hyprland pyprland polkit-kde-agent ffmpeg viewnior     \
-pavucontrol thunar wl-clipboard wf-recorder swww wofi 	       \
-grimblast-git ffmpegthumbnailer tumbler playerctl              \
-thunar-archive-plugin kitty waybar wlogout                     \
-swaylock-effects wlsunset sddm pamixer cliphist                \
-nwg-look-bin nordic-theme papirus-icon-theme dunst otf-sora    \
-ttf-nerd-fonts-symbols-common otf-firamono-nerd inter-font     \
-ttf-fantasque-nerd noto-fonts noto-fonts-emoji ttf-comfortaa   \
-ttf-jetbrains-mono-nerd ttf-icomoon-feather ttf-iosevka-nerd   \
-adobe-source-code-pro-fonts brightnessctl gnome-disk-utility   \
-qt5-wayland qt6-wayland ttf-font-awesome udiskie adwaita-dark  \
-ttf-meslo-nerd-font-powerlevel10k leafpad firefox git neofetch \
-mako pacman-contrib oh-my-posh
-
+paru -S hyprland pyprland hyprlock polkit-kde-agent viewnior       \
+pavucontrol thunar thunar-archive-plugin wl-clipboard              \
+wf-recorder wofi grimblast-git ffmpegthumbnailer tumbler           \
+playerctl kitty waybar wlogout-git swaylock-effects-git            \
+wlsunset sddm sddm-theme-tokyo-night-git pamixer cliphist         \
+nwg-look nwg-displays nordic-theme papirus-icon-theme             \
+dunst mako otf-sora ttf-nerd-fonts-symbols-common otf-firamono-nerd \
+inter-font ttf-fantasque-nerd noto-fonts noto-fonts-emoji         \
+ttf-comfortaa ttf-jetbrains-mono-nerd ttf-icomoon-feather         \
+ttf-iosevka-nerd adobe-source-code-pro-fonts woff2-font-awesome   \
+ttf-meslo-nerd-font-powerlevel10k brightnessctl gnome-disk-utility \
+qt5-wayland qt6-wayland udiskie adwaita-dark leafpad firefox git  \
+fastfetch pacman-contrib oh-my-posh matugen-bin quickshell        \
+grim slurp pipewire pipewire-alsa pipewire-jack pipewire-pulse    \
+wireplumber gst-plugin-pipewire networkmanager btop
 ```
 
 ### Additional Packages (for QOL and general use)
 
 ```bash
-paru -S qemu-full virt-manager virt-viewer vde2 ebtables \
-iptables-nft nftables dnsmasq bridge-utils ovmf swtpm	 \
-dmidecode gpu-passthrough-manager mozillavpn 		     \
-spotify-launcher spicetify-cli xwaylandvideobridge-git   \
-xdg-desktop-portal-hyprland mpv ani-cli	obs-studio	     \
-looking-glass obs-plugin-looking-glass                   \
-rocm-core rocm-hip-runtime rocm-hip-sdk rocminfo         \
-hip-runtime-amd                                          \
+paru -S qemu-full virt-manager virt-viewer vde2 nftables          \
+dnsmasq bridge-utils edk2-ovmf swtpm dmidecode                    \
+gpu-passthrough-manager mozillavpn spotify-launcher               \
+spicetify-cli xwaylandvideobridge-git xdg-desktop-portal-hyprland \
+vlc ani-cli obs-studio looking-glass opencl-amd-dev               \
+deluge deluge-gtk localsend-bin vscodium-bin flatpak              \
+remmina freerdp imagemagick
 ```
 
 ### Gaming on Arch
 
 ```bash
-paru -R amdvlk lib32-amdvlk 				              \
-paru -S vulkan-radeon lib32-vulkan-radeon 		          \
-paru -S steam gamemode webcord mangohud goverlay lutris	  \
+paru -R amdvlk lib32-amdvlk
+paru -S vulkan-radeon lib32-vulkan-radeon
+paru -S steam gamemode lib32-gamemode webcord mangohud            \
+lib32-mangohud goverlay lutris proton-ge-custom-bin               \
+protontricks protonup-qt steamtinkerlaunch cemu rpcs3-appimage
 ```
 
 ### Work related
 
 ```bash
-paru -S icaclient webex-bin zoom
+paru -S icaclient zoom lmstudio-bin
 ```
