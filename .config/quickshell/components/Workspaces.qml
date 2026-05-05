@@ -4,68 +4,73 @@ import Quickshell
 import Quickshell.Hyprland
 import "../theme"
 
-Row {
+Item {
     id: root
     property color barAccent: "#00ffea"
-    spacing: 3
     property string screenName: ""
 
-    Repeater {
-        model: [1, 2, 3, 4, 5]
+    implicitWidth: row.implicitWidth
+    implicitHeight: row.implicitHeight
 
-        Item {
-            required property int modelData
+    // ── Workspace pill row ───────────────────────────────────────────────
+    Row {
+        id: row
+        spacing: 3
 
-            // Full bar-height hit area, pill centered inside
-            width: pill.width
-            height: Theme.barHeight - Theme.barPadding * 2
+        Repeater {
+            model: [1, 2, 3, 4, 5]
 
-            property var ws: {
-                Hyprland.workspaces.count
-                return Hyprland.workspaces.values.find(w =>
-                    w.id === modelData &&
-                    (root.screenName === "" || (w.monitor && w.monitor.name === root.screenName))
-                ) ?? null
-            }
+            Item {
+                id: pillContainer
+                required property int modelData
 
-            Rectangle {
-                id: pill
-                anchors.verticalCenter: parent.verticalCenter
+                height: Theme.barHeight - Theme.barPadding * 2
+                width: pill.width
+                clip: false
 
-                height: 10
-                radius: 5
+                property var ws: {
+                    Hyprland.workspaces.count
+                    return Hyprland.workspaces.values.find(function(w) {
+                        return w.id === modelData &&
+                            (root.screenName === "" ||
+                             (w.monitor && w.monitor.name === root.screenName))
+                    }) ?? null
+                }
 
-                width: ws && ws.focused  ? 32
-                     : ws && ws.active   ? 22
-                     : ws && ws.toplevels.count > 0 ? 16
-                     : 10
+                Rectangle {
+                    id: pill
+                    anchors.verticalCenter: parent.verticalCenter
+                    height: 10
+                    radius: 5
 
-                color: ws && ws.focused  ? root.barAccent
-                     : ws && ws.active   ? Theme.wsActive
-                     : ws && ws.toplevels.count > 0 ? Theme.wsOccupied
-                     : "transparent"
+                    width: ws && ws.focused  ? 32
+                         : ws && ws.active   ? 22
+                         : ws && ws.toplevels.count > 0 ? 16
+                         : 10
 
-                border.color: ws && ws.focused ? Qt.rgba(root.barAccent.r, root.barAccent.g, root.barAccent.b, 0.45)
-                            : ws && ws.toplevels.count > 0 ? Theme.borderLight
-                            : Theme.borderMuted
-                border.width: 1
+                    color: ws && ws.focused  ? root.barAccent
+                         : ws && ws.active   ? Theme.wsActive
+                         : ws && ws.toplevels.count > 0 ? Theme.wsOccupied
+                         : "transparent"
 
-                Behavior on width       { NumberAnimation { duration: 300; easing.type: Easing.OutBack } }
-                Behavior on color       { ColorAnimation  { duration: Theme.animMedium } }
-                Behavior on border.color { ColorAnimation { duration: Theme.animMedium } }
-            }
+                    border.color: ws && ws.focused
+                        ? Qt.rgba(root.barAccent.r, root.barAccent.g, root.barAccent.b, 0.45)
+                        : ws && ws.toplevels.count > 0 ? Theme.borderLight
+                        : Theme.borderMuted
+                    border.width: 1
 
-            scale: hover.containsMouse ? 1.15 : 1.0
-            Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutBack } }
+                    Behavior on width        { NumberAnimation { duration: 300; easing.type: Easing.OutBack } }
+                    Behavior on color        { ColorAnimation  { duration: Theme.animMedium } }
+                    Behavior on border.color { ColorAnimation  { duration: Theme.animMedium } }
 
-            MouseArea {
-                id: hover
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                onClicked: {
-                    if (parent.ws) parent.ws.activate()
-                    else Hyprland.dispatch("workspace " + parent.modelData)
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: function() {
+                            if (pillContainer.ws) pillContainer.ws.activate()
+                            else Hyprland.dispatch("workspace " + pillContainer.modelData)
+                        }
+                    }
                 }
             }
         }

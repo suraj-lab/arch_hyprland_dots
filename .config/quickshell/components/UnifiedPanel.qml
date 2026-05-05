@@ -17,9 +17,10 @@ Item {
     property string currentView: "sound"   // "sound" | "notifs" | "system"
     property var parentWindow: null        // barPanel PanelWindow, for focus grab
 
-    // Notification passthrough
+    // Passthrough
     property var  notifModel: null
     property bool dndEnabled: false
+    property var  screenTimeTracker: null
     signal dismissRequested(int notifId)
     signal clearAllRequested()
     signal dndToggled()
@@ -221,6 +222,7 @@ Item {
                         barAccent: root.barAccent
                         viewActive: root.currentView === "system" && root.panelOpen
                         dndEnabled: root.dndEnabled
+                        screenTimeTracker: root.screenTimeTracker
                         visible: root.currentView === "system"
                         onDndToggled: root.dndToggled()
                         onCloseRequested: root.close()

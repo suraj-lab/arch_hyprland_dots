@@ -208,12 +208,20 @@ ShellRoot {
     // ── Wallpaper picker state ─────────────────────────────────────────────
     property bool wallpickerOpen: false
 
+    // ── Workspace overview state ──────────────────────────────────────────
+    property bool overviewOpen: false
+    property var  overviewScreen: null
+
     // ── Screenshot state ──────────────────────────────────────────────────
     property string screenshotMode: ""   // "" | "area" | "screen"
     property var screenshotScreen: null
 
     // ── Session overlay state + processes ──────────────────────────────────
     property bool sessionOpen: false
+
+    // ── Screen time tracking (runs continuously) ──────────────────────────
+    ScreenTimeTracker { id: stTracker }
+
 
     Process { id: pLock;    command: ["hyprlock"]                            }
     Process { id: pLogout;  command: ["hyprctl",   "dispatch", "exit"]      }
@@ -239,12 +247,14 @@ ShellRoot {
                 left:  Theme.barMarginSide
                 right: Theme.barMarginSide
             }
+
             implicitHeight: Theme.barHeight
             color: "transparent"
 
             Rectangle {
                 id: barRect
-                anchors.fill: parent
+                anchors { left: parent.left; right: parent.right; top: parent.top }
+                height: Theme.barHeight
                 radius: 10
                 color: Theme.barBg
                 border.color: Qt.rgba(barPanel.screenAccent.r, barPanel.screenAccent.g, barPanel.screenAccent.b, 0.25)
@@ -258,13 +268,17 @@ ShellRoot {
             }
 
             Item {
-                anchors { fill: parent; margins: Theme.barPadding }
+                id: barContent
+                anchors { left: parent.left; right: parent.right; top: parent.top; margins: Theme.barPadding }
+                implicitHeight: Theme.barHeight - Theme.barPadding * 2
 
                 // ── LEFT ───────────────────────────────────────────────────
                 Row {
+                    id: leftRow
                     anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
                     spacing: Theme.barSpacing
                     Workspaces {
+                        id: wsChip
                         screenName: barPanel.modelData.name
                         barAccent: barPanel.screenAccent
                         anchors.verticalCenter: parent.verticalCenter
@@ -321,6 +335,7 @@ ShellRoot {
                     anchors { right: parent.right; bottom: parent.bottom; bottomMargin: -8 }
                     parentWindow: barPanel
                     barAccent: barPanel.screenAccent
+                    screenTimeTracker: stTracker
                     notifModel:  shellRoot.globalNotifModel
                     dndEnabled:  shellRoot.dndEnabled
                     onDismissRequested:  function(id) { shellRoot.dismissNotif(id) }
@@ -330,6 +345,7 @@ ShellRoot {
                     onPanelOpenChanged:  if (panelOpen) barClock.popupOpen = false
                 }
             }
+
         }
     }
 
@@ -453,6 +469,66 @@ ShellRoot {
                 mode: shellRoot.screenshotMode
                 screenName: modelData.name
                 onCloseRequested: shellRoot.screenshotMode = ""
+            }
+        }
+    }
+
+    // ── Workspace overview overlay (focused monitor only) ──────────────
+    IpcHandler {
+        target: "overview"
+        function toggle() {
+            if (!shellRoot.overviewOpen) {
+                shellRoot.overviewScreen = Hyprland.focusedMonitor != null
+                    ? Hyprland.focusedMonitor.name : null
+            }
+            shellRoot.overviewOpen = !shellRoot.overviewOpen
+        }
+        function close() {
+            shellRoot.overviewOpen = false
+        }
+        function open() {
+            shellRoot.overviewScreen = Hyprland.focusedMonitor != null
+                ? Hyprland.focusedMonitor.name : null
+            shellRoot.overviewOpen = true
+        }
+    }
+
+    Variants {
+        model: Quickshell.screens
+
+        PanelWindow {
+            id: overviewPanel
+            required property ShellScreen modelData
+            screen: modelData
+            visible: shellRoot.overviewOpen
+                     && shellRoot.overviewScreen != null
+                     && modelData.name === shellRoot.overviewScreen
+
+            anchors { top: true; bottom: true; left: true; right: true }
+            color: "transparent"
+            exclusionMode: ExclusionMode.Ignore
+            WlrLayershell.layer: WlrLayer.Overlay
+            WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
+            WlrLayershell.namespace: "quickshell-overview"
+
+            implicitWidth:  screen.width
+            implicitHeight: screen.height
+
+            Component {
+                id: overviewComp
+                Overview {
+                    anchors.fill: parent
+                    barAccent: shellRoot.accentFor(shellRoot.overviewScreen || "")
+                    screenName: overviewPanel.modelData.name
+                    onCloseRequested: shellRoot.overviewOpen = false
+                }
+            }
+
+            Loader {
+                anchors.fill: parent
+                active: shellRoot.overviewOpen
+                        && overviewPanel.modelData.name === shellRoot.overviewScreen
+                sourceComponent: overviewComp
             }
         }
     }

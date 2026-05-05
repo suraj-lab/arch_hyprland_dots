@@ -22,6 +22,60 @@ fi
 
 write_accent() {
     echo "$1" > "$ACCENT_FILE"
+
+    # Generate dynamic hyprlock.conf with accent color
+    local HEX="$1"
+    local R=$((16#${HEX:1:2}))
+    local G=$((16#${HEX:3:2}))
+    local B=$((16#${HEX:5:2}))
+
+    cat > "$HOME/.config/hypr/hyprlock.conf" << HYPREOF
+background {
+    monitor =
+    path = screenshot
+    blur_passes = 3
+    blur_size = 8
+}
+
+input-field {
+    monitor =
+    size = 280, 50
+    outline_thickness = 2
+    dots_size = 0.25
+    dots_spacing = 0.15
+    outer_color = rgba(${R}, ${G}, ${B}, 0.6)
+    inner_color = rgba(15, 12, 20, 0.9)
+    font_color = rgb(205, 214, 244)
+    fade_on_empty = true
+    placeholder_text = <i>Password...</i>
+    position = 0, -40
+    halign = center
+    valign = center
+}
+
+label {
+    monitor =
+    text = \$TIME
+    font_size = 72
+    font_family = JetBrainsMono Nerd Font
+    color = rgba(${R}, ${G}, ${B}, 0.9)
+    position = 0, 80
+    halign = center
+    valign = center
+}
+
+label {
+    monitor =
+    text = cmd[update:60000] date '+%A, %d %B'
+    font_size = 14
+    font_family = JetBrainsMono Nerd Font
+    color = rgba(205, 214, 244, 0.6)
+    position = 0, 30
+    halign = center
+    valign = center
+}
+HYPREOF
+
     command -v qs &>/dev/null && qs msg accent update 2>/dev/null
     exit 0
 }
