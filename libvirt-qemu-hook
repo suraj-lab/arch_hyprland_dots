@@ -1,0 +1,17 @@
+#!/bin/bash
+# libvirt VM lifecycle hook
+# Frees hugepages when the Work VM releases (Windows shutdown, virsh shutdown,
+# crash, force-off — any path that fully stops the VM).
+#
+# Args: $1=vm_name $2=operation $3=sub-op $4=extra
+# Operations: prepare | start | started | stopped | release | reconnect | migrate
+
+VM_NAME="$1"
+OPERATION="$2"
+
+if [ "$VM_NAME" = "Work" ] && [ "$OPERATION" = "release" ]; then
+    echo 0 > /proc/sys/vm/nr_hugepages
+    logger -t libvirt-hook "Freed hugepages after Work VM release"
+fi
+
+exit 0
