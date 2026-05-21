@@ -22,7 +22,7 @@ makepkg -si
 paru -S hyprland hyprlock polkit-kde-agent viewnior       \
 pavucontrol thunar thunar-archive-plugin wl-clipboard              \
 wf-recorder wofi grimblast-git ffmpegthumbnailer tumbler           \
-playerctl kitty waybar wlogout-git swaylock-effects-git            \
+playerctl ghostty starship waybar wlogout-git swaylock-effects-git \
 wlsunset sddm sddm-theme-tokyo-night-git pamixer cliphist         \
 nwg-look nwg-displays nordic-theme papirus-icon-theme             \
 dunst mako otf-sora ttf-nerd-fonts-symbols-common otf-firamono-nerd \
@@ -31,9 +31,21 @@ ttf-comfortaa ttf-jetbrains-mono-nerd ttf-icomoon-feather         \
 ttf-iosevka-nerd adobe-source-code-pro-fonts woff2-font-awesome   \
 ttf-meslo-nerd-font-powerlevel10k brightnessctl gnome-disk-utility \
 qt5-wayland qt6-wayland udiskie adwaita-dark leafpad firefox git  \
-fastfetch pacman-contrib oh-my-posh matugen-bin quickshell        \
+fastfetch pacman-contrib matugen-bin quickshell                   \
 grim slurp pipewire pipewire-alsa pipewire-jack pipewire-pulse    \
 wireplumber gst-plugin-pipewire networkmanager btop
+```
+
+### Terminal / prompt
+
+Ghostty is the primary terminal and Starship is the shell prompt.
+
+Config paths:
+
+```text
+.config/ghostty/config
+.config/starship.toml
+.zshrc
 ```
 
 ### Additional Packages (for QOL and general use)
