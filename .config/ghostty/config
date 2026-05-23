@@ -2,7 +2,7 @@
 # Restart Ghostty after editing this file.
 
 # Match the Kitty font setup, but keep Ghostty's shaping/rendering.
-font-family = "MesloLGS NF"
+font-family = "MesloLGS Nerd Font Mono"
 font-size = 11
 
 # Vibrant neon-style palette with Kitty-like transparency.
@@ -22,6 +22,7 @@ cursor-style-blink = false
 # Behavior.
 confirm-close-surface = true
 shell-integration = zsh
+mouse-scroll-multiplier = precision:0.5,discrete:1
 
 # Clipboard functionality.
 # OSC 52 read/write is intentionally allowed for terminal workflows.
