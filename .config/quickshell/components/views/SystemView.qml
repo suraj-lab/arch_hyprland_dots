@@ -14,6 +14,7 @@ Item {
     property color barAccent: "#00ffea"
     property bool viewActive: false
     property bool dndEnabled: false
+    property var screenTimeTracker: null   // ScreenTimeTracker instance from shell.qml
     signal dndToggled()
     signal closeRequested()
 
@@ -569,6 +570,218 @@ Item {
                                     font.pixelSize: 7; font.bold: true; font.family: Theme.fontFamily
                                     color: mon.vrr > 0 ? root.barAccent : Theme.textFaint
                                 }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Item { Layout.fillWidth: true; implicitHeight: 8 }
+        }
+
+        // ── Screen Time (visible when not in network drill-in) ──────────
+        ColumnLayout {
+            Layout.fillWidth: true
+            Layout.leftMargin: 12; Layout.rightMargin: 12
+            spacing: 6
+            visible: !root.networkViewOpen && root.screenTimeTracker != null
+
+            Rectangle {
+                Layout.fillWidth: true; height: 1; color: Theme.borderLight
+            }
+
+            Text {
+                text: "Screen Time"
+                font.pixelSize: 9; font.bold: true; font.family: Theme.fontFamily
+                color: Theme.textFaint; Layout.topMargin: 4
+            }
+
+            // Today's total + comparison
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+
+                Text {
+                    text: root.screenTimeTracker ? root.screenTimeTracker.formatTime(root.screenTimeTracker.todayTotal) : "0m"
+                    font.pixelSize: 20; font.bold: true; font.family: Theme.fontFamily
+                    color: root.barAccent
+                }
+                Text {
+                    text: "today"
+                    font.pixelSize: 10; font.family: Theme.fontFamily
+                    color: Theme.textFaint
+                }
+
+                Item { Layout.fillWidth: true }
+
+                Text {
+                    visible: root.screenTimeTracker && root.screenTimeTracker.yesterdayTotal > 0
+                    text: {
+                        if (!root.screenTimeTracker) return ""
+                        var pct = root.screenTimeTracker.changePercent()
+                        var arrow = pct >= 0 ? "\u25b2" : "\u25bc"
+                        return arrow + " " + Math.abs(pct) + "%"
+                    }
+                    font.pixelSize: 9; font.bold: true; font.family: Theme.fontFamily
+                    color: {
+                        if (!root.screenTimeTracker) return Theme.textFaint
+                        return root.screenTimeTracker.changePercent() >= 0 ? Theme.warning : Theme.media
+                    }
+                }
+            }
+
+            // 7-day bar chart
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 4
+
+                Repeater {
+                    model: {
+                        if (!root.screenTimeTracker) return 0
+                        // Build 7 entries: 6 history days + today
+                        return 7
+                    }
+
+                    Item {
+                        Layout.fillWidth: true
+                        implicitHeight: 28
+
+                        property int dayIdx: index
+                        property bool isToday: dayIdx === 6
+                        property var dayData: {
+                            if (!root.screenTimeTracker) return { label: "", total: 0 }
+                            if (isToday) {
+                                var d = new Date()
+                                return { label: "Today", total: root.screenTimeTracker.todayTotal }
+                            }
+                            // History index: 6 days ago = history[5], 5 days ago = history[4], etc.
+                            var histIdx = 5 - dayIdx
+                            var hist = root.screenTimeTracker.weekHistory
+                            if (histIdx >= 0 && histIdx < hist.length) {
+                                return { label: root.screenTimeTracker.dayLabel(hist[histIdx].date), total: hist[histIdx].total }
+                            }
+                            return { label: "", total: 0 }
+                        }
+                        property real maxTotal: {
+                            if (!root.screenTimeTracker) return 1
+                            var max = root.screenTimeTracker.todayTotal
+                            var hist = root.screenTimeTracker.weekHistory
+                            for (var i = 0; i < hist.length; i++) {
+                                if (hist[i].total > max) max = hist[i].total
+                            }
+                            return Math.max(max, 1)
+                        }
+                        property real fillPct: dayData.total / maxTotal
+
+                        Rectangle {
+                            anchors.fill: parent; radius: 4
+                            color: "transparent"
+                            border.color: isToday ? Qt.rgba(root.barAccent.r, root.barAccent.g, root.barAccent.b, 0.3) : "transparent"
+                            border.width: 1
+                        }
+
+                        ColumnLayout {
+                            anchors.fill: parent; spacing: 1
+                            anchors.margins: 2
+
+                            Text {
+                                text: dayData.label
+                                font.pixelSize: 7; font.bold: true; font.family: Theme.fontFamily
+                                color: isToday ? root.barAccent : Theme.textFaint
+                                Layout.alignment: Qt.AlignHCenter
+                            }
+
+                            Item {
+                                Layout.fillWidth: true; Layout.fillHeight: true
+
+                                Rectangle {
+                                    anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+                                    anchors.margins: 2
+                                    height: 4; radius: 2
+                                    color: Qt.rgba(255,255,255,0.06)
+
+                                    Rectangle {
+                                        width: parent.width * fillPct
+                                        height: parent.height; radius: 2
+                                        color: Qt.rgba(root.barAccent.r, root.barAccent.g, root.barAccent.b,
+                                                       0.3 + fillPct * 0.5)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Top apps
+            Repeater {
+                model: root.screenTimeTracker ? root.screenTimeTracker.topApps(4) : []
+
+                Item {
+                    required property var modelData
+                    required property int index
+                    Layout.fillWidth: true
+                    implicitHeight: 28
+
+                    property color appCol: {
+                        var n = (modelData.name || "").toLowerCase()
+                        if (n.indexOf("code") >= 0 || n.indexOf("codium") >= 0) return root.barAccent
+                        if (n.indexOf("firefox") >= 0 || n.indexOf("chromium") >= 0) return Theme.warning
+                        if (n.indexOf("discord") >= 0 || n.indexOf("webcord") >= 0) return "#7289da"
+                        if (n.indexOf("spotify") >= 0) return Theme.media
+                        if (n.indexOf("steam") >= 0) return root.barAccent
+                        if (n.indexOf("kitty") >= 0 || n.indexOf("alacritty") >= 0) return Theme.purple
+                        return Theme.textDim
+                    }
+
+                    RowLayout {
+                        anchors { fill: parent }
+                        spacing: 8
+
+                        Rectangle {
+                            width: 24; height: 24; radius: 6
+                            color: Qt.rgba(appCol.r, appCol.g, appCol.b, 0.12)
+                            Text {
+                                anchors.centerIn: parent
+                                text: {
+                                    var n = (modelData.name || "").toLowerCase()
+                                    if (n.indexOf("code") >= 0 || n.indexOf("codium") >= 0) return "\uf121"
+                                    if (n.indexOf("firefox") >= 0) return "\uf269"
+                                    if (n.indexOf("discord") >= 0 || n.indexOf("webcord") >= 0) return "\uf392"
+                                    if (n.indexOf("spotify") >= 0) return "\uf1bc"
+                                    if (n.indexOf("steam") >= 0) return "\uf11b"
+                                    if (n.indexOf("kitty") >= 0 || n.indexOf("alacritty") >= 0) return "\uf120"
+                                    return "\uf108"
+                                }
+                                font.pixelSize: 11; font.family: Theme.fontFamily
+                                color: appCol
+                            }
+                        }
+
+                        Text {
+                            text: modelData.name || ""
+                            font.pixelSize: 9; font.bold: true; font.family: Theme.fontFamily
+                            color: Theme.text
+                            Layout.fillWidth: true
+                            elide: Text.ElideRight
+                        }
+
+                        Text {
+                            text: root.screenTimeTracker ? root.screenTimeTracker.formatTime(modelData.seconds) : ""
+                            font.pixelSize: 9; font.family: Theme.fontFamily
+                            color: Theme.textFaint
+                        }
+
+                        Rectangle {
+                            width: 60; height: 4; radius: 2
+                            color: Qt.rgba(255,255,255,0.06)
+                            Rectangle {
+                                width: {
+                                    if (!root.screenTimeTracker || root.screenTimeTracker.todayTotal <= 0) return 0
+                                    return parent.width * Math.min(1, modelData.seconds / root.screenTimeTracker.todayTotal)
+                                }
+                                height: parent.height; radius: 2
+                                color: appCol
                             }
                         }
                     }
