@@ -120,14 +120,14 @@ hl.curve("winOut", { type = "bezier", points = { { 0.3, 1 }, { 0, 1 } } })
 hl.curve("linear", { type = "bezier", points = { { 1, 1 }, { 1, 1 } } })
 hl.curve("easeOut", { type = "bezier", points = { { 0.16, 1 }, { 0.3, 1 } } })
 
-hl.animation({ leaf = "windowsIn", enabled = true, speed = interval, curve = curve, style = "slide" })
-hl.animation({ leaf = "windowsOut", enabled = true, speed = interval, curve = curve, style = "slide" })
-hl.animation({ leaf = "windowsMove", enabled = true, speed = interval, curve = curve, style = "slide" })
-hl.animation({ leaf = "border", enabled = true, speed = 10, curve = "default" })
-hl.animation({ leaf = "fade", enabled = true, speed = 10, curve = "smoothIn" })
-hl.animation({ leaf = "fadeDim", enabled = true, speed = 10, curve = "smoothIn" })
-hl.animation({ leaf = "workspaces", enabled = true, speed = 6, curve = curve, style = "slide" })
-hl.animation({ leaf = "layers", enabled = true, speed = 6.9, curve = curve, style = "slide" })
+hl.animation({ leaf = "windowsIn", enabled = true, speed = interval, bezier = curve, style = "slide" })
+hl.animation({ leaf = "windowsOut", enabled = true, speed = interval, bezier = curve, style = "slide" })
+hl.animation({ leaf = "windowsMove", enabled = true, speed = interval, bezier = curve, style = "slide" })
+hl.animation({ leaf = "border", enabled = true, speed = 10, bezier = "default" })
+hl.animation({ leaf = "fade", enabled = true, speed = 10, bezier = "smoothIn" })
+hl.animation({ leaf = "fadeDim", enabled = true, speed = 10, bezier = "smoothIn" })
+hl.animation({ leaf = "workspaces", enabled = true, speed = 6, bezier = curve, style = "slide" })
+hl.animation({ leaf = "layers", enabled = true, speed = 6.9, bezier = curve, style = "slide" })
 
 -- Mouse
 hl.device({
