@@ -1,4 +1,3 @@
--- Converted from ~/.config/hypr/hyprland.conf
 
 -- Monitors
 hl.monitor({
@@ -30,18 +29,19 @@ hl.on("hyprland.start", function()
 	hl.exec_cmd("quickshell")
 	hl.exec_cmd("awww-daemon")
 	hl.exec_cmd("spotify-launcher")
-	hl.exec_cmd("~/.config/hypr/scripts/awww-random-DP2 ~/.config/hypr/wallpapers")
-	hl.exec_cmd("~/.config/hypr/scripts/awww-random-HDMI1 ~/.config/hypr/wallpapers")
 	hl.exec_cmd("/usr/lib/polkit-kde-authentication-agent-1")
 	hl.exec_cmd("wl-paste --type text --watch cliphist store")
 	hl.exec_cmd("wl-paste --type image --watch cliphist store")
-	hl.exec_cmd("~/.config/hypr/scripts/xdg-portal-hyprland")
 	hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP")
 	hl.exec_cmd("systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP")
 	hl.exec_cmd("wl-clipboard-history -t")
 	hl.exec_cmd("wlsunset -S 9:00 -s 19:30")
 	hl.exec_cmd("mozillavpn activate")
 end)
+
+-- Modules
+require("modules.wallpaper")
+require("modules.xdg_portal")
 
 -- Environment
 hl.env("XCURSOR_SIZE", "24")
@@ -106,33 +106,52 @@ hl.config({
 	},
 })
 
--- Animations
-local interval = 3
-local curve = "easeOut"
-
-hl.curve("overshot", { type = "bezier", points = { { 0.05, 0.9 }, { 0.1, 1.05 } } })
-hl.curve("smoothOut", { type = "bezier", points = { { 0.36, 0 }, { 0.66, -0.56 } } })
-hl.curve("smoothIn", { type = "bezier", points = { { 0.25, 1 }, { 0.5, 1 } } })
+-- Animations: macOS-like, snappy, controlled motion
+hl.curve("macSpring", { type = "spring", mass = 1, stiffness = 95, dampening = 18 })
+hl.curve("macSoftSpring", { type = "spring", mass = 1, stiffness = 75, dampening = 16 })
+hl.curve("snappyOut", { type = "bezier", points = { { 0.16, 1 }, { 0.3, 1 } } })
+hl.curve("smoothFocus", { type = "bezier", points = { { 0.25, 1 }, { 0.5, 1 } } })
 hl.curve("default", { type = "bezier", points = { { 0, 1 }, { 0, 1 } } })
-hl.curve("wind", { type = "bezier", points = { { 0.05, 0.69 }, { 0.1, 1 } } })
-hl.curve("winIn", { type = "bezier", points = { { 0.1, 1.1 }, { 0.1, 1 } } })
-hl.curve("winOut", { type = "bezier", points = { { 0.3, 1 }, { 0, 1 } } })
-hl.curve("linear", { type = "bezier", points = { { 1, 1 }, { 1, 1 } } })
-hl.curve("easeOut", { type = "bezier", points = { { 0.16, 1 }, { 0.3, 1 } } })
 
-hl.animation({ leaf = "windowsIn", enabled = true, speed = interval, bezier = curve, style = "slide" })
-hl.animation({ leaf = "windowsOut", enabled = true, speed = interval, bezier = curve, style = "slide" })
-hl.animation({ leaf = "windowsMove", enabled = true, speed = interval, bezier = curve, style = "slide" })
-hl.animation({ leaf = "border", enabled = true, speed = 10, bezier = "default" })
-hl.animation({ leaf = "fade", enabled = true, speed = 10, bezier = "smoothIn" })
-hl.animation({ leaf = "fadeDim", enabled = true, speed = 10, bezier = "smoothIn" })
-hl.animation({ leaf = "workspaces", enabled = true, speed = 6, bezier = curve, style = "slide" })
-hl.animation({ leaf = "layers", enabled = true, speed = 6.9, bezier = curve, style = "slide" })
+hl.animation({ leaf = "windows", enabled = true, speed = 4.2, spring = "macSpring" })
+hl.animation({ leaf = "windowsIn", enabled = true, speed = 4.0, spring = "macSpring", style = "popin 85%" })
+hl.animation({ leaf = "windowsOut", enabled = true, speed = 2.4, bezier = "snappyOut", style = "popin 88%" })
+hl.animation({ leaf = "windowsMove", enabled = true, speed = 3.4, spring = "macSpring" })
+hl.animation({ leaf = "border", enabled = true, speed = 8, bezier = "default" })
+hl.animation({ leaf = "fade", enabled = true, speed = 2.5, bezier = "snappyOut" })
+hl.animation({ leaf = "fadeSwitch", enabled = true, speed = 6, bezier = "smoothFocus" })
+hl.animation({ leaf = "fadeDim", enabled = true, speed = 6, bezier = "smoothFocus" })
+hl.animation({ leaf = "workspaces", enabled = true, speed = 4.2, spring = "macSoftSpring", style = "slidefade 18%" })
+hl.animation({ leaf = "layersIn", enabled = true, speed = 3.2, bezier = "snappyOut", style = "popin 90%" })
+hl.animation({ leaf = "layersOut", enabled = true, speed = 2.2, bezier = "snappyOut", style = "fade" })
 
 -- Mouse
 hl.device({
 	name = "epic-mouse-v1",
 	sensitivity = -0.5,
+})
+
+-- Apple Magic Trackpad
+hl.device({
+	name = "apple-inc.-magic-trackpad",
+	sensitivity = 0.35,
+	natural_scroll = true,
+	scroll_factor = 0.65,
+	clickfinger_behavior = true,
+	tap_to_click = true,
+	tap_and_drag = true,
+	drag_lock = 1,
+})
+
+hl.device({
+	name = "apple-inc.-magic-trackpad-1",
+	sensitivity = 0.35,
+	natural_scroll = true,
+	scroll_factor = 0.65,
+	clickfinger_behavior = true,
+	tap_to_click = true,
+	tap_and_drag = true,
+	drag_lock = 1,
 })
 
 -- Multimedia
@@ -199,6 +218,9 @@ hl.bind("ALT + SHIFT + S", hl.dsp.window.move({ workspace = "special:magic" }))
 -- Scroll through existing workspaces with mainMod + scroll
 hl.bind(mainMod .. " + mouse_down", hl.dsp.focus({ workspace = "e+1" }))
 hl.bind(mainMod .. " + mouse_up", hl.dsp.focus({ workspace = "e-1" }))
+
+-- Trackpad gestures
+hl.gesture({ fingers = 3, direction = "horizontal", action = "workspace" })
 
 -- Move/resize windows with mainMod + LMB/RMB and dragging
 hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(), { mouse = true })
