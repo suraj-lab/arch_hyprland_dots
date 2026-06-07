@@ -1,0 +1,165 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# BBE RDP launcher for FreeRDP on Linux/Hyprland.
+# Default workflow:
+#   1. Download the BBE .rdp file to ~/Downloads
+#   2. Run: bbe-rdp
+#
+# By default, this picks the newest ~/Downloads/launch*.rdp file, so it still
+# works if your browser saves a new file as launch(1).rdp or launch (1).rdp.
+#
+# Optional overrides:
+#   bbe-rdp --24                 # use 24-bit color instead of 16-bit
+#   bbe-rdp --size 2560x1440     # lower resolution for smoother perf
+#   bbe-rdp --camera             # enable camera redirection when needed
+#   bbe-rdp --file /path/file.rdp
+#   BBE_RDP_NETWORK=broadband-high bbe-rdp
+
+RDP_FILE=""
+RDP_FILE_EXPLICIT=0
+SIZE="${BBE_RDP_SIZE:-3440x1440}"
+BPP="${BBE_RDP_BPP:-16}"
+NETWORK="${BBE_RDP_NETWORK:-wan}"
+CLIPBOARD="+clipboard"
+CAMERA="${BBE_RDP_CAMERA:-0}"
+
+usage() {
+  cat <<EOF
+Usage: bbe-rdp [options]
+
+Options:
+  --file PATH        RDP file to launch (default: newest ~/Downloads/launch*.rdp)
+  --size WxH         Session size (default: ${SIZE})
+  --16              Use 16-bit color (default)
+  --24              Use 24-bit color
+  --network NAME     FreeRDP network profile (default: ${NETWORK})
+  --camera          Enable camera redirection
+  --no-camera       Disable camera redirection (default)
+  --no-clipboard    Disable clipboard redirection
+  -h, --help         Show this help
+
+Examples:
+  bbe-rdp
+  bbe-rdp --24
+  bbe-rdp --size 2560x1440
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --file)
+      RDP_FILE="${2:-}"
+      RDP_FILE_EXPLICIT=1
+      shift 2
+      ;;
+    --size)
+      SIZE="${2:-}"
+      shift 2
+      ;;
+    --16)
+      BPP="16"
+      shift
+      ;;
+    --24)
+      BPP="24"
+      shift
+      ;;
+    --network)
+      NETWORK="${2:-}"
+      shift 2
+      ;;
+    --camera)
+      CAMERA="1"
+      shift
+      ;;
+    --no-camera)
+      CAMERA="0"
+      shift
+      ;;
+    --no-clipboard)
+      CLIPBOARD="-clipboard"
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [[ "$RDP_FILE_EXPLICIT" -eq 0 ]]; then
+  shopt -s nullglob
+  candidates=("$HOME"/Downloads/launch*.rdp "$HOME"/Downloads/Launch*.rdp)
+  shopt -u nullglob
+
+  newest=""
+  newest_mtime=0
+  for candidate in "${candidates[@]}"; do
+    [[ -f "$candidate" ]] || continue
+    mtime="$(stat -c '%Y' -- "$candidate")"
+    if (( mtime > newest_mtime )); then
+      newest_mtime="$mtime"
+      newest="$candidate"
+    fi
+  done
+  RDP_FILE="$newest"
+fi
+
+if [[ -z "$RDP_FILE" || ! -f "$RDP_FILE" ]]; then
+  echo "BBE RDP file not found." >&2
+  echo "Download the BBE .rdp file to ~/Downloads, or run: bbe-rdp --file /path/to/launch.rdp" >&2
+  exit 1
+fi
+
+if ! command -v xfreerdp3 >/dev/null 2>&1; then
+  echo "xfreerdp3 not found. Install FreeRDP first, e.g. sudo pacman -S freerdp" >&2
+  exit 1
+fi
+
+TMP="$(mktemp --suffix=.rdp)"
+cleanup() {
+  rm -f "$TMP"
+}
+trap cleanup EXIT
+
+# Copy the downloaded BBE file but override settings that hurt Linux/Hyprland performance.
+# Keep gateway/cookie/auth fields intact.
+awk -v bpp="$BPP" -v camera="$CAMERA" '
+  BEGIN {
+    seen_screen=0; seen_smart=0; seen_bpp=0; seen_camera=0;
+    camera_value=(camera == "1" ? "*" : "");
+  }
+  /^screen mode id:i:/ { print "screen mode id:i:1"; seen_screen=1; next }
+  /^smart sizing:i:/ { print "smart sizing:i:0"; seen_smart=1; next }
+  /^session bpp:i:/ { print "session bpp:i:" bpp; seen_bpp=1; next }
+  /^camerastoredirect:s:/ { print "camerastoredirect:s:" camera_value; seen_camera=1; next }
+  { print }
+  END {
+    if (!seen_screen) print "screen mode id:i:1";
+    if (!seen_smart) print "smart sizing:i:0";
+    if (!seen_bpp) print "session bpp:i:" bpp;
+    if (!seen_camera) print "camerastoredirect:s:" camera_value;
+  }
+' "$RDP_FILE" > "$TMP"
+
+echo "Launching BBE RDP: ${SIZE}, ${BPP}-bit, network=${NETWORK}, camera=$([[ "$CAMERA" == "1" ]] && echo on || echo off)"
+
+exec xfreerdp3 "$TMP" \
+  /size:"$SIZE" \
+  +dynamic-resolution \
+  +decorations \
+  /gfx:AVC420:on,AVC444:off,progressive:off \
+  /network:"$NETWORK" \
+  /bpp:"$BPP" \
+  /audio-mode:none \
+  -wallpaper \
+  -themes \
+  -menu-anims \
+  "$CLIPBOARD" \
+  /cert:tofu
