@@ -93,3 +93,17 @@ The private `arch-gaming-optimization` repo contains the full root-helper deploy
 ```bash
 paru -S icaclient zoom lmstudio-bin
 ```
+
+## Windows Terminal
+
+Windows Terminal ricing is saved at:
+
+```text
+windows/windows-terminal/settings.json
+```
+
+Restore on Windows:
+
+```powershell
+Copy-Item .\windows\windows-terminal\settings.json "$env:LOCALAPPDATA\Packages\Microsoft.WindowsTerminal_8wekyb3d8bbwe\LocalState\settings.json" -Force
+```
