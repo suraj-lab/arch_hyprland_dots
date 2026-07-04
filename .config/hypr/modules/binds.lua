@@ -67,6 +67,11 @@ hl.bind(mainMod .. " + SHIFT + P", hl.dsp.window.pseudo())
 hl.bind("CTRL + ALT + L", hl.dsp.exec_cmd("hyprlock"))
 hl.bind(mainMod .. " + SHIFT + W", hl.dsp.exec_cmd("qs msg wallpicker toggle"))
 
+-- Gaming Mode: switch to Steam Big Picture in Gamescope (Deck Mode).
+-- Return with Super+Shift+R inside Gaming Mode (evdev monitor) or
+-- Steam > Power > Exit to Desktop.
+hl.bind(mainMod .. " + SHIFT + S", hl.dsp.exec_cmd("/usr/local/bin/switch-to-gaming"))
+
 -- Move focus (mainMod) / move window (mainMod + SHIFT) with arrow keys
 for key, dir in pairs({ left = "l", right = "r", up = "u", down = "d" }) do
 	hl.bind(mainMod .. " + " .. key, hl.dsp.focus({ direction = dir }))

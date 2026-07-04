@@ -18,6 +18,21 @@ makepkg -si
 
 ### Dependencies
 
+The package manifests are now split for reinstall/ISO work:
+
+```bash
+grep -hvE '^\s*(#|$)' packages/desktop-core.txt | paru -S --needed -
+grep -hvE '^\s*(#|$)' packages/gaming-mode.txt | paru -S --needed -
+```
+
+For the full SteamOS-style Gaming Mode bootstrap:
+
+```bash
+./scripts/install-gaming-mode.sh
+```
+
+Legacy one-shot package list, kept as a rough reference:
+
 ```bash
 paru -S hyprland hyprlock polkit-kde-agent viewnior       \
 pavucontrol thunar thunar-archive-plugin wl-clipboard              \
@@ -62,13 +77,16 @@ remmina freerdp imagemagick
 
 ### Gaming on Arch
 
+Validated Gaming Mode / Deck Mode details are in `docs/gaming-mode.md`.
+
+Quick package restore:
+
 ```bash
 paru -R amdvlk lib32-amdvlk
-paru -S vulkan-radeon lib32-vulkan-radeon
-paru -S steam gamemode lib32-gamemode webcord mangohud            \
-lib32-mangohud goverlay lutris proton-ge-custom-bin               \
-protontricks protonup-qt steamtinkerlaunch cemu rpcs3-appimage
+grep -hvE '^\s*(#|$)' packages/gaming-mode.txt | paru -S --needed -
 ```
+
+The private `arch-gaming-optimization` repo contains the full root-helper deployment, verifier, troubleshooting notes, and hardware-specific scripts.
 
 ### Work related
 

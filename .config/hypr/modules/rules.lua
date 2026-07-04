@@ -1,3 +1,10 @@
+-- Gaming: immediate (tearing-capable) page flips for games.
+-- general:allow_tearing is on; tearing only activates for windows with the
+-- `immediate` rule, so the desktop is unaffected.
+for _, class in ipairs({ "^steam_app_.*", "^gamescope$" }) do
+	hl.window_rule({ match = { class = class }, immediate = true })
+end
+
 -- Spotify window rules
 hl.window_rule({ match = { class = "Spotify" }, workspace = "special:spotify silent" })
 hl.window_rule({ match = { class = "Spotify" }, float = true })

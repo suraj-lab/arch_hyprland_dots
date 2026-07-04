@@ -11,4 +11,7 @@ hl.on("hyprland.start", function()
 	hl.exec_cmd("wl-clipboard-history -t")
 	hl.exec_cmd("wlsunset -S 9:00 -s 19:30")
 	hl.exec_cmd("mozillavpn activate")
+	-- Deck Mode: remove transient SDDM autologin + recover portals/pipewire
+	-- when returning from Gaming Mode (no-op on normal logins).
+	hl.exec_cmd("/usr/local/bin/gaming-desktop-restore")
 end)

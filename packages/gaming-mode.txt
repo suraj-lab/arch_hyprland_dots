@@ -1,0 +1,25 @@
+# Validated Gaming Mode / Deck Mode packages for Suraj's Arch/CachyOS desktop.
+# Install with: paru -S --needed - < packages/gaming-mode.txt
+# Notes:
+# - Uses CachyOS gamescope-session backend, not ChimeraOS AUR -git packages.
+# - jupiter-hw-support provides SteamOS helper commands expected by the session.
+# - python-evdev is required for the Super+Shift+R evdev exit monitor.
+# - udisks2 is expected by SteamOS-style session helpers.
+
+gamescope
+gamescope-session-cachyos
+jupiter-hw-support
+python-evdev
+udisks2
+proton-cachyos-slr
+steam
+gamemode
+lib32-gamemode
+mangohud
+lib32-mangohud
+goverlay
+lutris
+protontricks
+protonup-qt
+vulkan-radeon
+lib32-vulkan-radeon

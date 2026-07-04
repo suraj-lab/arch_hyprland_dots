@@ -54,4 +54,10 @@ hl.config({
 		enable_swallow = true,
 		swallow_regex = "^(ghostty)$",
 	},
+
+	render = {
+		-- 2 = auto: direct scanout only for fullscreen game-type content.
+		-- Bypasses compositing for games (lower latency) without affecting desktop.
+		direct_scanout = 2,
+	},
 })
