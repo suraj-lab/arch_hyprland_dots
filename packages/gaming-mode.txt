@@ -21,3 +21,7 @@ goverlay
 lutris
 protontricks
 protonup-qt
+
+# Gaming apps in daily use
+cemu
+steamtinkerlaunch

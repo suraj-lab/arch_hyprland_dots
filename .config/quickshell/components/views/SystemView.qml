@@ -224,7 +224,7 @@ Item {
             netConnectProc.command = ["nmcli", "dev", "wifi", "connect", ssid]
             netConnectProc.running = true
         } else {
-            Hyprland.dispatch("exec [float;size 40% 30%;center] kitty -e nmcli dev wifi connect '" + ssid + "' --ask")
+            Hyprland.dispatch("exec [float;size 40% 30%;center] ghostty -e nmcli dev wifi connect '" + ssid + "' --ask")
         }
     }
 

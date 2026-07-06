@@ -18,7 +18,6 @@ php
 qmk
 
 # Terminals/system monitoring
-kitty
 ghostty
 btop
 htop
@@ -28,13 +27,11 @@ fastfetch
 
 # Browsers/comms/media/productivity
 firefox
-brave-bin
 webcord
 spotify-launcher
 vlc
 obs-studio
 libreoffice-fresh-uk
-localsend-bin
 zoom
 icaclient
 vscodium-bin
@@ -82,3 +79,5 @@ acpica
 dmg2img
 hfsprogs
 uefitool
+deluge
+deluge-gtk
