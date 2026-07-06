@@ -99,14 +99,13 @@ Backup one-shot package list, generated from `packages/desktop-core.txt` — run
 paru -S --needed base-devel git paru hyprland hyprlock quickshell-git qt6-5compat \
 qt5-wayland qt6-wayland polkit-kde-agent sddm \
 sddm-theme-tokyo-night-git ghostty starship firefox thunar \
-thunar-archive-plugin pavucontrol wl-clipboard cliphist \
-wl-clipboard-history playerctl wlsunset awww matugen-bin grim slurp \
-grimblast-git hyprpicker imagemagick pipewire pipewire-alsa \
-pipewire-jack pipewire-pulse wireplumber gst-plugin-pipewire \
-xdg-desktop-portal-hyprland networkmanager btop fastfetch nwg-look \
-nwg-displays nordic-theme papirus-icon-theme noto-fonts \
-noto-fonts-emoji ttf-jetbrains-mono-nerd \
-ttf-nerd-fonts-symbols-common
+thunar-archive-plugin pavucontrol wl-clipboard cliphist playerctl \
+wlsunset awww matugen-bin grim slurp grimblast-git hyprpicker \
+imagemagick pipewire pipewire-alsa pipewire-jack pipewire-pulse \
+wireplumber gst-plugin-pipewire xdg-desktop-portal-hyprland \
+networkmanager btop fastfetch nwg-look nwg-displays nordic-theme \
+papirus-icon-theme noto-fonts noto-fonts-emoji \
+ttf-jetbrains-mono-nerd ttf-nerd-fonts-symbols-common
 ```
 <!-- pkglist:end -->
 

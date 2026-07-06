@@ -21,7 +21,6 @@ thunar-archive-plugin
 pavucontrol
 wl-clipboard
 cliphist
-wl-clipboard-history
 playerctl
 wlsunset
 awww

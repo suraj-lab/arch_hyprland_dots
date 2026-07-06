@@ -364,8 +364,20 @@ ensure_paru() {
 }
 
 install_packages() {
-  local files=("$@") pkgs=()
+  local files=("$@") pkgs=() missing=() keep=() p m
   mapfile -t pkgs < <(pkg_lines "${files[@]}")
+  (( ${#pkgs[@]} )) || return 0
+  # Skip packages that no longer exist anywhere (repo/AUR rot) instead of
+  # letting one dead entry abort the whole bootstrap.
+  mapfile -t missing < <(as_user "$AUR_HELPER" -Si "${pkgs[@]}" 2>&1 >/dev/null | sed -n "s/.*package '\([^']*\)' was not found.*/\1/p" | sort -u)
+  if (( ${#missing[@]} )); then
+    warn "Unavailable packages skipped (fix the manifest): ${missing[*]}"
+    for p in "${pkgs[@]}"; do
+      for m in "${missing[@]}"; do [[ "$p" == "$m" ]] && continue 2; done
+      keep+=("$p")
+    done
+    pkgs=("${keep[@]}")
+  fi
   (( ${#pkgs[@]} )) || return 0
   say "Installing ${#pkgs[@]} packages via $AUR_HELPER"
   as_user "$AUR_HELPER" -S --needed "${PARU_CONFIRM[@]}" "${pkgs[@]}"
