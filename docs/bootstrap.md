@@ -10,8 +10,12 @@ Default profile: desktop-core + daily apps + Gaming Mode + Flatpaks + dotfiles +
 2. Run `archinstall` pre-seeded from this repo — it asks only for **disk** and **user/passwords**, everything else is pre-answered:
 
    ```bash
-   archinstall --config-url https://raw.githubusercontent.com/suraj-lab/arch_hyprland_dots/master/deploy/archinstall.json
+   archinstall --config-url https://da.gd/surajarch
    ```
+
+   (`https://da.gd/surajarch` is a permanent redirect to
+   `https://raw.githubusercontent.com/suraj-lab/arch_hyprland_dots/master/deploy/archinstall.json` —
+   use the long form if the shortener is ever unreachable.)
 
    For the disk menu: choose *best-effort default layout* → your target disk → **btrfs** → default subvolume structure → compression. Passwords are never stored in the repo by design.
 

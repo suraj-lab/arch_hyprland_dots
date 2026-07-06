@@ -25,8 +25,10 @@ Virtualization/passthrough tools are opt-in via `--virt`; laptop extras via `--l
 From the Arch ISO, pre-seed archinstall (only disk + passwords asked):
 
 ```bash
-archinstall --config-url https://raw.githubusercontent.com/suraj-lab/arch_hyprland_dots/master/deploy/archinstall.json
+archinstall --config-url https://da.gd/surajarch
 ```
+
+(Permanent short link to `deploy/archinstall.json` on master; long form: `https://raw.githubusercontent.com/suraj-lab/arch_hyprland_dots/master/deploy/archinstall.json`.)
 
 Then after first login:
 
