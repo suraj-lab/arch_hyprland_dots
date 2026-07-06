@@ -1,0 +1,43 @@
+#!/bin/bash
+# libvirt VM lifecycle hook
+#
+# 1. Dynamic CPU isolation for the Work VM — replaces the static
+#    isolcpus=0-7,16-23 kernel parameter. While the Work VM runs, host
+#    processes are restricted to CPUs 8-15,24-31 so the VM has near-exclusive
+#    use of its pinned cores (0-7,16-23 per Work.xml vcpupin). Restored to all
+#    CPUs on release, so host gaming gets the full 32 threads when the VM is
+#    off. (--runtime: settings do not persist across reboot, so a crash while
+#    the VM runs is self-healing on reboot.)
+#
+# 2. Frees hugepages when the Work VM releases (Windows shutdown, virsh
+#    shutdown, crash, force-off — any path that fully stops the VM).
+#
+# Args: $1=vm_name $2=operation $3=sub-op $4=extra
+# Operations: prepare | start | started | stopped | release | reconnect | migrate
+
+VM_NAME="$1"
+OPERATION="$2"
+
+HOST_CPUS_DURING_VM="8-15,24-31"
+ALL_CPUS="0-31"
+SLICES="init.scope system.slice user.slice"
+
+if [ "$VM_NAME" = "Work" ]; then
+    case "$OPERATION" in
+        prepare)
+            for slice in $SLICES; do
+                systemctl set-property --runtime "$slice" "AllowedCPUs=$HOST_CPUS_DURING_VM"
+            done
+            logger -t libvirt-hook "Work VM prepare: host restricted to CPUs $HOST_CPUS_DURING_VM"
+            ;;
+        release)
+            for slice in $SLICES; do
+                systemctl set-property --runtime "$slice" "AllowedCPUs=$ALL_CPUS"
+            done
+            echo 0 > /proc/sys/vm/nr_hugepages
+            logger -t libvirt-hook "Work VM release: host CPUs restored to $ALL_CPUS; freed hugepages"
+            ;;
+    esac
+fi
+
+exit 0

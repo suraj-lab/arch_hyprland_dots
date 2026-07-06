@@ -1,0 +1,110 @@
+#!/bin/bash
+# switch-to-gaming — Hyprland -> Gaming Mode (Super+Shift+S)
+set -u
+
+if [[ ! -x /usr/bin/start-gamescope-session ]]; then
+    notify-send -u critical -t 5000 "Gaming Mode" \
+        "start-gamescope-session not found (install gamescope-session-cachyos)" 2>/dev/null || true
+    exit 1
+fi
+
+notify() {
+    notify-send "$@" 2>/dev/null || true
+}
+
+steam_any_running() {
+    pgrep -u "$(id -u)" -x steam >/dev/null 2>&1 || \
+    pgrep -u "$(id -u)" -x steamwebhelper >/dev/null 2>&1 || \
+    pgrep -u "$(id -u)" -f '/Steam/ubuntu12_32/steam' >/dev/null 2>&1
+}
+
+steam_update_running() {
+    pgrep -u "$(id -u)" -f -- '-child-update-ui' >/dev/null 2>&1
+}
+
+steam_preflight() {
+    [[ "${GAMING_STEAM_PREFLIGHT:-1}" == "0" ]] && return 0
+
+    local timeout_s="${GAMING_STEAM_PREFLIGHT_TIMEOUT:-900}"
+    local start now last_notice=0
+    start=$(date +%s)
+
+    notify -t 3000 "Gaming Mode" "Preparing Steam on the desktop first..."
+
+    if ! steam_any_running; then
+        steam >/dev/null 2>&1 &
+        sleep 5
+    fi
+
+    # Steam regularly validates/extracts/updates at launch. Do that while the
+    # desktop is still visible instead of after SDDM has switched to the
+    # SteamOS-style gamescope session, where it looks like a black screen.
+    while steam_update_running; do
+        now=$(date +%s)
+        if (( now - start > timeout_s )); then
+            notify -u critical -t 8000 "Gaming Mode" \
+                "Steam is still updating/validating. Leaving you on the desktop; try Gaming Mode again after Steam finishes."
+            return 1
+        fi
+        if (( now - last_notice >= 30 )); then
+            notify -t 4000 "Gaming Mode" "Steam is updating/validating; waiting before switching..."
+            last_notice=$now
+        fi
+        sleep 5
+    done
+
+    # Let desktop Steam settle, then shut it down cleanly so the gamescope
+    # session owns the next Steam launch. Do not hard-kill here; a hard kill is
+    # what causes the next launch to schedule another immediate update check.
+    sleep 3
+    timeout 30 steam -shutdown >/dev/null 2>&1 || true
+
+    start=$(date +%s)
+    while steam_any_running; do
+        now=$(date +%s)
+        if (( now - start > 60 )); then
+            notify -u critical -t 8000 "Gaming Mode" \
+                "Steam did not exit cleanly. Leaving you on the desktop; exit Steam manually and try again."
+            return 1
+        fi
+        sleep 2
+    done
+}
+
+notify -t 2000 "Gaming Mode" "Preparing Steam Big Picture..."
+steam_preflight || exit 1
+
+# Kill leftovers from any previous gaming session. This runs only after Steam
+# update/bootstrap has completed or timed out visibly on the desktop.
+pkill -9 gamescope 2>/dev/null || true
+pkill -9 -f gamescope-session 2>/dev/null || true
+sleep 0.5
+
+# Multi-monitor handling (ported from deckshift v0.1.11).
+# With an auxiliary monitor attached, gamescope can land on the wrong screen
+# or die fatally — observed here 2026-07-03/04 as "drm: flip error: Invalid
+# argument" + SIGABRT ~8s in, alongside kernel "Failed to setup vendor
+# infoframe on connector HDMI-A-1: -22" (EINVAL). Disable the listed
+# connector(s) via hyprctl while Hyprland is still alive so gamescope takes
+# over a KMS state where only the gaming display is lit. Runtime-only: the
+# fresh Hyprland on return reads its static config and re-enables them.
+# Configure via OUTPUT_CONNECTOR_TO_DISABLE in 99-gaming-session.conf
+# (single connector or comma list).
+ENV_CONF="$HOME/.config/environment.d/99-gaming-session.conf"
+if [[ -f "$ENV_CONF" ]]; then
+    TO_DISABLE=$(awk -F= '$1=="OUTPUT_CONNECTOR_TO_DISABLE" { sub(/^[^=]*=/,""); v=$0 } END { print v }' "$ENV_CONF")
+    if [[ -n "${TO_DISABLE:-}" ]]; then
+        IFS=',' read -ra DISABLE_LIST <<< "$TO_DISABLE"
+        for conn in "${DISABLE_LIST[@]}"; do
+            conn="${conn// /}"
+            [[ -z "$conn" ]] && continue
+            hyprctl keyword monitor "${conn},disable" 2>/dev/null || true
+        done
+        sleep 0.5
+    fi
+fi
+
+sudo -n /usr/local/bin/gaming-session-switch gaming || {
+    notify-send -u critical -t 5000 "Gaming Mode" "Session switch failed (check sudoers)" 2>/dev/null || true
+    exit 1
+}

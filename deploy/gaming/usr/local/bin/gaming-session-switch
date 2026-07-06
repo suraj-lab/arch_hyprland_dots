@@ -1,0 +1,186 @@
+#!/bin/bash
+# gaming-session-switch — root helper for Deck Mode session switching.
+# The ONLY entry in sudoers; all privileged switching goes through here.
+# Adapted from 28allday/deckshift (gaming-session-switch + sudoers design),
+# with two changes:
+#   - SDDM restart uses --no-block so the job is queued in PID 1 before the
+#     calling session (and this process) is torn down — atomic restart.
+#   - "cleanup" removes the autologin config entirely: unlike Omarchy, this
+#     system uses a manual SDDM login, so autologin exists only transiently
+#     during a switch. A boot-cleanup system unit removes stale autologin if
+#     the machine is rebooted mid-gaming; SteamOS-style suspend/resume still
+#     works inside the live Gaming Mode session.
+#
+# usage: gaming-session-switch gaming|desktop|cleanup
+set -u
+
+CONF="/etc/sddm.conf.d/zz-gaming-session.conf"
+# Written by CachyOS's steam-set-session (pkexec, e.g. Steam's own "Switch to
+# Desktop" button). Sorts AFTER our conf alphabetically so its Session= would
+# override ours — and it points at plasma.desktop, which doesn't exist here.
+# Remove it on every operation. (cachyos-gamescope-autologin.service, which
+# rewrites it on each desktop login, is masked user-side.)
+STEAMOS_CONF="/etc/sddm.conf.d/zz-steamos-autologin.conf"
+GAMING_SESSION="gamescope-gaming"
+DESKTOP_SESSION="hyprland"
+LOGIN_USER="suraj"
+SLEEP_TARGETS="sleep.target suspend.target hibernate.target hybrid-sleep.target"
+
+# Aux monitor DRM-level force-off (2026-07-04 root cause): gamescope drives
+# ALL connected connectors on its GPU; amdgpu DC validation rejects the
+# combined dual-CRTC state once the AW3423DWF runs above 60 Hz alongside the
+# 1080p ViewSonic (drm_atomic_helper_check_planes -22 → gamescope fatal flip
+# abort). hyprctl disable does NOT survive the SDDM restart; forcing the
+# connector status at the DRM level does. Resolved via PCI address because
+# card numbering is volatile across boots.
+GAMING_GPU_PCI="0000:03:00.0"   # RX 9070 XT
+AUX_CONNECTOR="HDMI-A-1"        # ViewSonic VX2476 input on that GPU
+
+aux_status_path() {
+    local p
+    for p in /sys/bus/pci/devices/$GAMING_GPU_PCI/drm/card*/card*-"$AUX_CONNECTOR"/status; do
+        [[ -e "$p" ]] && { echo "$p"; return 0; }
+    done
+    return 1
+}
+
+aux_connector() {  # $1 = off|detect
+    local p
+    if p=$(aux_status_path); then
+        echo "$1" > "$p" 2>/dev/null \
+            && logger -t gaming-session-switch "aux connector $AUX_CONNECTOR forced $1" \
+            || logger -t gaming-session-switch "WARNING: failed to force $AUX_CONNECTOR $1"
+    else
+        logger -t gaming-session-switch "WARNING: $AUX_CONNECTOR not found under $GAMING_GPU_PCI"
+    fi
+}
+
+# Reap the gaming session's process tree defensively so SDDM's stop job never
+# hangs for its full timeout. CachyOS's gamescope-session.target normally does
+# this, but keeping the helper hardens fallback paths and preserves the fix
+# from the ChimeraOS detour.
+reap_gaming_procs() {
+    # First ask the CachyOS user units to stop cleanly. Otherwise
+    # steam-launcher.service can immediately respawn Steam while the root
+    # helper is trying to tear the session down, which leaves Steam marked as
+    # uncleanly shut down and can make the next launch disappear into the
+    # Steam client updater before Gamepad UI draws.
+    local uid
+    uid="$(id -u "$LOGIN_USER" 2>/dev/null || true)"
+    if [[ -n "$uid" && -d "/run/user/$uid" ]]; then
+        runuser -u "$LOGIN_USER" -- env XDG_RUNTIME_DIR="/run/user/$uid" \
+            systemctl --user stop steam-launcher.service gamescope-session.target gamescope-session.service 2>/dev/null || true
+    fi
+
+    pkill -TERM -x gamescope 2>/dev/null || true
+    pkill -TERM -f gamescope-session-plus 2>/dev/null || true
+    pkill -TERM -x steam 2>/dev/null || true
+    pkill -TERM -x steamwebhelper 2>/dev/null || true
+    local i
+    for i in $(seq 1 20); do
+        pgrep -x gamescope >/dev/null 2>&1 || pgrep -x steam >/dev/null 2>&1 || break
+        sleep 0.5
+    done
+    pkill -KILL -x gamescope 2>/dev/null || true
+    pkill -KILL -f gamescope-session-plus 2>/dev/null || true
+    pkill -KILL -x steam 2>/dev/null || true
+    pkill -KILL -x steamwebhelper 2>/dev/null || true
+    pkill -KILL -x reaper 2>/dev/null || true
+}
+
+# SDDM remembers the last session per user; after Gaming Mode that default
+# is gamescope-gaming, so the next MANUAL login (post boot-cleanup) lands in
+# Gaming Mode by surprise (observed 2026-07-04 09:08). Reset it.
+reset_sddm_last_session() {
+    local state="/var/lib/sddm/state.conf"
+    [[ -f "$state" ]] && sed -i "s|^Session=.*|Session=/usr/share/wayland-sessions/${DESKTOP_SESSION}.desktop|" "$state" 2>/dev/null || true
+}
+
+write_conf() {
+    printf '[Autologin]\nUser=%s\nSession=%s\nRelogin=false\n' "$LOGIN_USER" "$1" > "$CONF"
+}
+
+case "${1:-}" in
+    gaming)
+        # Prevent suspend while the monitor briefly disconnects mid-switch
+        systemctl mask --runtime $SLEEP_TARGETS 2>/dev/null || true
+        rm -f "$STEAMOS_CONF"
+        write_conf "$GAMING_SESSION"
+        # Single-display Gaming Mode: force the aux connector off at the DRM
+        # level so gamescope only ever sees the AW3423DWF.
+        aux_connector off
+        logger -t gaming-session-switch "switching to Gaming Mode ($GAMING_SESSION)"
+        systemctl restart sddm --no-block
+        ;;
+    desktop)
+        systemctl unmask --runtime $SLEEP_TARGETS 2>/dev/null || true
+        rm -f "$STEAMOS_CONF"
+        write_conf "$DESKTOP_SESSION"
+        reset_sddm_last_session
+        logger -t gaming-session-switch "switching to Desktop Mode ($DESKTOP_SESSION)"
+        # Ordered teardown (upstream Super-Shift-S parity, extended for the
+        # ChimeraOS foreground backend): reap gamescope AND Steam's process
+        # tree so (a) DRM is released before the greeter/Hyprland modeset,
+        # (b) SDDM's stop job doesn't wait ~90s on Steam children.
+        reap_gaming_procs
+        # Restore the aux connector before the new session starts so
+        # Hyprland re-lights the ViewSonic from its static config.
+        aux_connector detect
+        systemctl restart sddm --no-block
+        ;;
+    cleanup)
+        systemctl unmask --runtime $SLEEP_TARGETS 2>/dev/null || true
+        rm -f "$CONF" "$STEAMOS_CONF"
+        aux_connector detect
+        reset_sddm_last_session
+        logger -t gaming-session-switch "cleanup: autologin config removed"
+        ;;
+    gaming-ready)
+        # Called by the wrapper once the gaming session is up: the switch-time
+        # suspend mask is no longer needed, and leaving it in place would break
+        # Steam's Power > Suspend for the whole gaming session.
+        systemctl unmask --runtime $SLEEP_TARGETS 2>/dev/null || true
+        logger -t gaming-session-switch "gaming session ready: sleep targets unmasked"
+        ;;
+    chvt)
+        # Activate a session's VT. Needed because SDDM, restarted while the old
+        # session is still tearing down, can place the new autologin session on
+        # an inactive VT (greeter X grabs the active one) — logind then never
+        # grants gamescope DRM master and the screens stay black.
+        n="${2:-}"
+        if [[ "$n" =~ ^[0-9]+$ ]] && (( n >= 1 && n <= 12 )); then
+            logger -t gaming-session-switch "activating VT $n"
+            exec /usr/bin/chvt "$n"
+        fi
+        echo "usage: gaming-session-switch chvt <1-12>" >&2
+        exit 1
+        ;;
+    ensure-vt)
+        # Win the VT race deterministically. A one-shot chvt can LOSE to
+        # SDDM's greeter X server ("-background none" on its own vtN): X
+        # activates its VT when it finishes starting, often in the same
+        # second as the session's chvt (observed 2026-07-03: gaming session
+        # on VT 3 chvt'd fine, greeter X then activated VT 2 → black screens
+        # while gamescope + input kept running). Re-assert for ~15s so the
+        # last writer is always us; no-op seconds once the VT sticks.
+        n="${2:-}"
+        if ! [[ "$n" =~ ^[0-9]+$ ]] || (( n < 1 || n > 12 )); then
+            echo "usage: gaming-session-switch ensure-vt <1-12>" >&2
+            exit 1
+        fi
+        logger -t gaming-session-switch "ensure-vt $n: monitoring"
+        for _ in $(seq 1 15); do
+            active="$(fgconsole 2>/dev/null || echo 0)"
+            if [[ "$active" != "$n" ]]; then
+                /usr/bin/chvt "$n" 2>/dev/null || true
+            fi
+            sleep 1
+        done
+        logger -t gaming-session-switch "ensure-vt $n: done (active=$(fgconsole 2>/dev/null || echo '?'))"
+        ;;
+    *)
+        echo "usage: gaming-session-switch gaming|desktop|cleanup" >&2
+        exit 1
+        ;;
+esac
+exit 0

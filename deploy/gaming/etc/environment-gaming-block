@@ -1,0 +1,8 @@
+# --- arch-gaming-optimization (Tier 1.4) ---
+# /etc/environment is read by pam_env for every session (incl. SDDM->Hyprland),
+# unlike environment.d which only reaches systemd user services.
+# 12 GB Mesa shader cache: eliminates recompilation stutter across game updates.
+# (RADV_PERFTEST=gpl and DXVK_STATE_CACHE from the original plan are omitted:
+#  both are defaults / no-ops on Mesa 26 and DXVK 2.x.)
+MESA_SHADER_CACHE_MAX_SIZE=12G
+# --- end arch-gaming-optimization ---

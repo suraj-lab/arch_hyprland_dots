@@ -1,0 +1,82 @@
+#!/bin/bash
+# gamescope-session-wrapper — entry point for the Gaming Mode SDDM session.
+#
+# Wraps CachyOS's SteamOS-style session (/usr/bin/start-gamescope-session,
+# which runs gamescope-session.target under the systemd user manager) and
+# adds what it lacks for our desktop workflow:
+#   - /tmp/.gaming-session-active marker (switch scripts key off it)
+#   - the Super+Shift+R evdev keybind monitor
+#   - crash/exit fallback: if the session ends without an explicit switch
+#     (including Steam's own "Switch to Desktop", which just stops
+#     gamescope-session.target), return to Hyprland instead of leaving SDDM
+#     with a stale autologin.
+#
+# v3 (2026-07-04): restored CachyOS backend after the ChimeraOS detour —
+# the fatal flip crashes were dual-CRTC DC validation failures, fixed at the
+# DRM level by gaming-session-switch v3 (aux connector force-off), which is
+# session-stack-agnostic. CachyOS stack chosen for: repo binary updates,
+# native process reaping via gamescope-session.target, hardwired HDR/VRR
+# support (wanted), environment.d integration. See PROJECT.md decision log.
+#
+# GPU/output selection: ~/.config/environment.d/*.conf is honored because the
+# real session runs as systemd user services (MESA_VK_DEVICE_SELECT,
+# OUTPUT_CONNECTOR — see 99-gaming-session.conf).
+set -u
+
+log() { logger -t gamescope-session-wrapper "$1"; }
+
+log "Gaming Mode session starting"
+echo "gamescope" > /tmp/.gaming-session-active
+
+# CRITICAL: scrub stale compositor variables from the systemd user manager.
+# Hyprland's autostart imports WAYLAND_DISPLAY/DISPLAY into the user manager;
+# they outlive the Hyprland session, and gamescope-session.service inherits
+# them — making gamescope try to run NESTED against a dead wayland socket
+# ("Failed to connect to wayland socket: wayland-1") instead of taking over
+# the display. start-gamescope-session does not scrub these (CachyOS
+# handhelds boot straight into gamescope, so it never sees a dirty manager).
+systemctl --user unset-environment WAYLAND_DISPLAY DISPLAY HYPRLAND_INSTANCE_SIGNATURE 2>/dev/null || true
+unset WAYLAND_DISPLAY DISPLAY HYPRLAND_INSTANCE_SIGNATURE
+
+# CRITICAL: activate OUR VT — and keep re-asserting it. SDDM's greeter X
+# server activates ITS OWN VT when it finishes starting, racing a one-shot
+# chvt within the same second (2026-07-03: chvt 3 succeeded, greeter then
+# activated VT 2 → black screens, gamescope + input running underneath).
+# ensure-vt re-asserts for ~15s so we always win; backgrounded so session
+# startup is not delayed.
+if [[ -n "${XDG_VTNR:-}" ]]; then
+    sudo -n /usr/local/bin/gaming-session-switch chvt "$XDG_VTNR" 2>/dev/null || true
+    ( sudo -n /usr/local/bin/gaming-session-switch ensure-vt "$XDG_VTNR" ) &
+    log "ensure-vt $XDG_VTNR running in background"
+else
+    log "WARNING: XDG_VTNR not set — cannot ensure VT is active"
+fi
+
+# Re-enable suspend once the switch flicker window is over, so Steam's
+# Power > Suspend works inside Gaming Mode (the switch masks sleep targets
+# to avoid suspending while outputs briefly disconnect).
+( sleep 20; sudo -n /usr/local/bin/gaming-session-switch gaming-ready ) &
+
+# --- Super+Shift+R keybind monitor (Hyprland binds don't exist in gamescope) ---
+keybind_ok=true
+python3 -c "import evdev" 2>/dev/null || { log "WARNING: python-evdev missing"; keybind_ok=false; }
+groups | grep -qw input || { log "WARNING: user not in input group"; keybind_ok=false; }
+if $keybind_ok; then
+    /usr/local/bin/gaming-keybind-monitor &
+    log "keybind monitor started (Super+Shift+R to exit)"
+else
+    log "keybind monitor NOT started — use Steam > Power > Switch to Desktop"
+fi
+
+# Blocks until gamescope-session.target fully stops
+/usr/bin/start-gamescope-session
+rc=$?
+log "start-gamescope-session exited (rc=$rc)"
+
+# Fallback: if still marked active, no switch script ran — return to desktop.
+if [[ -f /tmp/.gaming-session-active ]]; then
+    log "session ended without explicit switch — falling back to desktop"
+    /usr/local/bin/switch-to-desktop
+fi
+
+exit $rc

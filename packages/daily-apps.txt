@@ -1,0 +1,84 @@
+# Daily applications and quality-of-life tools for Suraj's workstation.
+# Keep desktop compositor/session basics in desktop-core.txt and Gaming Mode in gaming-mode.txt.
+
+# Shell/editor/dev basics
+zsh
+neovim
+vim
+github-cli
+fd
+tree
+wget
+dos2unix
+man-db
+python-pip
+python-psutil
+go
+php
+qmk
+
+# Terminals/system monitoring
+kitty
+ghostty
+btop
+htop
+nvtop
+dysk
+fastfetch
+
+# Browsers/comms/media/productivity
+firefox
+brave-bin
+webcord
+spotify-launcher
+vlc
+obs-studio
+libreoffice-fresh-uk
+localsend-bin
+zoom
+icaclient
+vscodium-bin
+lmstudio-bin
+
+# Files, disks, network, printers/scanners
+file-roller
+gnome-disk-utility
+thunar
+thunar-archive-plugin
+tumbler
+gvfs
+gvfs-afc
+gvfs-gphoto2
+gvfs-mtp
+ntfs-3g
+udiskie
+simple-scan
+sane
+cups
+hplip
+gufw
+wireshark-qt
+freerdp
+tigervnc
+samba
+
+# Hardware/RGB/fans and machine utilities
+fwupd
+smartmontools
+dmidecode
+ddcutil
+openrgb
+lact
+fancontrol-gui
+lianli-linux-git
+android-tools
+usbmuxd
+
+# Archives/images/Hackintosh-adjacent utilities used often enough to keep handy
+7zip
+imagemagick
+testdisk
+acpica
+dmg2img
+hfsprogs
+uefitool

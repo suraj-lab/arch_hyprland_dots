@@ -1,0 +1,4 @@
+# Laptop extras (opt-in via --laptop or the interactive menu).
+# hypridle deliberately omitted: no hypridle config exists in these dotfiles yet.
+power-profiles-daemon
+brightnessctl

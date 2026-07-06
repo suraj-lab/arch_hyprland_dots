@@ -1,0 +1,10 @@
+[Unit]
+Description=Randomize SDDM theme before display manager
+Before=display-manager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/sddm-rotate-theme
+
+[Install]
+WantedBy=display-manager.service

@@ -1,0 +1,3 @@
+# AMD GPU drivers (Vulkan for Steam/gamescope; mesa comes as a dependency).
+vulkan-radeon
+lib32-vulkan-radeon

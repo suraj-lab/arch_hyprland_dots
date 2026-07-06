@@ -1,0 +1,4 @@
+# Intel GPU drivers.
+vulkan-intel
+lib32-vulkan-intel
+intel-media-driver

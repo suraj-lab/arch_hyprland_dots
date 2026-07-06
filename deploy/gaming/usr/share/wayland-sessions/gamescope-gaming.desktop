@@ -1,0 +1,5 @@
+[Desktop Entry]
+Name=Gaming Mode (Gamescope)
+Comment=Steam Big Picture inside Gamescope (Deck Mode)
+Exec=/usr/local/bin/gamescope-session-wrapper
+Type=Application

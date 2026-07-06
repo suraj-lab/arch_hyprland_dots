@@ -1,0 +1,17 @@
+# Local VM / passthrough workstation stack.
+qemu-full
+virt-manager
+virt-viewer
+vde2
+nftables
+dnsmasq
+bridge-utils
+edk2-ovmf
+edk2-shell
+swtpm
+dmidecode
+iptables
+libldm
+looking-glass
+looking-glass-module-dkms
+gpu-passthrough-manager

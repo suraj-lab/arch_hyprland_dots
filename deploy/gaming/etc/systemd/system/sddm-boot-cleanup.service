@@ -1,0 +1,14 @@
+[Unit]
+Description=Remove stale gaming session autologin on boot
+DefaultDependencies=no
+Before=sddm.service display-manager.service
+Conflicts=shutdown.target
+ConditionFileNotEmpty=/etc/sddm.conf.d/zz-gaming-session.conf
+
+[Service]
+Type=oneshot
+ExecStart=-/usr/local/bin/gaming-session-switch cleanup
+RemainAfterExit=yes
+
+[Install]
+WantedBy=sysinit.target

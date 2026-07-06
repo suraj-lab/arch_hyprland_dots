@@ -1,0 +1,24 @@
+#!/bin/bash
+# switch-to-desktop — Gaming Mode -> Hyprland (Super+Shift+R, Steam "Exit to
+# Desktop", or crash-fallback from the session wrapper).
+set -u
+
+# Guard: only meaningful inside an active gaming session
+[[ -f /tmp/.gaming-session-active ]] || exit 0
+rm -f /tmp/.gaming-session-active
+
+# Marker for gaming-desktop-restore (portal/pipewire recovery on Hyprland start)
+touch /tmp/.returned-from-gaming 2>/dev/null || true
+
+# Graceful Steam shutdown, then the root helper flips SDDM back to Hyprland.
+# Be deliberately patient here: killing Steam while it is self-updating leaves
+# it marked as "didn't shutdown cleanly", and the next Gaming Mode launch can
+# sit on a black screen while the Steam client updater runs before Gamepad UI
+# ever draws. Stop the CachyOS Steam unit first so systemd does not immediately
+# respawn it, then ask Steam to shutdown, then stop the target as a fallback.
+systemctl --user stop steam-launcher.service 2>/dev/null || true
+timeout 20 steam -shutdown 2>/dev/null || true
+systemctl --user stop gamescope-session.target gamescope-session.service 2>/dev/null || true
+sleep 1
+
+sudo -n /usr/local/bin/gaming-session-switch desktop

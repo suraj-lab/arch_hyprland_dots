@@ -1,0 +1,5 @@
+# Deck Mode session switching: single scoped NOPASSWD rule.
+# All privileged operations (SDDM autologin toggle, sddm restart, sleep-target
+# mask/unmask) are internal to this one root-owned helper — narrower than
+# deckshift's %video group rules.
+suraj ALL=(ALL) NOPASSWD: /usr/local/bin/gaming-session-switch

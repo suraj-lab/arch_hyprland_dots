@@ -1,0 +1,10 @@
+# NVIDIA GPU drivers. Open kernel modules (Turing/GTX 16xx and newer).
+# Older GPUs: swap nvidia-open-dkms for nvidia-dkms.
+# Hybrid laptop (Intel iGPU + NVIDIA): also install packages/gpu-intel.txt.
+nvidia-open-dkms
+linux-headers
+nvidia-utils
+lib32-nvidia-utils
+nvidia-settings
+egl-wayland
+libva-nvidia-driver

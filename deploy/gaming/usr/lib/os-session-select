@@ -1,0 +1,4 @@
+#!/bin/bash
+# os-session-select — Steam's "Power > Exit to Desktop" handler.
+# On a real Steam Deck this switches to Desktop Mode; same here.
+exec /usr/local/bin/switch-to-desktop

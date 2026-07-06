@@ -1,0 +1,48 @@
+#!/bin/bash
+# gaming-desktop-restore — runs on every Hyprland start (autostart.lua).
+# 1. Removes the transient SDDM autologin config so the next boot shows the
+#    normal login screen (autologin exists only to carry a session switch).
+# 2. If we just returned from Gaming Mode, restart the pipewire stack and
+#    portals: they bind to the dead session's Wayland socket and stay broken
+#    otherwise (deckshift's portal-recovery pattern, minus Omarchy bits).
+set -u
+
+sudo -n /usr/local/bin/gaming-session-switch cleanup 2>/dev/null || true
+
+# Ensure our VT is the active one — and keep re-asserting it (~15s): SDDM's
+# greeter X server activates its own VT when it finishes starting, racing a
+# one-shot chvt (same failure mode as Gaming Mode, observed 2026-07-03).
+if [[ -n "${XDG_VTNR:-}" ]]; then
+    sudo -n /usr/local/bin/gaming-session-switch chvt "$XDG_VTNR" 2>/dev/null || true
+    ( sudo -n /usr/local/bin/gaming-session-switch ensure-vt "$XDG_VTNR" 2>/dev/null ) &
+fi
+
+if [[ -f /tmp/.returned-from-gaming ]]; then
+    rm -f /tmp/.returned-from-gaming
+    logger -t gaming-desktop-restore "returned from Gaming Mode — recovering portals/pipewire"
+    # start-gamescope-session sets XDG_DESKTOP_PORTAL_DIR="" so only the
+    # gamescope/holo portals load. Plasma resets this on login; Hyprland does
+    # not — without this, desktop portals (screenshare, file pickers) load
+    # nothing after returning from Gaming Mode.
+    systemctl --user unset-environment XDG_DESKTOP_PORTAL_DIR 2>/dev/null || true
+    systemctl --user stop xdg-desktop-portal-hyprland.service xdg-desktop-portal.service 2>/dev/null || true
+    # Kill portal instances NOT owned by the services: Hyprland/D-Bus spawn
+    # them directly, and a survivor keeps the D-Bus name — the service start
+    # then loops on "Failed to request bus name (File exists)" until
+    # start-limit-hit (observed 2026-07-03).
+    pkill -f '/usr/lib/xdg-desktop-portal' 2>/dev/null || true
+    systemctl --user reset-failed xdg-desktop-portal-hyprland.service xdg-desktop-portal.service xdg-desktop-portal-gtk.service 2>/dev/null || true
+    systemctl --user restart pipewire.service pipewire-pulse.service wireplumber.service 2>/dev/null || true
+    sleep 2
+    systemctl --user start xdg-desktop-portal-hyprland.service xdg-desktop-portal.service 2>/dev/null || true
+
+    # Hyprland's normal autostart can race the SDDM/gamescope round-trip; on
+    # a successful 2026-07-04 validation pass, Quickshell simply was not
+    # running after return (no crash logs). Relaunch it once, only on the
+    # return-from-gaming path, and only if absent.
+    sleep 1
+    if ! pgrep -x quickshell >/dev/null 2>&1; then
+        logger -t gaming-desktop-restore "quickshell missing after return — starting it"
+        nohup quickshell >/tmp/quickshell-gaming-restore.log 2>&1 &
+    fi
+fi

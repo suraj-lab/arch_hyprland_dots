@@ -21,5 +21,3 @@ goverlay
 lutris
 protontricks
 protonup-qt
-vulkan-radeon
-lib32-vulkan-radeon

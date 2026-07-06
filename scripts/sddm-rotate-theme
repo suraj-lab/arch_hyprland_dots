@@ -1,0 +1,41 @@
+#!/bin/bash
+# Pick a random installed SDDM theme and set it as active.
+# Runs before display-manager.service starts.
+set -euo pipefail
+
+THEMES_DIR="/usr/share/sddm/themes"
+SDDM_CONF="/etc/sddm.conf.d/theme.conf"
+SDDM_CONF_DIR="/etc/sddm.conf.d"
+
+# We rotate *all* theme directories that contain metadata.desktop.
+# The known boring defaults that SDDM ships are excluded.
+SKIP=("elarun" "maldives" "maya")
+
+mapfile -t candidates < <(
+    for d in "$THEMES_DIR"/*/; do
+        name="$(basename "$d")"
+        skip=0
+        for s in "${SKIP[@]}"; do
+            [ "$name" = "$s" ] && skip=1 && break
+        done
+        [ $skip -eq 1 ] && continue
+        [ -f "$d/metadata.desktop" ] && echo "$name"
+    done
+)
+
+if [ ${#candidates[@]} -eq 0 ]; then
+    echo "sddm-rotate-theme: no candidate themes found" >&2
+    exit 0
+fi
+
+pick="${candidates[$RANDOM % ${#candidates[@]}]}"
+
+sudo mkdir -p "$SDDM_CONF_DIR"
+
+if [ -f "$SDDM_CONF" ] && grep -q "^Current=" "$SDDM_CONF" 2>/dev/null; then
+    sudo sed -i "s/^Current=.*/Current=${pick}/" "$SDDM_CONF"
+else
+    echo -e "[Theme]\nCurrent=${pick}" | sudo tee "$SDDM_CONF" > /dev/null
+fi
+
+echo "sddm-rotate-theme: set theme -> ${pick}"

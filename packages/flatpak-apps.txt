@@ -1,0 +1,3 @@
+# Flatpak application IDs (2026-07-06)
+com.github.tchx84.Flatseal
+com.usebottles.bottles

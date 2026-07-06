@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Gaming Mode
+GenericName=Steam Deck Mode
+Comment=Switch to fullscreen Steam Big Picture in Gamescope
+Exec=/usr/local/bin/switch-to-gaming
+Icon=steam
+Terminal=false
+Categories=Game;
+Keywords=Steam;Deck;Gamescope;Gaming;Game Mode;Big Picture;
+StartupNotify=false
+NoDisplay=false
