@@ -159,11 +159,13 @@ as_user() {
 }
 
 detect_gpu_kind() {
+  # Match PCI vendor IDs, not names: 'ati' is a substring of 'compATIble',
+  # which made QXL VMs (and would make Intel iGPUs) detect as amd.
   local pci
   pci="$(lspci -nn 2>/dev/null | grep -Ei 'vga|3d|display' || true)"
-  if grep -qi nvidia <<<"$pci"; then echo nvidia
-  elif grep -qiE 'amd|ati|radeon' <<<"$pci"; then echo amd
-  elif grep -qi intel <<<"$pci"; then echo intel
+  if grep -q '\[10de:' <<<"$pci"; then echo nvidia
+  elif grep -q '\[1002:' <<<"$pci"; then echo amd
+  elif grep -q '\[8086:' <<<"$pci"; then echo intel
   else echo none; fi
 }
 
