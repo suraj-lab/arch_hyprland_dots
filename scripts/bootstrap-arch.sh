@@ -238,8 +238,9 @@ interactive_menu() {
   done
   local ans2
   read -rp "GPU driver set (amd/nvidia/intel/none) [${GPU_KIND}]: " ans2
-  [[ -n "$ans2" ]] && GPU_KIND="$ans2"
-  (( INSTALL_GAMING )) && detect_gaming_hardware
+  if [[ -n "$ans2" ]]; then GPU_KIND="$ans2"; fi
+  # if-form, not '&&': a skipped step must not become the function's exit status (set -e)
+  if (( INSTALL_GAMING )); then detect_gaming_hardware; fi
 }
 
 confirm_plan() {
@@ -535,7 +536,7 @@ main() {
   if (( ! INTERACTIVE && ARG_COUNT == 0 )) && [[ -t 0 && -t 1 ]]; then
     INTERACTIVE=1
   fi
-  (( INTERACTIVE )) && interactive_menu
+  if (( INTERACTIVE )); then interactive_menu; fi
   resolve_gpu_kind
   confirm_plan
   ensure_multilib
