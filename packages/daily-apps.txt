@@ -14,7 +14,6 @@ man-db
 python-pip
 python-psutil
 go
-php
 qmk
 
 # Terminals/system monitoring
@@ -32,7 +31,6 @@ spotify-launcher
 vlc
 obs-studio
 libreoffice-fresh-uk
-zoom
 icaclient
 vscodium-bin
 lmstudio-bin
@@ -56,7 +54,6 @@ hplip
 gufw
 wireshark-qt
 freerdp
-tigervnc
 samba
 
 # Hardware/RGB/fans and machine utilities
