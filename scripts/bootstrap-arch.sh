@@ -348,6 +348,18 @@ ensure_cachyos() {
   ok "CachyOS repos enabled"
 }
 
+ensure_home_dirs() {
+  # GNU 'install -d -o USER' creates missing PARENT directories as root when
+  # run under sudo. On a fresh home that left ~/.cache root-owned and broke
+  # paru with 'Permission denied (os error 13)'. Create + own every level
+  # explicitly; also repairs damage from earlier runs.
+  local d
+  for d in .cache .config .local .local/state; do
+    sudo_run mkdir -p "$TARGET_HOME/$d"
+    sudo_run chown "$TARGET_UID:$TARGET_GID" "$TARGET_HOME/$d"
+  done
+}
+
 ensure_paru() {
   say "Ensuring base-devel, git, and paru"
   sudo_run pacman -S --needed "${PACMAN_CONFIRM[@]}" base-devel git curl
@@ -568,6 +580,7 @@ main() {
   resolve_gpu_kind
   confirm_plan
   sudo_keepalive
+  ensure_home_dirs
   ensure_multilib
   ensure_cachyos
   ensure_paru
