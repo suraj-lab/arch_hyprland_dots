@@ -130,12 +130,25 @@ PACMAN_CONFIRM=()
 PARU_CONFIRM=()
 MAKEPKG_CONFIRM=""
 FLATPAK_CONFIRM=()
-if (( AUTO_YES )); then
+apply_auto_yes() {
+  AUTO_YES=1
   PACMAN_CONFIRM=(--noconfirm)
   PARU_CONFIRM=(--noconfirm)
   MAKEPKG_CONFIRM="--noconfirm"
   FLATPAK_CONFIRM=(-y)
-fi
+}
+if (( AUTO_YES )); then apply_auto_yes; fi
+
+# Ask for sudo once, then keep the timestamp alive for the whole run
+# (AUR builds outlast the default 15-minute sudo cache).
+sudo_keepalive() {
+  (( DRY_RUN )) && return 0
+  (( EUID == 0 )) && return 0
+  sudo -v
+  ( while kill -0 "$$" 2>/dev/null; do sudo -n true 2>/dev/null; sleep 60; done ) &
+  SUDO_KEEPALIVE_PID=$!
+  trap '[[ -n "${SUDO_KEEPALIVE_PID:-}" ]] && kill "$SUDO_KEEPALIVE_PID" 2>/dev/null' EXIT
+}
 
 as_user() {
   if [[ "$(id -u)" == "$TARGET_UID" ]]; then
@@ -237,7 +250,8 @@ interactive_menu() {
     esac
   done
   local ans2
-  read -rp "GPU driver set (amd/nvidia/intel/none) [${GPU_KIND}]: " ans2
+  if [[ "$GPU_KIND" == auto ]]; then GPU_KIND="$(detect_gpu_kind)"; fi
+  read -rp "GPU drivers [Enter = ${GPU_KIND} (detected), or amd/nvidia/intel/none]: " ans2
   if [[ -n "$ans2" ]]; then GPU_KIND="$ans2"; fi
   # if-form, not '&&': a skipped step must not become the function's exit status (set -e)
   if (( INSTALL_GAMING )); then detect_gaming_hardware; fi
@@ -267,8 +281,10 @@ PLAN
   if (( AUTO_YES || DRY_RUN )); then
     return 0
   fi
-  read -rp "Continue? [y/N] " ans
+  read -rp "Continue? (runs unattended from here) [y/N] " ans
   [[ "${ans,,}" == y || "${ans,,}" == yes ]] || exit 1
+  # This confirmation IS the consent: no further per-package prompts.
+  apply_auto_yes
 }
 
 pkg_lines() {
@@ -539,6 +555,7 @@ main() {
   if (( INTERACTIVE )); then interactive_menu; fi
   resolve_gpu_kind
   confirm_plan
+  sudo_keepalive
   ensure_multilib
   ensure_cachyos
   ensure_paru
