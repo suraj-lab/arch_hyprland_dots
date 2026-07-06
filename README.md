@@ -22,6 +22,14 @@ The new bootstrap script is the preferred fresh-install path. It is tailored to 
 
 Virtualization/passthrough tools are opt-in via `--virt`; laptop extras via `--laptop`.
 
+From the Arch ISO, pre-seed archinstall (only disk + passwords asked):
+
+```bash
+archinstall --config-url https://raw.githubusercontent.com/suraj-lab/arch_hyprland_dots/master/deploy/archinstall.json
+```
+
+Then after first login:
+
 ```bash
 sudo pacman -S --needed git
 mkdir -p ~/Projects/Dotfiles

@@ -7,7 +7,15 @@ Default profile: desktop-core + daily apps + Gaming Mode + Flatpaks + dotfiles +
 ## The full flow
 
 1. Boot the Arch ISO, connect to the network (`iwctl` for Wi-Fi, ethernet just works).
-2. Run `archinstall` with the choices below. **Select only the target OS disk.**
+2. Run `archinstall` pre-seeded from this repo — it asks only for **disk** and **user/passwords**, everything else is pre-answered:
+
+   ```bash
+   archinstall --config-url https://raw.githubusercontent.com/suraj-lab/arch_hyprland_dots/master/deploy/archinstall.json
+   ```
+
+   For the disk menu: choose *best-effort default layout* → your target disk → **btrfs** → default subvolume structure → compression. Passwords are never stored in the repo by design.
+
+   `deploy/archinstall.json` was written against the archinstall 2.8.6 schema; if a newer ISO rejects it, fall back to answering the menus manually with the table below.
 3. Reboot into the fresh install, log in as your user on a TTY.
 4. Clone this repo and run the bootstrap:
 
