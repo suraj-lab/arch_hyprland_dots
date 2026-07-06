@@ -422,7 +422,19 @@ install_flatpaks() {
   local apps=()
   mapfile -t apps < <(pkg_lines "$DOTFILES_DIR/packages/flatpak-apps.txt")
   (( ${#apps[@]} )) || return 0
-  run flatpak install "${FLATPAK_CONFIRM[@]}" flathub "${apps[@]}"
+  as_user flatpak install "${FLATPAK_CONFIRM[@]}" flathub "${apps[@]}" || {
+    local failed=() a
+    for a in "${apps[@]}"; do
+      as_user flatpak list 2>/dev/null | grep -q "^$a" && continue
+      if as_user flatpak install "${FLATPAK_CONFIRM[@]}" flathub "$a"; then
+        ok "flatpak: $a"
+      else
+        warn "FAILED flatpak: $a"
+        failed+=("$a")
+      fi
+    done
+    (( ${#failed[@]} )) && warn "Could not install flatpaks: ${failed[*]} — install manually later"
+  }
 }
 
 copy_dotfiles() {
