@@ -80,7 +80,7 @@ NTFS disks additionally need `ntfs-3g` (installed by the daily-apps manifest).
 
 Yes, when you want it to be:
 
-- **No arguments on a terminal** (or `--interactive`/`-i`): a linutil-style component menu — toggle desktop/daily/gaming/SDDM themes/flatpak/dotfiles/pi/virt/laptop/full-snapshot/CachyOS/multilib by number, Enter to continue. If Gaming Mode is selected it then auto-detects GPUs (`lspci`) and connected outputs (`/sys/class/drm`) and lets you pick, plus a GPU driver-set prompt (amd/nvidia/intel/none). Ends with the plan summary and one `Continue? [y/N]`.
+- **No arguments on a terminal** (or `--interactive`/`-i`): a linutil-style component menu — toggle desktop/daily/gaming/SDDM themes/flatpak/dotfiles/pi/virt/laptop/full-snapshot/CachyOS/multilib by number, Enter to continue. If Gaming Mode is selected it then auto-detects GPUs (`lspci`) and connected outputs (`/sys/class/drm`) and lets you pick, plus a GPU driver prompt that shows the detected vendor (Enter accepts it). Ends with the plan summary and one `Continue? [y/N]` — answering `y` is the only consent: sudo is asked once (then kept alive) and every package operation runs `--noconfirm` from there.
 - **With flags**: fully scripted; the menu is skipped and flags decide everything. Still shows the plan + one confirm.
 - With `--yes`: no prompts at all — pacman/paru/flatpak run `--noconfirm`. The only interaction left is the **sudo password** early on.
 - With `--dry-run`: prints every command it would run, touches nothing.

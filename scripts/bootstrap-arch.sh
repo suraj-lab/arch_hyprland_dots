@@ -394,7 +394,24 @@ install_packages() {
   fi
   (( ${#pkgs[@]} )) || return 0
   say "Installing ${#pkgs[@]} packages via $AUR_HELPER"
-  as_user "$AUR_HELPER" -S --needed "${PARU_CONFIRM[@]}" "${pkgs[@]}"
+  as_user "$AUR_HELPER" -S --needed "${PARU_CONFIRM[@]}" "${pkgs[@]}" || {
+    # One or more packages failed (AUR build errors, 404s, etc.). Don't let
+    # a single bad apple abort the whole bootstrap. Retry remaining packages
+    # one at a time and warn about anything that still won't install.
+    local failed=()
+    for p in "${pkgs[@]}"; do
+      pacman -Q "$p" >/dev/null 2>&1 && continue  # already installed
+      if as_user "$AUR_HELPER" -S --needed "${PARU_CONFIRM[@]}" "$p"; then
+        ok "retried: $p"
+      else
+        warn "FAILED to install: $p"
+        failed+=("$p")
+      fi
+    done
+    if (( ${#failed[@]} )); then
+      warn "Could not install: ${failed[*]} — fix manifest or install manually later"
+    fi
+  }
 }
 
 install_flatpaks() {

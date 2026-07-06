@@ -73,7 +73,6 @@ usbmuxd
 imagemagick
 testdisk
 acpica
-dmg2img
 hfsprogs
 uefitool
 deluge
