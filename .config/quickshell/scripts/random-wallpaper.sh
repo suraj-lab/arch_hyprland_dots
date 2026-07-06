@@ -7,9 +7,11 @@
 
 if [[ $# -lt 1 ]] || [[ ! -d $1 ]]; then
     echo "Usage:
-    $0 <dir containing images>"
+    $0 <dir containing images> [monitor]"
     exit 1
 fi
+
+MONITOR="${2:-DP-2}"
 
 # Edit below to control the images transition
 export AWWW_TRANSITION_FPS=144
@@ -29,12 +31,12 @@ while true; do
         | sort -n | cut -d':' -f2- \
         | while read -r img; do
             TRANSITION=${TRANSITIONS[$((RANDOM % ${#TRANSITIONS[@]}))]}
-            awww img -o DP-2 "$img" \
+            awww img -o "$MONITOR" "$img" \
                 --transition-type "$TRANSITION" \
                 --transition-pos center \
                 --transition-duration 1
-            # Extract accent color from wallpaper (DP-2 monitor)
-            "$HOME/.config/quickshell/scripts/extract-accent.sh" "$img" "DP-2" &
+            # Extract accent color from wallpaper
+            "$HOME/.config/quickshell/scripts/extract-accent.sh" "$img" "$MONITOR" &
             sleep $INTERVAL
         done
 done
