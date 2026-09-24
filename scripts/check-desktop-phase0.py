@@ -25,9 +25,12 @@ def run(*command, env=ENV):
 
 frozen = ["deploy/gaming", ".config/environment.d/99-gaming-session.conf", ".config/gamescope",
           "scripts/install-gaming-mode.sh", "docs/gaming-mode.md",
-          ".config/hypr/modules/autostart.lua", "packages/gaming-mode.txt", "packages/daily-apps.txt"]
+          "packages/gaming-mode.txt", "packages/daily-apps.txt"]
 run("git", "diff", "--exit-code", BASE, "--", *frozen)
 assert not run("git", "ls-files", "--others", "--exclude-standard", "--", *frozen).strip(), "new frozen files"
+# Only the Gaming Mode restore line of autostart.lua is frozen (SPEC "Don't touch Gaming Mode").
+restore = '\thl.exec_cmd("/usr/local/bin/gaming-desktop-restore")\n'
+assert restore in Path(".config/hypr/modules/autostart.lua").read_text(), "gaming-desktop-restore line changed"
 binds = ".config/hypr/modules/binds.lua"
 assert Path(binds).read_text() == run("git", "show", f"{BASE}:{binds}").replace("qs msg ", "qs ipc call "), "keybind semantics changed"
 for directory in [Path(".config/hypr"), Path(".config/quickshell")]:

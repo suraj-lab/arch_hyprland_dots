@@ -10,7 +10,7 @@ import Quickshell.Wayland
 //     games using SDL/Proton), Caffeine, and Desktop Game Mode.
 //   • Caffeine (manual idle inhibit; the IdleInhibitor itself lives on the
 //     bar window in shell.qml because it needs a surface).
-//   • Night Light (wlsunset on/off).
+//   • Night Light (hyprsunset schedule daemon on/off).
 //   • Desktop Game Mode: auto-on while gamemoded is active — DND on, blur/
 //     animations off, no inactive-window dimming — restored when it ends.
 //
@@ -25,7 +25,7 @@ Item {
     property int lockTimeout:    600
     property int dpmsTimeout:    900
     property int suspendTimeout: 0     // desktop: off by default
-    property string nightLightCmd: "wlsunset -S 9:00 -s 19:30"   // mirrors autostart.lua
+    property string nightLightCmd: "hyprsunset"   // schedule in ~/.config/hypr/hyprsunset.conf
 
     // ── Wiring to ShellRoot's DND state ───────────────────────────────────
     property bool dndEnabled: false
@@ -52,7 +52,7 @@ Item {
         if (nightLight) { nightOffProc.running = true; return }
         // Detached: a shell-owned child would die whenever Quickshell restarts.
         Quickshell.execDetached(["bash", "-c", nightLightCmd])
-        nightLight = true   // the 5 s poll corrects this if wlsunset fails to start
+        nightLight = true   // the 5 s poll corrects this if hyprsunset fails to start
     }
     function toggleGameMode() {
         // Off suppresses only a currently running game, never the next session.
@@ -131,13 +131,13 @@ Item {
     // Reflect external starts/stops as well as our own toggles.
     Process {
         id: nightReadProc
-        command: ["pgrep", "-x", "wlsunset"]
+        command: ["pgrep", "-x", "hyprsunset"]
         running: true
         onExited: function(code) { root.nightLight = (code === 0) }
     }
     Process {
         id: nightOffProc
-        command: ["pkill", "-x", "wlsunset"]
+        command: ["pkill", "-x", "hyprsunset"]
         onExited: nightReadProc.running = true
     }
 

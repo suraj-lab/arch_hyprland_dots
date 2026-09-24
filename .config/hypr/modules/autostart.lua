@@ -9,7 +9,7 @@ hl.on("hyprland.start", function()
 	hl.exec_cmd("dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP")
 	hl.exec_cmd("systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP")
 	hl.exec_cmd("wl-clipboard-history -t")
-	hl.exec_cmd("wlsunset -S 9:00 -s 19:30")
+	hl.exec_cmd("hyprsunset") -- schedule: ~/.config/hypr/hyprsunset.conf
 	hl.exec_cmd("mozillavpn activate")
 	-- Deck Mode: remove transient SDDM autologin + recover portals/pipewire
 	-- when returning from Gaming Mode (no-op on normal logins).

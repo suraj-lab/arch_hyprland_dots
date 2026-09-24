@@ -741,6 +741,14 @@ HDMI-A-1 stays readable (no inactive dimming), and everything is restored on exi
 - Writing monitor layout from the shell (use nwg-displays).
 
 ## Change log
+- 2026-09-24 — Task 2.6 done early at Suraj's request. `hyprsunset` 0.4.0 installed
+  (CachyOS build; also in `extra`). Kept the process model instead of the IPC-toggle
+  design above: Night Light on = `hyprsunset` daemon running its schedule
+  (`.config/hypr/hyprsunset.conf`: 9:00 identity, 19:30 4000 K), off = daemon stopped.
+  Same semantics as the old wlsunset toggle, no shell-side state, survives shell
+  restarts. Verified: off/on toggle, profile applied, restart survival. Decision:
+  keep the CachyOS Quickshell build (same 0.3.1 source; the manifest rule is that
+  every entry exists in core/extra/multilib, not where the local copy came from).
 - 2026-09-24 — Phase 0 repository implementation started from clean `362b952`.
   Corrected release/package-source assumptions, live-change/commit approval gates,
   Game Mode restoration and override behaviour, toast callback lifetime, Qt 6 checks,

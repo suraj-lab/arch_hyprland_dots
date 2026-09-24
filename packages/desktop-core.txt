@@ -22,7 +22,7 @@ pavucontrol
 wl-clipboard
 cliphist
 playerctl
-wlsunset
+hyprsunset
 awww
 matugen-bin
 grim
