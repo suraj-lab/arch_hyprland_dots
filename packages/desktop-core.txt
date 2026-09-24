@@ -1,18 +1,18 @@
 # Core desktop packages from the current Hyprland/Quickshell setup.
 # Keep this list boring and reinstall-focused; app-specific extras can live elsewhere.
+# Official repos only (core/extra/multilib): scripts/check-official.sh enforces it.
+# paru (AUR helper) is built by bootstrap-arch.sh, not listed here.
 
 base-devel
 git
-paru
 hyprland
 hyprlock
-quickshell-git
+quickshell
 qt6-5compat
 qt5-wayland
 qt6-wayland
 polkit-kde-agent
 sddm
-sddm-theme-tokyo-night-git
 ghostty
 starship
 firefox
@@ -24,10 +24,9 @@ cliphist
 playerctl
 hyprsunset
 awww
-matugen-bin
+matugen
 grim
 slurp
-grimblast-git
 hyprpicker
 imagemagick
 pipewire
@@ -42,9 +41,34 @@ btop
 fastfetch
 nwg-look
 nwg-displays
-nordic-theme
+adw-gtk-theme
 papirus-icon-theme
 noto-fonts
 noto-fonts-emoji
 ttf-jetbrains-mono-nerd
 ttf-nerd-fonts-symbols-common
+
+# Desktop plumbing (configured in DE-upgrade Phase 2)
+xdg-desktop-portal-gtk
+gnome-keyring
+libsecret
+seahorse
+qt6ct
+qt5ct
+kvantum
+kvantum-qt5
+xdg-user-dirs
+wl-clip-persist
+pacman-contrib
+udisks2
+udiskie
+gvfs
+gvfs-mtp
+gvfs-smb
+bluez
+bluez-utils
+ddcutil
+system-config-printer
+
+# Shell features (DE-upgrade Phase 5+)
+libqalculate

@@ -624,6 +624,10 @@ main() {
   (( INSTALL_LAPTOP )) && manifests+=("$DOTFILES_DIR/packages/laptop.txt")
   (( INSTALL_VIRT )) && manifests+=("$DOTFILES_DIR/packages/virtualization.txt")
   (( INSTALL_FULL_CURRENT )) && manifests+=("$DOTFILES_DIR/packages/current-explicit.txt" "$DOTFILES_DIR/packages/current-aur.txt")
+  # desktop-core must stay installable from official repos alone (other manifests may use the AUR).
+  if (( DRY_RUN && INSTALL_DESKTOP )); then
+    "$DOTFILES_DIR/scripts/check-official.sh" "$DOTFILES_DIR/packages/desktop-core.txt" || exit 1
+  fi
   install_packages "${manifests[@]}"
   install_flatpaks
   copy_dotfiles

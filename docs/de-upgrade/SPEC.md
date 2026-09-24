@@ -154,7 +154,7 @@ deploy/gaming/                       FROZEN (§1.2)
 |---|---|
 | Portals | Only `xdg-desktop-portal-hyprland`. There's no FileChooser backend, so "Open/Save" dialogs are missing for portal apps and Flatpaks. `modules/xdg_portal.lua` kills and restarts portals by hand. |
 | Secrets | No keyring. Browser/editor/Discord secrets and saved Wi-Fi PSKs have nowhere safe to go. |
-| Theming | `GTK_THEME=Adwaita:dark` env var (breaks libadwaita apps). No Qt theming. `nordic-theme` (AUR) is installed but unused. |
+| Theming | `GTK_THEME=Adwaita:dark` env var (breaks libadwaita apps). No Qt theming. `nordic-theme` (AUR) is still the GTK settings/gsettings theme; only D-Bus-activated GTK apps without `GTK_THEME` (e.g. `xdg-desktop-portal-gtk` file dialogs) render with it. |
 | Defaults | No `mimeapps.list`, no `xdg-user-dirs`. |
 | Leftovers | Configs for waybar, wofi, mako, swaylock, wlogout, kitty and alacritty remain. `hypr/scripts/volume` points at mako icons. `hypr/scripts/swww-random-*` still call `swww`. |
 | Sleep | Nothing locks the session before suspend or on `loginctl lock-session`. |
@@ -741,6 +741,15 @@ HDMI-A-1 stays readable (no inactive dimming), and everything is restored on exi
 - Writing monitor layout from the shell (use nwg-displays).
 
 ## Change log
+- 2026-09-24 — Phase 1 done (manifest only, nothing installed). desktop-core.txt:
+  quickshell-git→quickshell, matugen-bin→matugen, nordic-theme→adw-gtk-theme,
+  dropped grimblast-git, sddm-theme-tokyo-night-git and paru (bootstrap builds it), added
+  the Phase 1 table except uwsm (Phase 7) and kdeconnect (skipped by Suraj).
+  `scripts/check-official.sh` checks availability in core/extra/multilib via `pacman -Sl`;
+  wired into `bootstrap-arch.sh --dry-run` for desktop-core only. Verified: passes on the
+  new list, flags exactly the 6 old non-official entries, dry-run exits 0 and writes nothing.
+  Locally: matugen-bin→matugen swapped and grimblast-git removed by Suraj. nordic-theme stays
+  until Task 2.3 (portal-gtk file dialogs use it); tokyo-night-sddm stays in the SDDM rotation.
 - 2026-09-24 — Task 2.6 done early at Suraj's request. `hyprsunset` 0.4.0 installed
   (CachyOS build; also in `extra`). Kept the process model instead of the IPC-toggle
   design above: Night Light on = `hyprsunset` daemon running its schedule
