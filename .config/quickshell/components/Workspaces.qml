@@ -68,7 +68,7 @@ Item {
                         cursorShape: Qt.PointingHandCursor
                         onClicked: function() {
                             if (pillContainer.ws) pillContainer.ws.activate()
-                            else Hyprland.dispatch("workspace " + pillContainer.modelData)
+                            else Hyprland.dispatch("hl.dsp.focus({ workspace = " + pillContainer.modelData + " })")
                         }
                     }
                 }

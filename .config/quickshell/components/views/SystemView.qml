@@ -14,6 +14,52 @@ Item {
     property color barAccent: "#00ffea"
     property bool viewActive: false
     property bool dndEnabled: false
+    property var  desktop: null   // DesktopServices (caffeine, night light, game mode, idle)
+
+    // Reusable quick-toggle tile, same look as the Wi-Fi/Bluetooth/DND tiles
+    component ToggleTile: Rectangle {
+        id: tileRoot
+        property string icon: ""
+        property string label: ""
+        property bool on: false
+        property color onColor: Theme.accent
+        signal activated()
+
+        Layout.fillWidth: true; implicitHeight: 52; radius: 12
+        activeFocusOnTab: true
+        Accessible.role: Accessible.Button
+        Accessible.name: label
+        Accessible.onPressAction: activated()
+        Keys.onSpacePressed: activated()
+        Keys.onReturnPressed: activated()
+        color: on ? Qt.rgba(onColor.r, onColor.g, onColor.b, 0.1)
+                  : (tileMouse.containsMouse ? Theme.surfaceHover : Theme.surface)
+        border.color: activeFocus ? onColor
+                      : on ? Qt.rgba(onColor.r, onColor.g, onColor.b, 0.3) : Theme.borderMuted
+        border.width: 1
+        Behavior on color { ColorAnimation { duration: Theme.animMedium } }
+
+        SequentialAnimation {
+            id: tilePress
+            NumberAnimation { target: tileRoot; property: "scale"; to: 0.93; duration: 80 }
+            NumberAnimation { target: tileRoot; property: "scale"; to: 1.0; duration: 200; easing.type: Easing.OutBack }
+        }
+        MouseArea {
+            id: tileMouse
+            anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+            onClicked: { tilePress.start(); tileRoot.activated() }
+        }
+        ColumnLayout {
+            anchors.centerIn: parent; spacing: 3
+            Text { text: tileRoot.icon; color: tileRoot.on ? tileRoot.onColor : Theme.textDimmer; font.pixelSize: 16; font.family: Theme.fontFamily; Layout.alignment: Qt.AlignHCenter; Behavior on color { ColorAnimation { duration: Theme.animMedium } } }
+            Text { text: tileRoot.label; color: tileRoot.on ? tileRoot.onColor : Theme.textDim; font.pixelSize: Theme.fontSm; font.bold: true; font.family: Theme.fontFamily; Layout.alignment: Qt.AlignHCenter; elide: Text.ElideRight; Layout.maximumWidth: 150; Behavior on color { ColorAnimation { duration: Theme.animMedium } } }
+        }
+    }
+
+    function fmtTimeout(sec) {
+        if (!sec || sec <= 0) return "off"
+        return sec >= 60 ? Math.round(sec / 60) + " min" : sec + " s"
+    }
     property var screenTimeTracker: null   // ScreenTimeTracker instance from shell.qml
     signal dndToggled()
     signal closeRequested()
@@ -224,7 +270,9 @@ Item {
             netConnectProc.command = ["nmcli", "dev", "wifi", "connect", ssid]
             netConnectProc.running = true
         } else {
-            Hyprland.dispatch("exec [float;size 40% 30%;center] ghostty -e nmcli dev wifi connect '" + ssid + "' --ask")
+            var shellSsid = "'" + ssid.replace(/'/g, "'\\''") + "'"
+            Hyprland.dispatch("hl.dsp.exec_cmd(" + JSON.stringify("ghostty -e nmcli dev wifi connect " + shellSsid + " --ask")
+                + ", { float = true, size = { \"40%\", \"30%\" }, center = true })")
         }
     }
 
@@ -382,13 +430,38 @@ Item {
                 }
                 MouseArea {
                     id: mixerH; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                    onClicked: { mixerPress.start(); Hyprland.dispatch("exec [float;size 40% 90%;move 60% 5%] pavucontrol"); root.closeRequested() }
+                    onClicked: { mixerPress.start(); Hyprland.dispatch("hl.dsp.exec_cmd(\"pavucontrol\", { float = true, size = { \"40%\", \"90%\" }, move = { \"60%\", \"5%\" } })"); root.closeRequested() }
                 }
                 ColumnLayout {
                     anchors.centerIn: parent; spacing: 3
                     Text { text: "\uf1de"; color: Theme.textDimmer; font.pixelSize: 16; font.family: Theme.fontFamily; Layout.alignment: Qt.AlignHCenter }
                     Text { text: "Mixer"; color: Theme.textDim; font.pixelSize: Theme.fontSm; font.bold: true; font.family: Theme.fontFamily; Layout.alignment: Qt.AlignHCenter }
                 }
+            }
+
+            ToggleTile {
+                icon: "\uf0f4"; label: "Caffeine"; onColor: Theme.warning
+                on: root.desktop ? root.desktop.caffeine : false
+                onActivated: if (root.desktop) root.desktop.toggleCaffeine()
+            }
+            ToggleTile {
+                icon: "\uf186"; label: "Night Light"; onColor: Theme.warning
+                on: root.desktop ? root.desktop.nightLight : false
+                onActivated: if (root.desktop) root.desktop.toggleNightLight()
+            }
+            ToggleTile {
+                icon: "\uf11b"; onColor: Theme.success
+                on: root.desktop ? root.desktop.gameMode : false
+                label: !root.desktop ? "Game Mode"
+                       : root.desktop.gameModeError ? "Game Mode · error"
+                       : root.desktop.gameMode !== root.desktop.desiredGameMode ? "Game Mode · pending"
+                       : root.desktop.gameMode && root.desktop.gameModeOverride === "auto" ? "Game Mode · auto"
+                       : "Game Mode"
+                onActivated: if (root.desktop) root.desktop.toggleGameMode()
+            }
+            ToggleTile {
+                icon: "\uf1b6"; label: "Enter Gaming Mode"; onColor: Theme.media
+                onActivated: { if (root.desktop) root.desktop.enterGamingMode(); root.closeRequested() }
             }
         }
 
@@ -523,6 +596,51 @@ Item {
                 text: "Click to connect"; font.pixelSize: 8; font.family: Theme.fontFamily
                 color: Theme.textGhost; horizontalAlignment: Text.AlignHCenter
                 visible: root.networkList.length > 0
+            }
+        }
+
+        // ── Idle (visible when not in network drill-in) ─────────────────
+        Rectangle {
+            Layout.fillWidth: true; height: 1; color: Theme.borderLight
+            Layout.leftMargin: 12; Layout.rightMargin: 12
+            visible: !root.networkViewOpen && root.desktop !== null
+        }
+        ColumnLayout {
+            Layout.fillWidth: true
+            Layout.leftMargin: 12; Layout.rightMargin: 12; Layout.topMargin: 8; Layout.bottomMargin: 8
+            spacing: 6
+            visible: !root.networkViewOpen && root.desktop !== null
+
+            RowLayout {
+                Layout.fillWidth: true
+                Text { text: "Idle"; font.pixelSize: Theme.fontBar; font.bold: true; font.family: Theme.fontFamily; color: Theme.text }
+                Item { Layout.fillWidth: true }
+                Text {
+                    text: root.desktop ? root.desktop.idleStatus : ""
+                    font.pixelSize: Theme.fontSm; font.bold: true; font.family: Theme.fontFamily
+                    color: root.desktop && root.desktop.idleEnabled ? Theme.success : Theme.warning
+                }
+            }
+            RowLayout {
+                Layout.fillWidth: true; spacing: 6
+                Repeater {
+                    model: root.desktop ? [
+                        { k: "LOCK",        v: root.fmtTimeout(root.desktop.lockTimeout) },
+                        { k: "SCREENS OFF", v: root.fmtTimeout(root.desktop.dpmsTimeout) },
+                        { k: "SUSPEND",     v: root.fmtTimeout(root.desktop.suspendTimeout) }
+                    ] : []
+                    Rectangle {
+                        required property var modelData
+                        Layout.fillWidth: true; height: 42; radius: 10
+                        color: Theme.surface; border.color: Theme.borderMuted; border.width: 1
+                        ColumnLayout {
+                            anchors { left: parent.left; leftMargin: 8; verticalCenter: parent.verticalCenter }
+                            spacing: 1
+                            Text { text: modelData.k; font.pixelSize: 8; font.family: Theme.fontFamily; color: Theme.textDimmer }
+                            Text { text: modelData.v; font.pixelSize: Theme.fontNormal; font.bold: true; font.family: Theme.fontFamily; color: Theme.text }
+                        }
+                    }
+                }
             }
         }
 

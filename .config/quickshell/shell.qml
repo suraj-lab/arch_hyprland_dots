@@ -222,9 +222,16 @@ ShellRoot {
     // ── Screen time tracking (runs continuously) ──────────────────────────
     ScreenTimeTracker { id: stTracker }
 
+    // ── Desktop services: idle, caffeine, night light, desktop game mode ──
+    DesktopServices {
+        id: desk
+        dndEnabled: shellRoot.dndEnabled
+        onDndRequested: function(enabled) { shellRoot.dndEnabled = enabled }
+    }
+
 
     Process { id: pLock;    command: ["hyprlock"]                            }
-    Process { id: pLogout;  command: ["hyprctl",   "dispatch", "exit"]      }
+    Process { id: pLogout;  command: ["hyprctl", "dispatch", "hl.dsp.exit()"] }
     Process { id: pSuspend; command: ["systemctl", "suspend"]               }
     Process { id: pReboot;  command: ["systemctl", "reboot"]                }
     Process { id: pOff;     command: ["systemctl", "poweroff"]              }
@@ -250,6 +257,12 @@ ShellRoot {
 
             implicitHeight: Theme.barHeight
             color: "transparent"
+
+            // Caffeine: inhibit idle while enabled (needs a surface — the bar).
+            IdleInhibitor {
+                window: barPanel
+                enabled: desk.caffeine
+            }
 
             Rectangle {
                 id: barRect
@@ -306,7 +319,8 @@ ShellRoot {
                         onChipClicked: { barClock.popupOpen = false; unifiedPanel.open("sound") }
                     }
                     Microphone  { anchors.verticalCenter: parent.verticalCenter; barAccent: barPanel.screenAccent }
-                    GameMode    { anchors.verticalCenter: parent.verticalCenter; barAccent: barPanel.screenAccent }
+                    Caffeine    { anchors.verticalCenter: parent.verticalCenter; barAccent: barPanel.screenAccent; active: desk.caffeine; onClicked: desk.toggleCaffeine() }
+                    GameMode    { anchors.verticalCenter: parent.verticalCenter; barAccent: barPanel.screenAccent; active: desk.gameMode; onClicked: desk.toggleGameMode() }
 
                     NotificationCenter {
                         id: notifChip
@@ -336,6 +350,7 @@ ShellRoot {
                     parentWindow: barPanel
                     barAccent: barPanel.screenAccent
                     screenTimeTracker: stTracker
+                    desktop: desk
                     notifModel:  shellRoot.globalNotifModel
                     dndEnabled:  shellRoot.dndEnabled
                     onDismissRequested:  function(id) { shellRoot.dismissNotif(id) }
@@ -562,7 +577,7 @@ ShellRoot {
 
                 Rectangle {
                     anchors.centerIn: parent
-                    width: 560; height: 210
+                    width: 662; height: 210
                     radius: 20
                     color: Theme.popupBg
                     border.color: Theme.border; border.width: 1
@@ -635,6 +650,19 @@ ShellRoot {
                                 ColumnLayout { anchors.centerIn: parent; spacing: 5
                                     Text { text: "\uf021"; color: h4.containsMouse ? Theme.media : Theme.textDimmer; font.pixelSize: 26; font.family: Theme.fontFamily; Layout.alignment: Qt.AlignHCenter; Behavior on color { ColorAnimation { duration: 150 } } }
                                     Text { text: "Reboot"; color: h4.containsMouse ? Theme.media : Theme.textDim; font.pixelSize: Theme.fontSm; font.bold: true; font.family: Theme.fontFamily; Layout.alignment: Qt.AlignHCenter; Behavior on color { ColorAnimation { duration: 150 } } }
+                                }
+                            }
+                            Rectangle {
+                                width: 90; height: 90; radius: 14
+                                color: h6.containsMouse ? Qt.rgba(0.22,1,0.08,0.12) : Theme.surface
+                                border.color: h6.containsMouse ? Qt.rgba(0.22,1,0.08,0.35) : Theme.borderMuted; border.width: 1
+                                scale: h6.containsMouse ? 1.07 : 1.0
+                                Behavior on color { ColorAnimation { duration: 150 } }
+                                Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutBack } }
+                                MouseArea { id: h6; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { desk.enterGamingMode(); sessionOpen = false } }
+                                ColumnLayout { anchors.centerIn: parent; spacing: 5
+                                    Text { text: "\uf11b"; color: h6.containsMouse ? Theme.success : Theme.textDimmer; font.pixelSize: 26; font.family: Theme.fontFamily; Layout.alignment: Qt.AlignHCenter; Behavior on color { ColorAnimation { duration: 150 } } }
+                                    Text { text: "Gaming"; color: h6.containsMouse ? Theme.success : Theme.textDim; font.pixelSize: Theme.fontSm; font.bold: true; font.family: Theme.fontFamily; Layout.alignment: Qt.AlignHCenter; Behavior on color { ColorAnimation { duration: 150 } } }
                                 }
                             }
                             Rectangle {

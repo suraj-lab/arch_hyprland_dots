@@ -261,7 +261,7 @@ Item {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: {
-                            Hyprland.dispatch("workspace " + wsCard.wsId)
+                            Hyprland.dispatch("hl.dsp.focus({ workspace = " + wsCard.wsId + " })")
                             root.closeRequested()
                         }
                     }
@@ -419,7 +419,7 @@ Item {
                                     onClicked: {
                                         var addr = winRect.modelData.address
                                         if (addr != null) {
-                                            Hyprland.dispatch("focuswindow address:" + addr)
+                                            Hyprland.dispatch("hl.dsp.focus({ window = \"address:" + addr + "\" })")
                                         }
                                         root.closeRequested()
                                     }
@@ -457,7 +457,7 @@ Item {
     Keys.onPressed: function(event) {
         if (event.key >= Qt.Key_1 && event.key <= Qt.Key_5) {
             var ws = event.key - Qt.Key_1 + 1
-            Hyprland.dispatch("workspace " + ws)
+            Hyprland.dispatch("hl.dsp.focus({ workspace = " + ws + " })")
             root.closeRequested()
             event.accepted = true
         }

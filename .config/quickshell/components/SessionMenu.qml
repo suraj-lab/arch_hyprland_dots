@@ -90,7 +90,7 @@ Item {
                                 }
                                 HoverHandler { id: loH }
                                 TapHandler { onTapped: { loProc.running = true; root.menuOpen = false } }
-                                Process { id: loProc; command: ["hyprctl", "dispatch", "exit"] }
+                                Process { id: loProc; command: ["hyprctl", "dispatch", "hl.dsp.exit()"] }
                             }
 
                             // ── Suspend ───────────────────────────────────

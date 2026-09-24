@@ -21,6 +21,7 @@ Item {
     property var  notifModel: null
     property bool dndEnabled: false
     property var  screenTimeTracker: null
+    property var  desktop: null            // DesktopServices
     signal dismissRequested(int notifId)
     signal clearAllRequested()
     signal dndToggled()
@@ -223,6 +224,7 @@ Item {
                         viewActive: root.currentView === "system" && root.panelOpen
                         dndEnabled: root.dndEnabled
                         screenTimeTracker: root.screenTimeTracker
+                        desktop: root.desktop
                         visible: root.currentView === "system"
                         onDndToggled: root.dndToggled()
                         onCloseRequested: root.close()
