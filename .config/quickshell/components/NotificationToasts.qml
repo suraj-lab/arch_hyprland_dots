@@ -54,11 +54,7 @@ Item {
                 Timer {
                     id: dismissTimer
                     interval: 300
-                    onTriggered: {
-                        var sid = toastDelegate.savedId
-                        root.removeToast(sid)
-                        if (root.dismissFunc) root.dismissFunc(sid)
-                    }
+                    onTriggered: root.finishDismiss(toastDelegate.savedId)
                 }
 
                 function startDismiss() {
@@ -203,6 +199,14 @@ Item {
                 }
             }
         }
+    }
+
+    // Removing a model row destroys its delegate (and the timer's JS context).
+    // Finish the callback here, in the surviving parent component's context.
+    function finishDismiss(id) {
+        var dismiss = root.dismissFunc
+        root.removeToast(id)
+        if (dismiss) dismiss(id)
     }
 
     function removeToast(id) {
