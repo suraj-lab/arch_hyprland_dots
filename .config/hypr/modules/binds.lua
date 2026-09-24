@@ -16,8 +16,8 @@ hl.bind("XF86AudioNext", hl.dsp.exec_cmd("playerctl next"))
 hl.bind("XF86AudioPrev", hl.dsp.exec_cmd("playerctl previous"))
 
 -- Screenshot
-hl.bind("CTRL + SHIFT + S", hl.dsp.exec_cmd("qs msg screenshot area"))
-hl.bind("Print", hl.dsp.exec_cmd("qs msg screenshot screen"))
+hl.bind("CTRL + SHIFT + S", hl.dsp.exec_cmd("qs ipc call screenshot area"))
+hl.bind("Print", hl.dsp.exec_cmd("qs ipc call screenshot screen"))
 
 -- Keybinds
 hl.bind(mainMod .. " + return", hl.dsp.exec_cmd(terminal))
@@ -25,8 +25,8 @@ hl.bind(mainMod .. " + C", hl.dsp.window.close())
 hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(fileManager))
 hl.bind(mainMod .. " + B", hl.dsp.exec_cmd("firefox"))
 hl.bind(mainMod .. " + P", hl.dsp.window.float({ action = "toggle" }))
-hl.bind(mainMod .. " + Space", hl.dsp.exec_cmd("qs msg launcher toggle"))
-hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("qs msg overview toggle"))
+hl.bind(mainMod .. " + Space", hl.dsp.exec_cmd("qs ipc call launcher toggle"))
+hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("qs ipc call overview toggle"))
 hl.bind(mainMod .. " + V", hl.dsp.exec_cmd("killall wofi || cliphist list | wofi --dmenu | cliphist decode | wl-copy"))
 hl.bind(mainMod .. " + F", hl.dsp.window.fullscreen())
 
@@ -65,7 +65,7 @@ end)
 hl.bind(mainMod .. " + SHIFT + F", toggle_workspace_float)
 hl.bind(mainMod .. " + SHIFT + P", hl.dsp.window.pseudo())
 hl.bind("CTRL + ALT + L", hl.dsp.exec_cmd("hyprlock"))
-hl.bind(mainMod .. " + SHIFT + W", hl.dsp.exec_cmd("qs msg wallpicker toggle"))
+hl.bind(mainMod .. " + SHIFT + W", hl.dsp.exec_cmd("qs ipc call wallpicker toggle"))
 
 -- Gaming Mode: switch to Steam Big Picture in Gamescope (Deck Mode).
 -- Return with Super+Shift+R inside Gaming Mode (evdev monitor) or

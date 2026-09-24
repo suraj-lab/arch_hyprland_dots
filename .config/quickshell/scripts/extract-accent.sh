@@ -76,7 +76,7 @@ label {
 }
 HYPREOF
 
-    command -v qs &>/dev/null && qs msg accent update 2>/dev/null
+    command -v qs &>/dev/null && qs ipc call accent update 2>/dev/null
     exit 0
 }
 
