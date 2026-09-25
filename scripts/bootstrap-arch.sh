@@ -443,8 +443,9 @@ copy_dotfiles() {
   local paths=(
     .bashrc .zshrc
     .config/alacritty .config/environment.d .config/gamescope .config/ghostty
-    .config/hypr .config/kitty .config/mako .config/nvim .config/quickshell
-    .config/starship.toml .config/swaylock .config/waybar .config/wlogout .config/wofi
+    .config/hypr .config/kitty .config/mako .config/matugen .config/mimeapps.list .config/nvim
+    .config/qt5ct .config/qt6ct .config/quickshell .config/starship.toml .config/swaylock
+    .config/waybar .config/wlogout .config/wofi .config/xdg-desktop-portal
   )
   local rel src dst
   sudo_run install -d -o "$TARGET_UID" -g "$TARGET_GID" "$BACKUP_ROOT/home"
@@ -631,6 +632,9 @@ main() {
   install_packages "${manifests[@]}"
   install_flatpaks
   copy_dotfiles
+  # Standard folders (Documents, Downloads, ...) and ~/.config/user-dirs.dirs; not committed
+  # because the tool rewrites paths that don't exist yet.
+  if (( INSTALL_DESKTOP )); then as_user xdg-user-dirs-update || warn "xdg-user-dirs-update failed"; fi
   install_gaming_deploy
   install_sddm_theming
   install_pi

@@ -18,6 +18,8 @@ starship
 firefox
 thunar
 thunar-archive-plugin
+mpv
+viewnior
 pavucontrol
 wl-clipboard
 cliphist

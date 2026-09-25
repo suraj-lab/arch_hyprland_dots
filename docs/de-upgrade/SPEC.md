@@ -741,6 +741,14 @@ HDMI-A-1 stays readable (no inactive dimming), and everything is restored on exi
 - Writing monitor layout from the shell (use nwg-displays).
 
 ## Change log
+- 2026-09-25 — Task 2.4. `.config/mimeapps.list`: Thunar, Firefox (web + PDF), Codium (text/code),
+  Viewnior (images), mpv (video/audio; Suraj kept current apps), File Roller (archives). mpv and
+  viewnior added to desktop-core (extra). `x-scheme-handler/terminal` skipped: Ghostty doesn't
+  declare it and nothing here reads it. Live file merged, not replaced (keeps app-added URL
+  handlers: Discord, Nexus). bootstrap: runs `xdg-user-dirs-update` (user-dirs.dirs not
+  committed: it rewrites missing paths to $HOME); copy list now includes mimeapps.list and the
+  folders Tasks 2.1/2.3 added but bootstrap never copied (matugen, qt5ct, qt6ct,
+  xdg-desktop-portal). docs/README: kvantum references removed (missed in 2.3a).
 - 2026-09-25 — Task 2.3 split (Suraj): 2.3a static base, 2.3b wallpaper colours. Kept breeze-dark
   icons, Adwaita Sans and the cursor (Suraj); Ghostty follows the wallpaper (Suraj).
   2.3a: `GTK_THEME` removed; `QT_QPA_PLATFORMTHEME=qt6ct`; `apply-theme.sh` (autostart) sets
