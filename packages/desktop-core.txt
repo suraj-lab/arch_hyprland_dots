@@ -55,8 +55,6 @@ libsecret
 seahorse
 qt6ct
 qt5ct
-kvantum
-kvantum-qt5
 xdg-user-dirs
 wl-clip-persist
 pacman-contrib

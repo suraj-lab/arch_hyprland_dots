@@ -741,6 +741,11 @@ HDMI-A-1 stays readable (no inactive dimming), and everything is restored on exi
 - Writing monitor layout from the shell (use nwg-displays).
 
 ## Change log
+- 2026-09-25 — Task 2.3 split (Suraj): 2.3a static base, 2.3b wallpaper colours. Kept breeze-dark
+  icons, Adwaita Sans and the cursor (Suraj); Ghostty follows the wallpaper (Suraj).
+  2.3a: `GTK_THEME` removed; `QT_QPA_PLATFORMTHEME=qt6ct`; `apply-theme.sh` (autostart) sets
+  gsettings `adw-gtk3-dark` + `prefer-dark` and syncs gtk-3.0/settings.ini. qt5ct/qt6ct: Fusion,
+  breeze-dark icons. kvantum dropped from desktop-core (unused: qtct palettes suffice).
 - 2026-09-25 — Tasks 2.1 + 2.2 done. Portals: `modules/xdg_portal.lua` removed; D-Bus/systemd
   activate them. System `hyprland-portals.conf` already routes FileChooser/Settings to gtk, so
   the user file only adds `Secret=gnome-keyring` (it must repeat `default=hyprland;gtk`).

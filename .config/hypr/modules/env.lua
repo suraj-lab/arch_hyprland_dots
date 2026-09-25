@@ -1,4 +1,5 @@
 -- Environment
 hl.env("XCURSOR_SIZE", "24")
-hl.env("GTK_THEME", "Adwaita:dark")
+-- GTK theme comes from gsettings (quickshell/scripts/apply-theme.sh), not GTK_THEME.
+hl.env("QT_QPA_PLATFORMTHEME", "qt6ct") -- qt5ct reads the same variable for Qt5
 hl.env("WLR_DRM_NO_ATOMIC", "1")
