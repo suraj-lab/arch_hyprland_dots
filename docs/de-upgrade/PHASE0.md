@@ -146,8 +146,10 @@ Approved reversible tests; state restored after each run.
   backup manifest hash was updated.
 - No QML runtime errors in any new instance.
 
+**Logout passed** on 2026-09-25 (twice, via the session menu; SDDM login afterwards).
+
 **Deferred by Suraj:** timed idle lock/screens-off/wake and Caffeine inhibition,
-Logout, and the Gamescope Gaming Mode round-trip. Phase 0 is functionally complete
+and the Gamescope Gaming Mode round-trip. Phase 0 is functionally complete
 for everything else but not formally signed off until those pass.
 
 ## Supervised deployment and smoke-test checklist

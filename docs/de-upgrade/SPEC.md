@@ -741,6 +741,20 @@ HDMI-A-1 stays readable (no inactive dimming), and everything is restored on exi
 - Writing monitor layout from the shell (use nwg-displays).
 
 ## Change log
+- 2026-09-25 — Tasks 2.1 + 2.2 done. Portals: `modules/xdg_portal.lua` removed; D-Bus/systemd
+  activate them. System `hyprland-portals.conf` already routes FileChooser/Settings to gtk, so
+  the user file only adds `Secret=gnome-keyring` (it must repeat `default=hyprland;gtk`).
+  Correction to 2.1's premise: the systemd user manager outlives logout, and
+  xdg-desktop-portal-hyprland dies with the old compositor and hits start-limit. autostart.lua
+  now imports the env, then stops + reset-fails the three portal units (D-Bus re-activates on
+  first use). Keyring: `gnome-keyring` + `seahorse` installed; `/etc/pam.d/sddm` already had the
+  `-auth`/`-session pam_gnome_keyring.so` lines (unmodified, no /etc edits). The package's user
+  socket (`gnome-keyring-daemon.socket`) is enabled by preset; start it once if the keyring is
+  installed mid-session, or a D-Bus-activated daemon without a control socket blocks PAM unlock.
+  No SSH agent (Suraj). KWallet stays as a library dependency (kio, mozillavpn; no data).
+  Verified after two real logout/logins: FileChooser dialog opens, all 7 portal interfaces, no
+  failed units, `secret-tool store/lookup/clear` with no prompt. Gaming Mode caveat: the return
+  path uses a password-less SDDM autologin, so apps prompt once to unlock the keyring.
 - 2026-09-24 — Phase 1 done (manifest only, nothing installed). desktop-core.txt:
   quickshell-git→quickshell, matugen-bin→matugen, nordic-theme→adw-gtk-theme,
   dropped grimblast-git, sddm-theme-tokyo-night-git and paru (bootstrap builds it), added
