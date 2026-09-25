@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Offline Phase 3 checks; never connect to the running desktop or user bus."""
+"""Offline Phase 3 checks; never connect to the running desktop, user bus or network."""
 import json
 import os
 from pathlib import Path
@@ -12,6 +12,13 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 
+hourly = [{"weatherCode": "113"}] * 8
+WEATHER = {"current_condition": [{"temp_C": "12", "FeelsLikeC": "10", "humidity": "80",
+                                  "windspeedKmph": "15", "weatherCode": "116",
+                                  "weatherDesc": [{"value": "Partly cloudy"}]}],
+           "weather": [{"date": "2026-09-2%d" % i, "maxtempC": "20", "mintempC": "9",
+                        "hourly": hourly} for i in range(3)]}
+
 with tempfile.TemporaryDirectory(prefix=".p3-", dir=ROOT) as tmp:
     home = Path(tmp)
     config = home / ".config/quickshell/settings.json"
@@ -21,7 +28,8 @@ with tempfile.TemporaryDirectory(prefix=".p3-", dir=ROOT) as tmp:
     fixture.write_text((ROOT / "scripts/tests/shell-config.qml").read_text().replace(
         '"../../.config/quickshell/services"', '"services"'))
     (home / "r").mkdir(mode=0o700)
-    # Desktop starts these on construction. No real controller/service commands may run.
+    (home / "weather.json").write_text(json.dumps(WEATHER))
+    # Services start these on construction. No real controller/service/network command may run.
     (home / "bin").mkdir()
     for name, body in {
         "gamemoded": "printf 'gamemode is inactive\\n'",
@@ -30,6 +38,7 @@ with tempfile.TemporaryDirectory(prefix=".p3-", dir=ROOT) as tmp:
         "hyprctl": "exit 1",
         "systemctl": "exit 1",
         "hyprlock": "exit 1",
+        "curl": 'printf "%s\\n" "$*" >> "$HOME/curl-args"; cat "$HOME/weather.json"',
     }.items():
         command = home / "bin" / name
         command.write_text("#!/bin/sh\n" + body + "\n")
@@ -65,34 +74,63 @@ with tempfile.TemporaryDirectory(prefix=".p3-", dir=ROOT) as tmp:
     reader = threading.Thread(target=collect, daemon=True)
     reader.start()
 
-    def expect(lock=600, dpms=900, suspend=0):
-        expected = dict(lockSec=lock, dpmsSec=dpms, suspendSec=suspend)
-        deadline = time.monotonic() + 5
-        config_seen = desktop_seen = False
+    def wait_for(tag, accept, what, timeout=5):
+        # Scan the whole log: expect() may already have taken the line off the queue.
+        deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
+            for line in list(log):
+                if tag + " " in line:
+                    value = json.loads(line.split(tag + " ", 1)[1])
+                    if accept(value):
+                        return value
+            time.sleep(0.1)
+        raise AssertionError(f"No {tag} line with {what}\n{''.join(log)}")
+
+    def expect(lock=600, dpms=900, suspend=0, location="London"):
+        idle = dict(lockSec=lock, dpmsSec=dpms, suspendSec=suspend)
+        desktop = dict(idle, dnd=False, backendDnd=False, gameMode=False)
+        seen = set()
+        deadline = time.monotonic() + 5
+        while seen != {"CONFIG", "DESKTOP"}:
+            if time.monotonic() > deadline:
+                raise AssertionError(f"No update to {idle}, {location}\n{''.join(log)}")
             try:
                 line = lines.get(timeout=0.1)
             except queue.Empty:
                 continue
-            if "CONFIG " in line and json.loads(line.split("CONFIG ", 1)[1]) == expected:
-                config_seen = True
-            if "DESKTOP " in line:
-                desktop = json.loads(line.split("DESKTOP ", 1)[1])
-                desktop_seen = desktop == dict(expected, dnd=False, backendDnd=False, gameMode=False)
-            if config_seen and desktop_seen:
-                return
-        raise AssertionError(f"No config update to {expected}\n{''.join(log)}")
+            if "CONFIG " in line:
+                c = json.loads(line.split("CONFIG ", 1)[1])
+                if c == dict(idle=idle, weather=dict(location=location)):
+                    seen.add("CONFIG")
+            if "DESKTOP " in line and json.loads(line.split("DESKTOP ", 1)[1]) == desktop:
+                seen.add("DESKTOP")
 
     try:
         expect()  # missing file: defaults, and watching for its creation
+        notifs = wait_for("NOTIFS", lambda v: True, "a notification test result")
+        assert notifs == {
+            "toasts": 4, "history": 5, "unread": 5, "oldestToast": 2, "body": "x & y",
+            "criticalTimeout": 0, "customTimeout": 9000, "deskDnd": True,
+            "dnd": [8, 7, 7],                    # history grows; no badge or toast under DND
+            "dismissed": [True, 7, 3],
+            "media": [-1, "Spotify", "Song", "Artist", 3000, 7],  # toast only, not history
+            "cleared": [0, 0, 8, False],
+        }, notifs
+        wait_for("WEATHER", lambda v: v == dict(location="London", temp="12", desc="Partly cloudy",
+                                                days=3, error=False), "the London forecast")
+        sysmon = wait_for("SYSMON", lambda v: True, "CPU/memory/temperature readings", timeout=8)
+        assert 0 <= sysmon["cpu"] <= 100 and 0 < sysmon["mem"] <= 100, sysmon
+        assert 0 < sysmon["temp"] < 120 and sysmon["path"].startswith("/sys/"), sysmon
+
         config.write_text('{"idle":{"lockSec":1200,"dpmsSec":1500,"suspendSec":1800}}')
         expect(1200, 1500, 1800)
         config.write_text('{"idle":{"lockSec":0}}')
         expect(0)
         config.write_text('{"idle":{"lockSec":-1,"dpmsSec":"20","suspendSec":1.5}}')
         expect()
-        config.write_text('{"idle":{"lockSec":700}}')
-        expect(700)
+        config.write_text('{"idle":{"lockSec":700},"weather":{"location":"  New York "}}')
+        expect(700, location="New York")
+        wait_for("WEATHER", lambda v: v["location"] == "New York", "a New York refetch")
         config.write_text('{"idle":')  # an incomplete editor save must retain good settings
         time.sleep(0.3)
         updates = []
@@ -100,18 +138,25 @@ with tempfile.TemporaryDirectory(prefix=".p3-", dir=ROOT) as tmp:
             line = lines.get_nowait()
             if "CONFIG " in line:
                 updates.append(json.loads(line.split("CONFIG ", 1)[1]))
-        assert all(v["lockSec"] == 700 for v in updates), updates
+        assert all(v["idle"]["lockSec"] == 700 for v in updates), updates
         replacement = config.with_suffix(".tmp")
         replacement.write_text('{}')
-        replacement.replace(config)  # atomic editor saves must also reload
+        replacement.replace(config)  # atomic editor saves must also reload; sections reset
         expect()
-        config.write_text('{"idle":{"lockSec":true,"dpmsSec":2147483648}}')
+        config.write_text('{"idle":{"lockSec":true,"dpmsSec":2147483648},"weather":{"location":42}}')
         expect()
+        config.write_text('{"weather":{"location":"' + "x" * 101 + '"}}')
+        expect()
+        urls = (home / "curl-args").read_text().split()
+        assert "wttr.in/London?format=j1" in urls, urls
+        assert "wttr.in/New%20York?format=j1" in urls, urls  # one encoded argument, no shell
         bad = [line for line in log if any(marker in line for marker in (
             " ERROR", "ReferenceError:", "TypeError:", "Binding loop", "Failed to load configuration"))]
         assert not bad, "".join(bad)
         print("PASS: Config defaults, file creation, watched/atomic edits, zero, partial/invalid settings")
         print("PASS: Desktop singleton startup, live timeout bindings and two-way DND wiring (stubbed commands)")
+        print("PASS: Notifs toasts/history/badge/DND/dismiss/clear and media toasts; Weather fetch and "
+              "location reload (stubbed curl); Sysmon live /proc and CPU sensor readings")
     finally:
         proc.terminate()
         try:

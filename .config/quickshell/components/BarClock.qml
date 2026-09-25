@@ -5,6 +5,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Hyprland
 import "../theme"
+import "../services"
 
 Item {
     id: root
@@ -18,97 +19,11 @@ Item {
 
     SystemClock { id: clock; precision: SystemClock.Minutes }
 
-    // ── Weather state ─────────────────────────────────────────────────────
-    property bool weatherLoaded: false
-    property bool weatherError: false
-    property string weatherTemp: ""
-    property string weatherDesc: ""
-    property string weatherFeels: ""
-    property string weatherHumidity: ""
-    property string weatherWind: ""
-    property string weatherCode: ""
-    property var forecastDays: []
-    property real lastWeatherFetch: 0
-
-    // Weather code → Nerd Font icon mapping (wttr.in codes)
-    function weatherIcon(code) {
-        var c = parseInt(code)
-        if (c === 113) return "\uf185"  // sun — clear/sunny
-        if (c === 116) return "\uf6c4"  // cloud-sun — partly cloudy
-        if (c === 119 || c === 122) return "\uf0c2"  // cloud — cloudy/overcast
-        if (c === 143 || c === 248 || c === 260) return "\uf0c2"  // cloud — fog/mist
-        if (c >= 176 && c <= 314) return "\uf043"  // tint — rain variants
-        if (c >= 317 && c <= 338 || c === 179 || c === 182 || c === 185
-            || c === 227 || c === 230 || c === 350) return "\uf2dc"  // snowflake
-        if (c === 200 || c >= 386) return "\uf0e7"  // bolt — thunder
-        return "\uf0c2"  // cloud — fallback
-    }
-
     // Day name from date string "YYYY-MM-DD"
     function dayName(dateStr) {
         var d = new Date(dateStr + "T12:00:00")
         var names = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
         return names[d.getDay()]
-    }
-
-    // ── Weather fetching ──────────────────────────────────────────────────
-    property var _weatherBuf: []
-
-    Process {
-        id: weatherProc
-        command: ["curl", "-sf", "--max-time", "10", "wttr.in/London?format=j1"]
-
-        stdout: SplitParser {
-            onRead: function(line) { root._weatherBuf.push(line) }
-        }
-
-        onRunningChanged: {
-            if (!running) {
-                var raw = root._weatherBuf.join("")
-                root._weatherBuf = []
-                if (raw.length === 0) { root.weatherError = true; return }
-                try {
-                    var d = JSON.parse(raw)
-                    var cc = d.current_condition[0]
-                    root.weatherTemp = cc.temp_C
-                    root.weatherDesc = cc.weatherDesc[0].value
-                    root.weatherFeels = cc.FeelsLikeC
-                    root.weatherHumidity = cc.humidity
-                    root.weatherWind = cc.windspeedKmph
-                    root.weatherCode = cc.weatherCode
-
-                    var fc = []
-                    var days = d.weather
-                    for (var i = 0; i < Math.min(3, days.length); i++) {
-                        // Use the most common weather code from hourly data
-                        var codes = {}
-                        var maxCode = days[i].hourly[4].weatherCode  // midday hour
-                        fc.push({
-                            date:  days[i].date,
-                            high:  days[i].maxtempC,
-                            low:   days[i].mintempC,
-                            code:  maxCode
-                        })
-                    }
-                    root.forecastDays = fc
-                    root.weatherLoaded = true
-                    root.weatherError = false
-                    root.lastWeatherFetch = Date.now()
-                } catch(e) {
-                    root.weatherError = true
-                }
-            }
-        }
-    }
-
-    // Fetch on startup
-    Component.onCompleted: weatherProc.running = true
-
-    // Refresh every 30 minutes
-    Timer {
-        interval: 1800000
-        running: true; repeat: true
-        onTriggered: weatherProc.running = true
     }
 
     // ── Bar display ────────────────────────────────────────────────────────
@@ -158,9 +73,7 @@ Item {
             viewMonth = clock.date.getMonth()
             viewYear = clock.date.getFullYear()
             calGrabDelay.restart()
-            if (Date.now() - lastWeatherFetch > 600000) {
-                weatherProc.running = true
-            }
+            Weather.refreshIfStale()
         } else {
             root._grabReady = false
             calGrabDelay.stop()
@@ -331,7 +244,7 @@ Item {
                 Item {
                     Layout.fillWidth: true
                     implicitHeight: 36
-                    visible: root.weatherError && !root.weatherLoaded
+                    visible: Weather.error && !Weather.loaded
                     Layout.topMargin: 4
 
                     Text {
@@ -347,7 +260,7 @@ Item {
                 Item {
                     Layout.fillWidth: true
                     implicitHeight: 36
-                    visible: !root.weatherLoaded && !root.weatherError
+                    visible: !Weather.loaded && !Weather.error
                     Layout.topMargin: 4
 
                     Text {
@@ -363,7 +276,7 @@ Item {
                 Item {
                     Layout.fillWidth: true
                     implicitHeight: currentRow.implicitHeight
-                    visible: root.weatherLoaded
+                    visible: Weather.loaded
                     Layout.topMargin: 4
                     Layout.leftMargin: 4; Layout.rightMargin: 4
 
@@ -374,11 +287,11 @@ Item {
 
                         // Weather icon
                         Text {
-                            text: root.weatherIcon(root.weatherCode)
+                            text: Weather.icon(Weather.code)
                             font.pixelSize: 28
                             font.family: Theme.fontFamily
                             color: {
-                                var c = parseInt(root.weatherCode)
+                                var c = parseInt(Weather.code)
                                 if (c === 113) return Theme.warning    // sunny = warm
                                 if (c === 116) return root.barAccent     // partly cloudy
                                 if (c === 200 || c >= 386) return Theme.purple  // thunder
@@ -394,13 +307,13 @@ Item {
                             Layout.fillWidth: true
 
                             Text {
-                                text: root.weatherTemp + "\u00b0C"
+                                text: Weather.temp + "\u00b0C"
                                 font.pixelSize: 22; font.bold: true
                                 font.family: Theme.fontFamily
                                 color: Theme.text
                             }
                             Text {
-                                text: root.weatherDesc
+                                text: Weather.desc
                                 font.pixelSize: 9
                                 font.family: Theme.fontFamily
                                 color: Theme.textFaint
@@ -413,19 +326,19 @@ Item {
                             Layout.alignment: Qt.AlignRight
 
                             Text {
-                                text: "Feels " + root.weatherFeels + "\u00b0"
+                                text: "Feels " + Weather.feels + "\u00b0"
                                 font.pixelSize: 9; font.family: Theme.fontFamily
                                 color: Theme.textDimmer
                                 Layout.alignment: Qt.AlignRight
                             }
                             Text {
-                                text: "Humid " + root.weatherHumidity + "%"
+                                text: "Humid " + Weather.humidity + "%"
                                 font.pixelSize: 9; font.family: Theme.fontFamily
                                 color: Theme.textDimmer
                                 Layout.alignment: Qt.AlignRight
                             }
                             Text {
-                                text: "Wind " + root.weatherWind + "km/h"
+                                text: "Wind " + Weather.wind + "km/h"
                                 font.pixelSize: 9; font.family: Theme.fontFamily
                                 color: Theme.textDimmer
                                 Layout.alignment: Qt.AlignRight
@@ -440,13 +353,13 @@ Item {
                     Layout.leftMargin: 4; Layout.rightMargin: 4
                     Layout.topMargin: 4
                     spacing: 4
-                    visible: root.weatherLoaded && root.forecastDays.length > 0
+                    visible: Weather.loaded && Weather.forecastDays.length > 0
 
                     Repeater {
-                        model: root.forecastDays.length
+                        model: Weather.forecastDays.length
 
                         Rectangle {
-                            property var day: root.forecastDays[index] || ({})
+                            property var day: Weather.forecastDays[index] || ({})
 
                             Layout.fillWidth: true
                             implicitHeight: fcCol.implicitHeight + 12
@@ -479,7 +392,7 @@ Item {
                                     Layout.alignment: Qt.AlignHCenter
                                 }
                                 Text {
-                                    text: day.code ? root.weatherIcon(day.code) : ""
+                                    text: day.code ? Weather.icon(day.code) : ""
                                     font.pixelSize: 16
                                     font.family: Theme.fontFamily
                                     color: Theme.textDim
@@ -509,7 +422,7 @@ Item {
                     Layout.fillWidth: true
                     Layout.leftMargin: 4; Layout.rightMargin: 4
                     Layout.topMargin: 2; Layout.bottomMargin: 2
-                    visible: root.weatherLoaded
+                    visible: Weather.loaded
 
                     Text {
                         text: "London, GB"

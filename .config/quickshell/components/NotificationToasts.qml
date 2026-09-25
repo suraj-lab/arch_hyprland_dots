@@ -3,13 +3,13 @@ import QtQuick.Layouts
 import "../theme"
 
 // Pure display component — toast data is managed by ShellRoot's Connections.
-// Receives the shared ListModel (shellRoot.globalToastModel) as `toastModel`.
+// Receives the shared ListModel (Notifs.toastModel) as `toastModel`.
 
 Item {
     id: root
 
-    property var toastModel:  null   // shellRoot.globalToastModel
-    property var dismissFunc: null   // function(id) — shell.qml's dismissNotif
+    property var toastModel:  null   // Notifs.toastModel
+    property var dismissFunc: null   // function(id) — Notifs.dismiss
 
     readonly property bool hasToasts: toastModel != null && toastModel.count > 0
 

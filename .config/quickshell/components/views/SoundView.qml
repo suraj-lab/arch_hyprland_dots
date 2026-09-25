@@ -5,6 +5,7 @@ import Quickshell.Io
 import Quickshell.Services.Mpris
 import Qt5Compat.GraphicalEffects
 import "../../theme"
+import "../../services"
 
 Item {
     id: root
@@ -26,8 +27,8 @@ Item {
     property string defaultSinkDesc: ""
 
     // ── Media state ──────────────────────────────────────────────────────
-    property var playerList: []
-    property int activeIdx: 0
+    readonly property var playerList: Media.players
+    property int activeIdx: 0             // per view: each monitor picks its own player
     property var activePlayer: {
         if (playerList.length === 0) return null
         var idx = Math.min(activeIdx, playerList.length - 1)
@@ -48,20 +49,9 @@ Item {
         return root.barAccent
     }
 
-    function refreshPlayers() {
-        var list = Mpris.players.values
-        var result = []
-        for (var i = 0; i < list.length; i++) {
-            if (list[i].canTogglePlaying || list[i].trackTitle) result.push(list[i])
-        }
-        playerList = result
-        if (activeIdx >= result.length) activeIdx = Math.max(0, result.length - 1)
-    }
+    function refreshPlayers() { Media.refresh() }   // re-applies the filter (e.g. on tab open)
 
-    Connections {
-        target: Mpris.players
-        function onValuesChanged() { refreshPlayers() }
-    }
+    onPlayerListChanged: if (activeIdx >= playerList.length) activeIdx = Math.max(0, playerList.length - 1)
 
     Timer {
         interval: 1000

@@ -146,8 +146,9 @@ deploy/gaming/                       FROZEN (§1.2)
   string gamemoded never prints, so it never showed).
 - Session overlay: a sixth "Gaming" button that runs `/usr/local/bin/switch-to-gaming`.
 - The unused `runShellAction(id)` patch scaffold is deferred until Phase 5 has a caller.
-- Approved live deployment/startup/IPC checks passed on 2026-09-24. Interactive,
-  idle and Gaming Mode round-trip checks remain pending; see PHASE0.md.
+- Approved live deployment/startup/IPC checks passed on 2026-09-24. Idle lock, screens-off
+  and Caffeine confirmed working by Suraj on 2026-09-25. The Gaming Mode round-trip remains
+  pending; see PHASE0.md.
 
 ### 2.3 Known gaps (what this spec fixes)
 | Area | Problem |
@@ -741,6 +742,30 @@ HDMI-A-1 stays readable (no inactive dimming), and everything is restored on exi
 - Writing monitor layout from the shell (use nwg-displays).
 
 ## Change log
+- 2026-09-25 — Phase 3 slice 2 (Notifs/Media/Weather/Sysmon), deployed with Suraj's approval.
+  `Notifs`: NotificationServer (keepOnReload), toast/history models, unread count, DND,
+  dismiss/clearAll moved verbatim out of ShellRoot; shell.qml keeps only the DND↔Desktop wiring.
+  `Media`: controllable-player list (same filter) and track-change detection; the toast is
+  built in Notifs. Unchanged: media toasts still show under DND and stay out of history. Each
+  monitor's Sound tab still picks its own player. `Weather`: one wttr.in fetch for all
+  monitors (was one per bar); location from `settings.json` `weather.location` (default London,
+  trimmed, ≤100 chars), URL-encoded as a single curl argument; refetches on change.
+  `Sysmon`: /proc/stat and /proc/meminfo via FileView every 3 s (was bash+vmstat+free while
+  the drawer was open); same CPU/memory meaning. Bug fixed: the temperature came from
+  thermal_zone0, which here is the Wi-Fi card (iwlwifi); it now reads the CPU package
+  sensor by hwmon name (k10temp Tctl / coretemp / zenpower), falling back to the old zone.
+  GPU temperature not exposed yet (no consumer until the Phase 4 dashboard).
+  Component interfaces unchanged (NotificationToasts test untouched). Checks: phase0 and
+  phase3 pass; the harness now also runs Notifs (cap, timeouts, DND, dismiss, clear, media
+  toast), Weather (stubbed curl: London, then an encoded "New York" refetch) and Sysmon
+  (live /proc and CPU sensor) with no D-Bus, network or compositor. qmllint 599 → 585 warnings.
+  Suraj: keep media toasts visible under DND. Live backup `phase3-slice2-20260925-215753`
+  (live files matched HEAD, so settings.json was replaced, not merged). Restart verified:
+  desktop IPC healthy, Notifications owned by Quickshell, no new log warnings, keybinds
+  unchanged, all 12 files match the repo; a real notify-send reached the new service.
+- 2026-09-25 — Verified by Suraj in daily use: idle lock and screens-off have fired on their timers
+  throughout, and Caffeine holds them off. Still untested: D-Bus ScreenSaver inhibits from apps
+  (e.g. Firefox video), which hypridle now owns (2.7). Gamescope round-trip still pending.
 - 2026-09-25 — Pre-existing bug found by Suraj during the Phase 3 check: re-clicking a bar chip did
   not close its popup. UnifiedPanel's grab includes the bar, and `open()` never toggled; it now
   closes when the same view's chip is clicked again. BarClock's grab excluded the bar, so the

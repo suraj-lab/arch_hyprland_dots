@@ -3,5 +3,8 @@
     "lockSec": 600,
     "dpmsSec": 900,
     "suspendSec": 0
+  },
+  "weather": {
+    "location": "London"
   }
 }

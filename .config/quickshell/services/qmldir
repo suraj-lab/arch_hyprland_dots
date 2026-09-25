@@ -2,3 +2,7 @@ module services
 singleton Config 1.0 Config.qml
 singleton Desktop 1.0 Desktop.qml
 singleton Hypr 1.0 Hypr.qml
+singleton Media 1.0 Media.qml
+singleton Notifs 1.0 Notifs.qml
+singleton Sysmon 1.0 Sysmon.qml
+singleton Weather 1.0 Weather.qml

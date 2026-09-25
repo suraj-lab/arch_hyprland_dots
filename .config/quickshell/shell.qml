@@ -4,8 +4,6 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
-import Quickshell.Services.Notifications
-import Quickshell.Services.Mpris
 import "theme"
 import "components"
 import "services"
@@ -14,26 +12,7 @@ ShellRoot {
     id: shellRoot
     settings.watchFiles: true
 
-    // ── Notification state — all managed at ShellRoot level ───────────────
-    // The server exposes no notifications list or doNotDisturb property.
-    // We manage our own history via onNotification + n.tracked = true.
-
-    NotificationServer { id: notifServerInst; keepOnReload: true }
-    ListModel { id: toastModelInst    }   // active toasts
-    ListModel { id: notifHistoryModel }   // notification history
-
-    property var  globalToastModel:   null   // → toastModelInst
-    property var  globalNotifModel:   null   // → notifHistoryModel
-    property var  notifMap:           ({})   // notifId → Notification object
-    property int  notifUnreadCount:   0
-    property bool hasToasts:          toastModelInst.count > 0
-    property bool dndEnabled:         false   // local DND (server has no property for it)
-
-    Component.onCompleted: {
-        globalToastModel = toastModelInst
-        globalNotifModel = notifHistoryModel
-        accentReadProc.running = true   // read cached accents on startup
-    }
+    Component.onCompleted: accentReadProc.running = true   // read cached accents on startup
 
     // ── Per-monitor dynamic accent colors from wallpaper ──────────────────
     property var monitorAccents: ({})       // { "DP-2": "#ab12cd", ... }
@@ -75,133 +54,6 @@ ShellRoot {
         }
     }
 
-    // ── MPRIS track change toasts ────────────────────────────────────────
-    property string _lastTrackKey: ""
-    property int _mprisToastId: -1
-
-    Connections {
-        target: Mpris.players
-        function onValuesChanged() { shellRoot.checkTrackChange() }
-    }
-
-    Timer {
-        id: trackCheckTimer
-        interval: 2000; running: true; repeat: true
-        onTriggered: shellRoot.checkTrackChange()
-    }
-
-    function checkTrackChange() {
-        try {
-            var players = Mpris.players.values
-            if (!players || players.length === 0) return
-            var active = null
-            for (var i = 0; i < players.length; i++) {
-                var p = players[i]
-                if (p && p.playbackState === MprisPlaybackState.Playing) {
-                    active = p; break
-                }
-            }
-            if (!active || !active.trackTitle) return
-
-            var key = (active.identity || "") + "|" + active.trackTitle + "|" + (active.trackArtist || "")
-            if (key === _lastTrackKey) return
-            var isFirst = _lastTrackKey === ""
-            _lastTrackKey = key
-
-            if (isFirst) return
-
-            if (toastModelInst.count >= 4) toastModelInst.remove(0)
-            var artUrl = active.trackArtUrl || ""
-            var tid = shellRoot._mprisToastId--
-            toastModelInst.append({
-                notifId:      tid,
-                appName:      active.identity || "Media",
-                summary:      active.trackTitle,
-                body:         artUrl ? "art:" + artUrl : (active.trackArtist || ""),
-                urgency:      0,
-                toastTimeout: 3000
-            })
-        } catch(e) {}
-    }
-
-    // All notification logic lives here — notifServerInst id is in scope.
-    Connections {
-        target: notifServerInst
-        function onNotification(n) {
-            n.tracked = true
-
-            // Always store in history so missed notifications are reviewable
-            var body = n.body
-                       ? n.body.replace(/<[^>]*>/g, "")
-                               .replace(/&amp;/g, "&")
-                               .replace(/&lt;/g,  "<")
-                               .replace(/&gt;/g,  ">")
-                       : ""
-            notifHistoryModel.append({
-                notifId:   n.id,
-                appName:   n.appName  || "",
-                summary:   n.summary  || "",
-                body:      body,
-                urgency:   n.urgency,
-                notifTime: Date.now()
-            })
-            var m = shellRoot.notifMap
-            m[n.id] = n
-            shellRoot.notifMap = m
-
-            // DND: stored in history but no toast and no badge increment
-            if (shellRoot.dndEnabled) return
-
-            shellRoot.notifUnreadCount++
-
-            // Toast
-            if (toastModelInst.count >= 4) toastModelInst.remove(0)
-            var timeout = (n.expireTimeout > 0 && n.expireTimeout <= 15000)
-                          ? n.expireTimeout : 5000
-            if (n.urgency === 2) timeout = 0
-            toastModelInst.append({
-                notifId:      n.id,
-                appName:      n.appName  || "",
-                summary:      n.summary  || "",
-                body:         body,
-                urgency:      n.urgency,
-                toastTimeout: timeout
-            })
-        }
-    }
-
-    // Dismiss a single notification by id (called from child signals)
-    function dismissNotif(id) {
-        var n = shellRoot.notifMap[id]
-        if (n) {
-            n.tracked = false
-            try { n.close() } catch(e) {}
-        }
-        // Remove from toast model
-        for (var t = 0; t < toastModelInst.count; t++) {
-            if (toastModelInst.get(t).notifId === id) { toastModelInst.remove(t); break }
-        }
-        // Remove from history model
-        for (var i = 0; i < notifHistoryModel.count; i++) {
-            if (notifHistoryModel.get(i).notifId === id) { notifHistoryModel.remove(i); break }
-        }
-        var m = Object.assign({}, shellRoot.notifMap)
-        delete m[id]
-        shellRoot.notifMap = m
-    }
-
-    // Clear all notifications
-    function clearAllNotifs() {
-        var ids = Object.keys(shellRoot.notifMap)
-        for (var i = 0; i < ids.length; i++) {
-            var n = shellRoot.notifMap[ids[i]]
-            if (n) { n.tracked = false; try { n.close() } catch(e) {} }
-        }
-        toastModelInst.clear()
-        notifHistoryModel.clear()
-        shellRoot.notifMap = {}
-    }
-
     // ── App launcher state ──────────────────────────────────────────────────
     property bool launcherOpen: false
 
@@ -223,10 +75,10 @@ ShellRoot {
     ScreenTimeTracker { id: stTracker }
 
     // ── Desktop services: idle, caffeine, night light, desktop game mode ──
-    Binding { target: Desktop; property: "dndEnabled"; value: shellRoot.dndEnabled }
+    Binding { target: Desktop; property: "dndEnabled"; value: Notifs.dndEnabled }
     Connections {
         target: Desktop
-        function onDndRequested(enabled) { shellRoot.dndEnabled = enabled }
+        function onDndRequested(enabled) { Notifs.dndEnabled = enabled }
     }
 
 
@@ -326,10 +178,10 @@ ShellRoot {
                         id: notifChip
                         anchors.verticalCenter: parent.verticalCenter
                         barAccent: barPanel.screenAccent
-                        externalUnreadCount: shellRoot.notifUnreadCount
-                        dndEnabled:          shellRoot.dndEnabled
+                        externalUnreadCount: Notifs.unreadCount
+                        dndEnabled:          Notifs.dndEnabled
                         onChipClicked: { barClock.popupOpen = false; unifiedPanel.open("notifs") }
-                        onPanelOpened: shellRoot.notifUnreadCount = 0
+                        onPanelOpened: Notifs.unreadCount = 0
                     }
                     ControlCenter {
                         id: ccChip
@@ -351,12 +203,12 @@ ShellRoot {
                     barAccent: barPanel.screenAccent
                     screenTimeTracker: stTracker
                     desktop: Desktop
-                    notifModel:  shellRoot.globalNotifModel
-                    dndEnabled:  shellRoot.dndEnabled
-                    onDismissRequested:  function(id) { shellRoot.dismissNotif(id) }
-                    onClearAllRequested: shellRoot.clearAllNotifs()
-                    onDndToggled:        shellRoot.dndEnabled = !shellRoot.dndEnabled
-                    onPanelOpened:       shellRoot.notifUnreadCount = 0
+                    notifModel:  Notifs.historyModel
+                    dndEnabled:  Notifs.dndEnabled
+                    onDismissRequested:  function(id) { Notifs.dismiss(id) }
+                    onClearAllRequested: Notifs.clearAll()
+                    onDndToggled:        Notifs.dndEnabled = !Notifs.dndEnabled
+                    onPanelOpened:       Notifs.unreadCount = 0
                     onPanelOpenChanged:  if (panelOpen) barClock.popupOpen = false
                 }
             }
@@ -726,8 +578,8 @@ ShellRoot {
             exclusionMode: ExclusionMode.Ignore
             WlrLayershell.layer: WlrLayer.Overlay
 
-            // shellRoot.hasToasts is a ShellRoot property — same mechanism as sessionOpen
-            visible: shellRoot.hasToasts
+            // Shown only while a toast is up (Notifs.hasToasts)
+            visible: Notifs.hasToasts
 
             NotificationToasts {
                 id: toastsItem
@@ -738,8 +590,8 @@ ShellRoot {
                 }
                 width:  parent.width
                 height: parent.height - (Theme.barHeight + Theme.barMarginTop + 8)
-                toastModel:  shellRoot.globalToastModel
-                dismissFunc: function(id) { shellRoot.dismissNotif(id) }
+                toastModel:  Notifs.toastModel
+                dismissFunc: function(id) { Notifs.dismiss(id) }
             }
         }
     }

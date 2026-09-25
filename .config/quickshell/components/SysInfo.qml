@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
-import Quickshell.Io
 import "../theme"
+import "../services"
 
 RowLayout {
     spacing: Theme.barSpacing
@@ -39,37 +39,9 @@ RowLayout {
             opacity: expanded ? 1.0 : 0.0
             Behavior on opacity { NumberAnimation { duration: Theme.animSlow } }
 
-            Text { id: cpuText;  color: Theme.pink;    font.pixelSize: Theme.fontBar; font.bold: true; font.family: Theme.fontFamily; text: "\ue266 --%"   }
-            Text { id: memText;  color: Theme.warning; font.pixelSize: Theme.fontBar; font.bold: true; font.family: Theme.fontFamily; text: "\uf2db --%"   }
-            Text { id: tempText; color: Theme.success; font.pixelSize: Theme.fontBar; font.bold: true; font.family: Theme.fontFamily; text: "\uf2c8 --°C" }
+            Text { id: cpuText;  color: Theme.pink;    font.pixelSize: Theme.fontBar; font.bold: true; font.family: Theme.fontFamily; text: "\ue266 " + (Sysmon.cpu < 0 ? "--" : Sysmon.cpu) + "%" }
+            Text { id: memText;  color: Theme.warning; font.pixelSize: Theme.fontBar; font.bold: true; font.family: Theme.fontFamily; text: "\uf2db " + (Sysmon.mem < 0 ? "--" : Sysmon.mem) + "%" }
+            Text { id: tempText; color: Theme.success; font.pixelSize: Theme.fontBar; font.bold: true; font.family: Theme.fontFamily; text: "\uf2c8 " + (Sysmon.temp < 0 ? "--" : Sysmon.temp) + "°C" }
         }
-    }
-
-    onExpandedChanged: statsProc.running = expanded ? true : false
-
-    Process {
-        id: statsProc
-        command: ["bash", "-c",
-            "cpu=$(vmstat 1 2 | tail -1 | awk '{print 100-$15}'); " +
-            "mem=$(free | awk '/Mem/{printf \"%.0f\", $3/$2*100}'); " +
-            "temp=$(cat /sys/class/thermal/thermal_zone*/temp 2>/dev/null | sort -rn | head -1); " +
-            "echo \"${cpu:-0}|${mem:-0}|$((${temp:-0}/1000))\""
-        ]
-        stdout: SplitParser {
-            onRead: data => {
-                var p = data.split("|")
-                if (p.length < 3) return
-                cpuText.text  = "\ue266 " + p[0] + "%"
-                memText.text  = "\uf2db " + p[1] + "%"
-                tempText.text = "\uf2c8 " + p[2] + "°C"
-            }
-        }
-    }
-
-    Timer {
-        interval: 3000
-        running: expanded
-        repeat: true
-        onTriggered: { statsProc.running = false; statsProc.running = true }
     }
 }

@@ -17,6 +17,19 @@ QtObject {
         }
     }
 
+    readonly property var weather: {
+        settingsFile.text()
+        var values = settingsData.weather || {}
+        var location = typeof values.location === "string" ? values.location.trim() : ""
+        return { location: location && location.length <= 100 ? location : "London" }
+    }
+
+    readonly property var sections: ["idle", "weather"]
+    function resetSections(data) {
+        for (var i = 0; i < sections.length; i++)
+            if (!data || !(sections[i] in data)) settingsData[sections[i]] = ({})
+    }
+
     function timeout(value, fallback) {
         return typeof value === "number" && Number.isInteger(value)
             && value >= 0 && value <= 2147483647 ? value : fallback
@@ -25,6 +38,7 @@ QtObject {
     property JsonAdapter settingsAdapter: JsonAdapter {
         id: settingsData
         property var idle: ({})
+        property var weather: ({})
     }
 
     property FileView settingsFile: FileView {
@@ -39,12 +53,11 @@ QtObject {
             // JsonAdapter retains omitted properties; deleting a section should restore defaults.
             try {
                 var data = JSON.parse(text())
-                if (data && typeof data === "object" && !Array.isArray(data) && !("idle" in data))
-                    settingsData.idle = ({})
+                if (data && typeof data === "object" && !Array.isArray(data)) root.resetSections(data)
             } catch (error) {} // JsonAdapter reports malformed JSON and retains the last good values.
         }
         onLoadFailed: function(error) {
-            if (error === FileViewError.FileNotFound) settingsData.idle = ({})
+            if (error === FileViewError.FileNotFound) root.resetSections(null)
             else console.warn("Cannot read shell settings: " + FileViewError.toString(error))
         }
     }
