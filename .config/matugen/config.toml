@@ -1,0 +1,31 @@
+# App colours (GTK, Qt, Ghostty, Hyprland borders). The input is the shell's neon accent,
+# not the image, so apps match the bar. Run by quickshell/scripts/extract-accent.sh:
+#   matugen color hex <accent> -c ~/.config/matugen/config.toml -m dark -t scheme-vibrant
+# Buttons/selection use primary/on_primary (contrast-safe); borders/cursor use the exact accent.
+[config]
+
+[templates.gtk3]
+input_path = '~/.config/matugen/templates/gtk.css'
+output_path = '~/.config/gtk-3.0/gtk.css'
+
+[templates.gtk4]
+input_path = '~/.config/matugen/templates/gtk.css'
+output_path = '~/.config/gtk-4.0/gtk.css'
+
+[templates.qt6ct]
+input_path = '~/.config/matugen/templates/qtct-colors.conf'
+output_path = '~/.config/qt6ct/colors/matugen.conf'
+
+[templates.qt5ct]
+input_path = '~/.config/matugen/templates/qtct-colors.conf'
+output_path = '~/.config/qt5ct/colors/matugen.conf'
+
+[templates.ghostty]
+input_path = '~/.config/matugen/templates/ghostty'
+output_path = '~/.config/ghostty/themes/matugen'
+
+[templates.hyprland]
+input_path = '~/.config/matugen/templates/hypr-colors.lua'
+output_path = '~/.config/hypr/colors.lua'
+# dofile, not `hyprctl eval "$(cat …)"`: hyprctl parses the file's leading `--` comment as a flag.
+post_hook = '''hyprctl eval 'dofile(os.getenv("HOME") .. "/.config/hypr/colors.lua")' >/dev/null 2>&1 || true'''

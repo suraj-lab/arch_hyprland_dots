@@ -49,6 +49,11 @@ local function set_random_wallpaper(output)
 			.. " --transition-step 3"
 			.. " "
 			.. shell_quote(image)
+			-- Recolour the shell (and apps, for the theme monitor) like the wallpaper picker does.
+			.. " && ~/.config/quickshell/scripts/extract-accent.sh "
+			.. shell_quote(image)
+			.. " "
+			.. shell_quote(output)
 	)
 end
 

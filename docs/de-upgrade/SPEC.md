@@ -746,6 +746,19 @@ HDMI-A-1 stays readable (no inactive dimming), and everything is restored on exi
   2.3a: `GTK_THEME` removed; `QT_QPA_PLATFORMTHEME=qt6ct`; `apply-theme.sh` (autostart) sets
   gsettings `adw-gtk3-dark` + `prefer-dark` and syncs gtk-3.0/settings.ini. qt5ct/qt6ct: Fusion,
   breeze-dark icons. kvantum dropped from desktop-core (unused: qtct palettes suffice).
+  2.3b deviation: matugen's input is the shell's neon accent (`matugen color hex <accent>
+  -t scheme-vibrant`), not the image; Material dark `primary` from the image was pastel and
+  didn't match the bar. GTK/Qt accents use primary/on_primary (contrast-safe); borders and the
+  Ghostty cursor use the exact accent. matugen 4.2 needs an empty `[config]` table. Outputs:
+  gtk-3.0/gtk-4.0 gtk.css, qt5ct/qt6ct colors/matugen.conf, ghostty/themes/matugen (bg/fg/
+  selection/cursor; Cyberpunk ANSI kept), hypr/colors.lua (`pcall(require, "colors")` +
+  post_hook `hyprctl eval 'dofile(...)'`; `eval "$(cat)"` fails on the leading `--` comment).
+  Apps follow THEME_MONITOR (DP-2). Found and fixed: the 30-min wallpaper rotation never ran
+  extract-accent.sh (hyprlock.conf was last written 2026-06-01); it now does. hyprlock keeps its
+  existing heredoc in extract-accent.sh (already accent-driven). Verified live: hook updates
+  borders, restore exact; scratch-HOME e2e for DP-2/HDMI-A-1 and fresh-install generation.
+  Verified after re-login: GTK_THEME unset, portal prefer-dark, rotation recoloured all targets
+  unattended; Thunar, Seahorse, qt6ct and launcher icons checked by Suraj (icons improved).
 - 2026-09-25 — Tasks 2.1 + 2.2 done. Portals: `modules/xdg_portal.lua` removed; D-Bus/systemd
   activate them. System `hyprland-portals.conf` already routes FileChooser/Settings to gtk, so
   the user file only adds `Secret=gnome-keyring` (it must repeat `default=hyprland;gtk`).

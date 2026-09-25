@@ -12,6 +12,8 @@ MONITOR="$2"
 
 CACHE_DIR="$HOME/.cache/quickshell"
 mkdir -p "$CACHE_DIR"
+# Apps (GTK, Qt, Ghostty, window borders) have one theme: they follow this monitor's accent.
+THEME_MONITOR="${THEME_MONITOR:-DP-2}"
 
 # Determine output file
 if [ -z "$MONITOR" ] || [ "$MONITOR" = "All" ]; then
@@ -77,6 +79,9 @@ label {
 HYPREOF
 
     command -v qs &>/dev/null && qs ipc call accent update 2>/dev/null
+    if [ -z "$MONITOR" ] || [ "$MONITOR" = "All" ] || [ "$MONITOR" = "$THEME_MONITOR" ]; then
+        matugen color hex "$1" -c "$HOME/.config/matugen/config.toml" -m dark -t scheme-vibrant -q 2>/dev/null
+    fi
     exit 0
 }
 
