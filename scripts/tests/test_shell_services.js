@@ -113,3 +113,37 @@ fakeAudio.volume = 0.34; osd.check(); assert.equal(shown, 1);
 fakeAudio.muted = true; osd.check(); assert.equal(shown, 2);
 osd.check(); assert.equal(shown, 2);                                  // no change, no popup
 console.log('PASS: OSD appears only on real volume/mute changes');
+
+// Net: the real functions with fake NetworkManager networks.
+const Sec = {Open: 0, Wpa2Psk: 1, toString: v => (v === 0 ? 'Open' : 'WPA2')};
+const wnet = (name, extra = {}) => Object.assign({name, connected: false, known: false, signalStrength: 0.5,
+    security: Sec.Wpa2Psk, connects: 0, connect() { this.connects++; }}, extra);
+const home = wnet('home', {connected: true, known: true, signalStrength: 0.72});
+const strong = wnet('cafe', {signalStrength: 0.9, security: Sec.Open});
+const saved = wnet('office', {known: true, signalStrength: 0.4});
+const hostile = wnet("x'; touch /tmp/pwned; echo '", {signalStrength: 0.3});
+const hidden = wnet('', {signalStrength: 0.99});
+const dispatched2 = [];
+const net = load('services/Net.qml', ['entry', 'sortNetworks', 'connect'],
+    {WifiSecurityType: Sec, Hypr: {dispatch: lua => dispatched2.push(lua)}});
+Object.assign(net, {root: net, wifiDevice: {networks: {values: [saved, hostile, strong, home, hidden]}}});
+const list = JSON.parse(JSON.stringify(net.sortNetworks(net.wifiDevice.networks.values)));
+assert.deepEqual(list.map(n => n.ssid), ['home', 'cafe', 'office', hostile.name]);  // connected first, no hidden
+assert.deepEqual(list[0], {inUse: true, ssid: 'home', signal: 72, known: true, security: 'WPA2'});
+assert.equal(list[1].security, '');                                   // open: no label, like nmcli '--'
+net.connect('office'); net.connect('cafe'); net.connect('missing');
+assert.deepEqual([saved.connects, strong.connects, dispatched2.length], [1, 1, 0]);  // known/open: native
+net.connect(hostile.name);                                            // new secured: terminal fallback
+assert.equal(dispatched2.length, 1);
+const lua = dispatched2[0];
+const arg = JSON.parse(lua.match(/^hl\.dsp\.exec_cmd\(("(?:[^"\\]|\\.)*")/)[1]);    // the Lua string == JSON string
+assert.equal(arg, "ghostty -e nmcli dev wifi connect 'x'\\''; touch /tmp/pwned; echo '\\''' --ask");
+const {execFileSync} = require('node:child_process');                // sh sees exactly one argument
+const argv = execFileSync('sh', ['-c', arg.replace('ghostty -e ', 'printf "%s\\n" '), 'sh'], {encoding: 'utf8'});
+assert.deepEqual(argv.trimEnd().split('\n'), ['nmcli', 'dev', 'wifi', 'connect', hostile.name, '--ask']);
+console.log('PASS: Net list order/labels, native connect for known/open, untrusted SSID stays one argument');
+
+const bt = load('services/Bt.qml', ['toggle']);
+bt.adapter = {enabled: true}; bt.toggle(); assert.equal(bt.adapter.enabled, false);
+bt.adapter = null; bt.toggle();                                       // no adapter: no throw
+console.log('PASS: Bt power toggle');

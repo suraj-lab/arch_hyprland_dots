@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Io
 import "../../theme"
+import "../../services"
 
 // System view for the unified panel.
 // Brightness, quick toggles, network drill-in, power profiles, display info.
@@ -68,14 +69,13 @@ Item {
 
     // ── System state ───────────────────────────────────────────────────────
     property real brightness: 0
-    property bool wifiEnabled: false
-    property bool bluetoothEnabled: false
-    property string wifiSSID: ""
+    readonly property bool wifiEnabled: Net.wifiEnabled
+    readonly property bool bluetoothEnabled: Bt.enabled
+    readonly property string wifiSSID: Net.ssid
 
     // ── Network state ────────────────────────────────────────────────────
     property bool networkViewOpen: false
-    property var networkList: []
-    property var knownNetworks: []
+    readonly property var networkList: Net.networks
 
     // ── Display info state ───────────────────────────────────────────────
     property var monitors: []
@@ -83,7 +83,6 @@ Item {
     // ── Refresh on view becoming active ──────────────────────────────────
     onViewActiveChanged: {
         if (viewActive) {
-            refresh()
             refreshBrightness()
             monitorReadProc.running = true
         } else {
@@ -91,20 +90,8 @@ Item {
         }
     }
 
-    // ── System polling ─────────────────────────────────────────────────────
-    function refresh() {
-        wifiReadProc.running = true
-        btReadProc.running = true
-    }
-
     function refreshBrightness() {
         brightReadProc.running = true
-    }
-
-    Timer {
-        interval: root.viewActive ? 2000 : 10000
-        running: true; repeat: true
-        onTriggered: refresh()
     }
 
     // Brightness (DDC/CI via ddcutil)
@@ -122,31 +109,6 @@ Item {
             }
         }
     }
-
-    // Wifi
-    Process {
-        id: wifiReadProc
-        command: ["bash", "-c", "echo $(nmcli radio wifi); nmcli -t -f active,ssid dev wifi 2>/dev/null | grep '^yes' | cut -d: -f2 | head -1"]
-        stdout: SplitParser {
-            property int lineNum: 0
-            onRead: data => {
-                if (lineNum === 0) root.wifiEnabled = (data.trim() === "enabled")
-                else if (lineNum === 1) root.wifiSSID = data.trim()
-                lineNum++
-            }
-        }
-        onRunningChanged: { if (running) wifiReadProc.stdout.lineNum = 0 }
-    }
-
-    // Bluetooth
-    Process {
-        id: btReadProc
-        command: ["bash", "-c", "bluetoothctl show 2>/dev/null | grep 'Powered:' | awk '{print $2}'"]
-        stdout: SplitParser {
-            onRead: data => { root.bluetoothEnabled = (data.trim() === "yes") }
-        }
-    }
-
 
     // Monitor info
     property var _monBuf: []
@@ -181,100 +143,16 @@ Item {
 
     // ── Commands ────────────────────────────────────────────────────────────
     Process { id: brightCmdProc }
-    Process { id: toggleCmdProc; onRunningChanged: { if (!running) refresh() } }
 
-    // ── Network scanning ─────────────────────────────────────────────────
-    property var _netBuf: []
-
-    Process {
-        id: netScanProc
-        command: ["nmcli", "-t", "-f", "IN-USE,SSID,SIGNAL,SECURITY", "dev", "wifi", "list", "--rescan", "auto"]
-        stdout: SplitParser {
-            onRead: function(line) { root._netBuf.push(line) }
-        }
-        onRunningChanged: {
-            if (!running) {
-                var raw = root._netBuf.slice()
-                root._netBuf = []
-                var seen = {}
-                var result = []
-                for (var i = 0; i < raw.length; i++) {
-                    var parts = raw[i].split(":")
-                    if (parts.length < 4) continue
-                    var inUse = parts[0].trim() === "*"
-                    var ssid = parts[1].trim()
-                    if (!ssid) continue
-                    var signal = parseInt(parts[2].trim()) || 0
-                    var security = parts.slice(3).join(":").trim()
-                    if (seen[ssid] !== undefined) {
-                        if (signal > result[seen[ssid]].signal) result[seen[ssid]].signal = signal
-                        if (inUse) result[seen[ssid]].inUse = true
-                        continue
-                    }
-                    seen[ssid] = result.length
-                    result.push({ inUse: inUse, ssid: ssid, signal: signal, security: security })
-                }
-                result.sort(function(a, b) {
-                    if (a.inUse && !b.inUse) return -1
-                    if (!a.inUse && b.inUse) return 1
-                    return b.signal - a.signal
-                })
-                root.networkList = result
-            }
-        }
-    }
-
-    property var _knownBuf: []
-
-    Process {
-        id: knownNetProc
-        command: ["nmcli", "-t", "-f", "NAME,TYPE", "con", "show"]
-        stdout: SplitParser {
-            onRead: function(line) { root._knownBuf.push(line) }
-        }
-        onRunningChanged: {
-            if (!running) {
-                var names = []
-                for (var i = 0; i < root._knownBuf.length; i++) {
-                    var parts = root._knownBuf[i].split(":")
-                    if (parts.length >= 2 && parts[1].trim().indexOf("wireless") >= 0)
-                        names.push(parts[0].trim())
-                }
-                root._knownBuf = []
-                root.knownNetworks = names
-            }
-        }
-    }
-
+    // ── Wi-Fi networks (services/Net: NetworkManager over D-Bus) ─────────
     function isKnownNetwork(ssid) {
-        for (var i = 0; i < knownNetworks.length; i++) {
-            if (knownNetworks[i] === ssid) return true
-        }
-        return false
+        var n = Net.networks.find(function(x) { return x.ssid === ssid })
+        return !!(n && n.known)
     }
-
-    function scanNetworks() {
-        knownNetProc.running = true
-        netScanProc.running = true
-    }
-
-    Process {
-        id: netConnectProc
-        onRunningChanged: { if (!running) scanNetworks() }
-    }
-
-    function connectToNetwork(ssid, security) {
-        var isOpen = !security || security === "" || security === "--"
-        var isKnown = isKnownNetwork(ssid)
-        if (isOpen || isKnown) {
-            netConnectProc.command = ["nmcli", "dev", "wifi", "connect", ssid]
-            netConnectProc.running = true
-        } else {
-            var shellSsid = "'" + ssid.replace(/'/g, "'\\''") + "'"
-            Hyprland.dispatch("hl.dsp.exec_cmd(" + JSON.stringify("ghostty -e nmcli dev wifi connect " + shellSsid + " --ask")
-                + ", { float = true, size = { \"40%\", \"30%\" }, center = true })")
-        }
-    }
+    function scanNetworks() { Net.scan() }
+    function connectToNetwork(ssid, security) { Net.connect(ssid) }
+    // Keep the scanner on while the list is open (each scan() lasts 30 s).
+    Timer { interval: 20000; running: root.networkViewOpen; repeat: true; onTriggered: Net.scan() }
 
     function setBrightness(v) {
         var pct = Math.max(5, Math.min(100, Math.round(v * 100)))
@@ -284,14 +162,8 @@ Item {
             "ddcutil setvcp 10 " + pct + " --bus 10 --noverify & wait"]
         brightCmdProc.running = true
     }
-    function toggleWifi() {
-        toggleCmdProc.command = ["nmcli", "radio", "wifi", wifiEnabled ? "off" : "on"]
-        toggleCmdProc.running = true
-    }
-    function toggleBluetooth() {
-        toggleCmdProc.command = ["bash", "-c", "command -v bluetoothctl >/dev/null && bluetoothctl power " + (bluetoothEnabled ? "off" : "on")]
-        toggleCmdProc.running = true
-    }
+    function toggleWifi() { Net.toggleWifi() }
+    function toggleBluetooth() { Bt.toggle() }
     function toggleDND() {
         dndToggled()
     }

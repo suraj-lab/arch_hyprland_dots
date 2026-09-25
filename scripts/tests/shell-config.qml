@@ -81,7 +81,12 @@ ShellRoot {
         interval: 100; running: true; repeat: true
         onTriggered: {
             if (!Desktop._gameChecked) return
-            if (!root.notifsTested) { root.notifsTested = true; root.notifsTest(); Audio.refreshStates() }
+            if (!root.notifsTested) {
+                root.notifsTested = true; root.notifsTest(); Audio.refreshStates()
+                console.log("NETBT " + JSON.stringify({ wifi: Net.wifiEnabled, ssid: Net.ssid,
+                    networks: Net.networks.length, bt: Bt.enabled }))
+                Net.scan(); Net.connect("anything"); Bt.toggle()   // no device/adapter: must be no-ops
+            }
             console.log("DESKTOP " + JSON.stringify({
                 lockSec: Desktop.lockTimeout, dpmsSec: Desktop.dpmsTimeout,
                 suspendSec: Desktop.suspendTimeout, dnd: Notifs.dndEnabled,

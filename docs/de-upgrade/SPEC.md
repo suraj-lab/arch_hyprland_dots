@@ -742,6 +742,25 @@ HDMI-A-1 stays readable (no inactive dimming), and everything is restored on exi
 - Writing monitor layout from the shell (use nwg-displays).
 
 ## Change log
+- 2026-09-25 — Phase 3 slice 3b (Net/Bt), deployed with Suraj's approval.
+  Before: the System tab polled nmcli + bluetoothctl every 2 s while open and every 10 s
+  always (one timer per monitor), plus 3 nmcli processes per network-list refresh. `Net`
+  (Quickshell.Networking, NetworkManager over D-Bus): wifiEnabled switch, connected SSID,
+  network list in the old item shape (connected first, then signal; hidden networks
+  dropped; Open → no label, else "WPA2"/"WPA3"…), native `connect()` for known/open networks,
+  scanner on for 30 s per scan (kept on while the list is open). Fixed as a side effect:
+  SSIDs containing ':' were split by the `nmcli -t` parser. New secured networks keep the
+  terminal fallback (`ghostty -e nmcli … --ask`) until the Phase 6 password prompt; SSIDs are
+  untrusted, and the sh-quote + JSON/Lua string path is unit-tested with a hostile SSID
+  (arrives as one argument). Known edge: an SSID with control characters makes the Lua string
+  invalid, so that connect fails safely. `Bt` (Quickshell.Bluetooth): adapter power only; the
+  device list waits for the Phase 6 UI. Checked live (read-only probe): 4 NM devices, wlan0
+  connected at 72%, adapter "arch" enabled; values arrive ~1 s after start.
+  Brightness unchanged (read on tab open; slice 3c). Checks: phase0/phase3 pass; the harness
+  now also requires the Networking "no backend" error as proof that D-Bus stayed unreachable.
+  Live backup `phase3-netbt-20260925-225755`. Restart verified: no nmcli/bluetoothctl/wpctl/
+  pactl process over 12 s (old timer fired every 10 s), no new log warnings, desktop IPC and
+  notifications fine, keybinds unchanged, Wi-Fi/Bluetooth state unchanged by the restart.
 - 2026-09-25 — Phase 3 slice 3a (Audio), deployed with Suraj's approval.
   Measured before: ~8 wpctl processes/second all the time (Volume chip 1 s, OSD 0.5 s, Sound
   tab 1 s; one each per monitor) plus 7 pactl calls per Sound-tab refresh. `Audio` now uses

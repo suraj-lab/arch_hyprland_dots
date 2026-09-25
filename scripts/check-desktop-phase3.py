@@ -123,6 +123,8 @@ with tempfile.TemporaryDirectory(prefix=".p3-", dir=ROOT) as tmp:
         wait_for("AUDIO", lambda v: v == dict(ready=False, volume=0, sinks=0, apps=0,
                                               states={"dock": "running"}),
                  "Audio loaded without PipeWire, pactl states parsed")
+        wait_for("NETBT", lambda v: v == dict(wifi=False, ssid="", networks=0, bt=False),
+                 "Net/Bt loaded without D-Bus")
         sysmon = wait_for("SYSMON", lambda v: True, "CPU/memory/temperature readings", timeout=8)
         assert 0 <= sysmon["cpu"] <= 100 and 0 < sysmon["mem"] <= 100, sysmon
         assert 0 < sysmon["temp"] < 120 and sysmon["path"].startswith("/sys/"), sysmon
@@ -156,7 +158,8 @@ with tempfile.TemporaryDirectory(prefix=".p3-", dir=ROOT) as tmp:
         assert "wttr.in/London?format=j1" in urls, urls
         assert "wttr.in/New%20York?format=j1" in urls, urls  # one encoded argument, no shell
         # The sandbox deliberately has no PipeWire or D-Bus; these errors prove it stayed isolated.
-        expected = ("quickshell.service.pipewire.loop: Failed to connect pipewire context",)
+        expected = ("quickshell.service.pipewire.loop: Failed to connect pipewire context",
+                    "quickshell.network: Network will not work. Could not find an available backend")
         for e in expected:
             assert any(e in line for line in log), "harness may have reached the real session: " + e
         bad = [line for line in log if not any(e in line for e in expected) and any(marker in line for marker in (
@@ -166,7 +169,7 @@ with tempfile.TemporaryDirectory(prefix=".p3-", dir=ROOT) as tmp:
         print("PASS: Desktop singleton startup, live timeout bindings and two-way DND wiring (stubbed commands)")
         print("PASS: Notifs toasts/history/badge/DND/dismiss/clear and media toasts; Weather fetch and "
               "location reload (stubbed curl); Sysmon live /proc and CPU sensor readings; Audio "
-              "loads without PipeWire (stubbed pactl states)")
+              "loads without PipeWire (stubbed pactl states); Net/Bt load without D-Bus")
     finally:
         proc.terminate()
         try:
