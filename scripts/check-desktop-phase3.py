@@ -44,6 +44,19 @@ with tempfile.TemporaryDirectory(prefix=".p3-", dir=ROOT) as tmp:
         command = home / "bin" / name
         command.write_text("#!/bin/sh\n" + body + "\n")
         command.chmod(0o700)
+    (home / "bin" / "ddcutil").write_text("#!/bin/sh\n" + "\n".join([
+'if [ "$1" = detect ]; then cat <<\'EOF\'',
+'Display 1',
+'   I2C bus:          /dev/i2c-8',
+'   DRM connector:    card1-HDMI-A-1',
+'',
+'Display 2',
+'   I2C bus:          /dev/i2c-10',
+'   DRM connector:    card1-DP-2',
+'EOF',
+'elif [ "$1" = getvcp ]; then echo \'VCP 10 C 28 100\'',
+'fi']) + "\n")
+    (home / "bin" / "ddcutil").chmod(0o700)
     (config.parent / "scripts").mkdir()
     (config.parent / "scripts/desktop-gamemode.py").write_text(
         'print(\'{"gameMode":false,"dnd":false}\')\n')
@@ -125,6 +138,8 @@ with tempfile.TemporaryDirectory(prefix=".p3-", dir=ROOT) as tmp:
                  "Audio loaded without PipeWire, pactl states parsed")
         wait_for("NETBT", lambda v: v == dict(wifi=False, ssid="", networks=0, bt=False),
                  "Net/Bt loaded without D-Bus")
+        wait_for("BRIGHT", lambda v: v["ready"] and abs(v["brightness"] - 0.28) < 0.001
+                 and v["buses"] == 2, "Brightness detect -> read with stubbed ddcutil")
         sysmon = wait_for("SYSMON", lambda v: True, "CPU/memory/temperature readings", timeout=8)
         assert 0 <= sysmon["cpu"] <= 100 and 0 < sysmon["mem"] <= 100, sysmon
         assert 0 < sysmon["temp"] < 120 and sysmon["path"].startswith("/sys/"), sysmon
@@ -169,7 +184,8 @@ with tempfile.TemporaryDirectory(prefix=".p3-", dir=ROOT) as tmp:
         print("PASS: Desktop singleton startup, live timeout bindings and two-way DND wiring (stubbed commands)")
         print("PASS: Notifs toasts/history/badge/DND/dismiss/clear and media toasts; Weather fetch and "
               "location reload (stubbed curl); Sysmon live /proc and CPU sensor readings; Audio "
-              "loads without PipeWire (stubbed pactl states); Net/Bt load without D-Bus")
+              "loads without PipeWire (stubbed pactl states); Net/Bt load without D-Bus; "
+              "Brightness detect->read (stubbed ddcutil)")
     finally:
         proc.terminate()
         try:

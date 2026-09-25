@@ -742,6 +742,17 @@ HDMI-A-1 stays readable (no inactive dimming), and everything is restored on exi
 - Writing monitor layout from the shell (use nwg-displays).
 
 ## Change log
+- 2026-09-25 — Phase 3 slice 3c (Brightness), deployed with Suraj's approval.
+  `Brightness` singleton owns ddcutil. `ddcutil detect --brief` runs once at startup and maps
+  DRM connector → I2C bus (verified live: HDMI-A-1→8, DP-2→10), so the hardcoded 8/10 in
+  SystemView go away. Read still samples one monitor's brightness (first detected bus; was
+  bus 8 = HDMI-A-1), and the single slider still sets every detected monitor, so behaviour is
+  unchanged until Phase 4 adds per-monitor controls. SystemView now binds `brightness` to the
+  singleton and delegates read/set to it. Checks: phase0/phase3 pass; parseDetect is unit
+  tested (real ddcutil output + a partial-entry rejection); the harness stubs ddcutil (detect,
+  getvcp→28%, setvcp no-op) and asserts the detect→read path resolves both buses.
+  Live backup `phase3-brightness-20260925-230602`. Restart verified: no new log warnings,
+  desktop IPC and notifications fine, keybinds unchanged, live brightness still 100%.
 - 2026-09-25 — Phase 3 slice 3b (Net/Bt), deployed with Suraj's approval.
   Before: the System tab polled nmcli + bluetoothctl every 2 s while open and every 10 s
   always (one timer per monitor), plus 3 nmcli processes per network-list refresh. `Net`

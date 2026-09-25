@@ -147,3 +147,21 @@ const bt = load('services/Bt.qml', ['toggle']);
 bt.adapter = {enabled: true}; bt.toggle(); assert.equal(bt.adapter.enabled, false);
 bt.adapter = null; bt.toggle();                                       // no adapter: no throw
 console.log('PASS: Bt power toggle');
+
+// Brightness: parse the real `ddcutil detect --brief` output into connector → bus.
+const br = load('services/Brightness.qml', ['parseDetect']);
+const detect = `Display 1
+   I2C bus:          /dev/i2c-8
+   DRM connector:    card1-HDMI-A-1
+   drm_connector_id: 471
+   Monitor:          VSC:VX2476 Series:UPA213310203
+
+Display 2
+   I2C bus:          /dev/i2c-10
+   DRM connector:    card1-DP-2
+   drm_connector_id: 458
+   Monitor:          DEL:AW3423DWF:70742S3
+`;
+assert.deepEqual(JSON.parse(JSON.stringify(br.parseDetect(detect))), {'HDMI-A-1': 8, 'DP-2': 10});
+assert.deepEqual(JSON.parse(JSON.stringify(br.parseDetect('garbage\nI2C bus: /dev/i2c-7\nno connector'))), {});
+console.log('PASS: Brightness detect parses connector → bus and ignores partial entries');

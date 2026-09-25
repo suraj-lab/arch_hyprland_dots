@@ -68,7 +68,7 @@ Item {
     implicitHeight: panelCol.implicitHeight
 
     // ── System state ───────────────────────────────────────────────────────
-    property real brightness: 0
+    readonly property real brightness: Brightness.brightness
     readonly property bool wifiEnabled: Net.wifiEnabled
     readonly property bool bluetoothEnabled: Bt.enabled
     readonly property string wifiSSID: Net.ssid
@@ -83,30 +83,10 @@ Item {
     // ── Refresh on view becoming active ──────────────────────────────────
     onViewActiveChanged: {
         if (viewActive) {
-            refreshBrightness()
+            Brightness.read()
             monitorReadProc.running = true
         } else {
             networkViewOpen = false
-        }
-    }
-
-    function refreshBrightness() {
-        brightReadProc.running = true
-    }
-
-    // Brightness (DDC/CI via ddcutil)
-    Process {
-        id: brightReadProc
-        command: ["bash", "-c", "ddcutil getvcp 10 --bus 8 --brief 2>/dev/null | awk '{print $4, $5}'"]
-        stdout: SplitParser {
-            onRead: data => {
-                var parts = data.trim().split(/\s+/)
-                if (parts.length >= 2) {
-                    var current = parseInt(parts[0])
-                    var max = parseInt(parts[1])
-                    if (!isNaN(current) && !isNaN(max) && max > 0) root.brightness = current / max
-                }
-            }
         }
     }
 
@@ -141,9 +121,6 @@ Item {
         }
     }
 
-    // ── Commands ────────────────────────────────────────────────────────────
-    Process { id: brightCmdProc }
-
     // ── Wi-Fi networks (services/Net: NetworkManager over D-Bus) ─────────
     function isKnownNetwork(ssid) {
         var n = Net.networks.find(function(x) { return x.ssid === ssid })
@@ -154,14 +131,7 @@ Item {
     // Keep the scanner on while the list is open (each scan() lasts 30 s).
     Timer { interval: 20000; running: root.networkViewOpen; repeat: true; onTriggered: Net.scan() }
 
-    function setBrightness(v) {
-        var pct = Math.max(5, Math.min(100, Math.round(v * 100)))
-        root.brightness = pct / 100
-        brightCmdProc.command = ["bash", "-c",
-            "ddcutil setvcp 10 " + pct + " --bus 8 --noverify & " +
-            "ddcutil setvcp 10 " + pct + " --bus 10 --noverify & wait"]
-        brightCmdProc.running = true
-    }
+    function setBrightness(v) { Brightness.set(v) }
     function toggleWifi() { Net.toggleWifi() }
     function toggleBluetooth() { Bt.toggle() }
     function toggleDND() {

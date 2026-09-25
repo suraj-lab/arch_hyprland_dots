@@ -31,6 +31,16 @@ ShellRoot {
         }
     }
 
+    // Brightness with stubbed ddcutil: detect must resolve both buses and read 28%.
+    Connections {
+        target: Brightness
+        function onBrightnessChanged() {
+            if (!Brightness.ready) return
+            console.log("BRIGHT " + JSON.stringify({ ready: Brightness.ready,
+                brightness: Brightness.brightness, buses: Brightness.buses.length }))
+        }
+    }
+
     // Audio with no PipeWire reachable: must load quietly and report "not ready".
     Connections {
         target: Audio

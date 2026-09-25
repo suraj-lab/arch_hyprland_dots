@@ -1,5 +1,6 @@
 module services
 singleton Audio 1.0 Audio.qml
+singleton Brightness 1.0 Brightness.qml
 singleton Bt 1.0 Bt.qml
 singleton Config 1.0 Config.qml
 singleton Desktop 1.0 Desktop.qml
