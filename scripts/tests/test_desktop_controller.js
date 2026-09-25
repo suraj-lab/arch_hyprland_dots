@@ -5,7 +5,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const source = fs.readFileSync(path.join(__dirname,
-    '../../.config/quickshell/components/DesktopServices.qml'), 'utf8');
+    '../../.config/quickshell/services/Desktop.qml'), 'utf8');
 const pending = [];
 const state = {
     gameModeOverride: 'auto', gamemodedActive: false, gameMode: false,

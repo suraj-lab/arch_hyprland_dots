@@ -1,0 +1,7 @@
+{
+  "idle": {
+    "lockSec": 600,
+    "dpmsSec": 900,
+    "suspendSec": 0
+  }
+}

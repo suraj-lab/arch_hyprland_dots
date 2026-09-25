@@ -747,6 +747,29 @@ HDMI-A-1 stays readable (no inactive dimming), and everything is restored on exi
   click cleared the grab and then reopened; it now includes the bar window (as UnifiedPanel
   does). Clicking elsewhere on the bar no longer closes the calendar (same as the panel).
   Deployed; backup `panel-toggle-20260925-210815`.
+- 2026-09-25 — Phase 3 first slice (Config/Desktop/Hypr), deployed with Suraj's approval.
+  Registered singletons in `services/qmldir`; moved DesktopServices to `services/Desktop.qml`
+  without changing its controller/IPC policy. ShellRoot still owns DND and explicitly binds it
+  to Desktop; existing bar/panel consumers share that singleton. `Hypr` now owns the shell's
+  focused-monitor lookups and logout dispatch, with a per-monitor fullscreen helper; other
+  components' direct Hyprland use remains for later slices.
+  `Config` watches `~/.config/quickshell/settings.json` via FileView/JsonAdapter. This slice
+  exposes only `idle.lockSec`, `idle.dpmsSec`, `idle.suspendSec` (defaults 600/900/0); zero
+  disables a stage. Missing/invalid fields use defaults, malformed JSON keeps the last good
+  values, and deleting a section restores defaults. No automatic writes. Other schema sections
+  and monitor overrides will be added with their consumers; hyprsunset.conf remains the
+  night-light schedule source until then.
+  Checks: `python3 scripts/check-desktop-phase0.py` and `python3 scripts/check-desktop-phase3.py`
+  pass. The latter exercises real Config/Desktop bindings in offscreen Quickshell with a
+  scratch HOME, inaccessible D-Bus/compositor, and stubbed service/helper commands; unit checks
+  cover Hypr and the existing Game Mode policy. Qt 6 parsing passes; qmllint still reports
+  Quickshell type-metadata warnings. Targeted live backup: `phase3-services-20260925-205658`
+  under `~/.local/state/dotfiles-backups/`; retired DesktopServices.qml preserved there.
+  Restart verified: desktop IPC healthy (Game Mode status known, no controller error),
+  org.freedesktop.Notifications owned by Quickshell, no QML/controller errors, only icon/SVG
+  warnings. All six deployed files match the repository; live keybind JSON is unchanged.
+  User visual bar/overlay and DND checks, idle/caffeine and Gamescope round-trip remain pending.
+  No keybind or frozen-path edits; this slice is not committed yet.
 - 2026-09-25 — Task 2.7: hypridle, hooks only (Suraj). `.config/hypr/hypridle.conf` has
   `lock_cmd`, `before_sleep_cmd = loginctl lock-session`, `after_sleep_cmd` dpms on,
   `inhibit_sleep = 3`; no listeners (idle timers stay in DesktopServices.qml). hypridle 0.1.8

@@ -1,13 +1,14 @@
+pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 
-// DesktopServices — the "desktop environment" glue that Hyprland doesn't
+// Desktop — the "desktop environment" glue that Hyprland doesn't
 // provide on its own:
-//   • Idle management (lock → screens off → optional suspend), replacing
-//     a separate hypridle daemon. Respects idle inhibitors (video players,
-//     games using SDL/Proton), Caffeine, and Desktop Game Mode.
+//   • Idle management (lock → screens off → optional suspend). hypridle
+//     handles lock-session / sleep hooks only. Respects Wayland idle
+//     inhibitors, Caffeine, and Desktop Game Mode.
 //   • Caffeine (manual idle inhibit; the IdleInhibitor itself lives on the
 //     bar window in shell.qml because it needs a surface).
 //   • Night Light (hyprsunset schedule daemon on/off).
@@ -22,9 +23,9 @@ Item {
     visible: false
 
     // ── Settings (seconds; 0 disables that stage) ─────────────────────────
-    property int lockTimeout:    600
-    property int dpmsTimeout:    900
-    property int suspendTimeout: 0     // desktop: off by default
+    readonly property int lockTimeout:    Config.idle.lockSec
+    readonly property int dpmsTimeout:    Config.idle.dpmsSec
+    readonly property int suspendTimeout: Config.idle.suspendSec
     property string nightLightCmd: "hyprsunset"   // schedule in ~/.config/hypr/hyprsunset.conf
 
     // ── Wiring to ShellRoot's DND state ───────────────────────────────────

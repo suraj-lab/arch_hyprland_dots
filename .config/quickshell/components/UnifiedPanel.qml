@@ -21,7 +21,7 @@ Item {
     property var  notifModel: null
     property bool dndEnabled: false
     property var  screenTimeTracker: null
-    property var  desktop: null            // DesktopServices
+    property var  desktop: null            // services/Desktop singleton
     signal dismissRequested(int notifId)
     signal clearAllRequested()
     signal dndToggled()

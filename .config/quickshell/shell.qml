@@ -4,11 +4,11 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
-import Quickshell.Hyprland
 import Quickshell.Services.Notifications
 import Quickshell.Services.Mpris
 import "theme"
 import "components"
+import "services"
 
 ShellRoot {
     id: shellRoot
@@ -223,15 +223,14 @@ ShellRoot {
     ScreenTimeTracker { id: stTracker }
 
     // ── Desktop services: idle, caffeine, night light, desktop game mode ──
-    DesktopServices {
-        id: desk
-        dndEnabled: shellRoot.dndEnabled
-        onDndRequested: function(enabled) { shellRoot.dndEnabled = enabled }
+    Binding { target: Desktop; property: "dndEnabled"; value: shellRoot.dndEnabled }
+    Connections {
+        target: Desktop
+        function onDndRequested(enabled) { shellRoot.dndEnabled = enabled }
     }
 
 
     Process { id: pLock;    command: ["hyprlock"]                            }
-    Process { id: pLogout;  command: ["hyprctl", "dispatch", "hl.dsp.exit()"] }
     Process { id: pSuspend; command: ["systemctl", "suspend"]               }
     Process { id: pReboot;  command: ["systemctl", "reboot"]                }
     Process { id: pOff;     command: ["systemctl", "poweroff"]              }
@@ -261,7 +260,7 @@ ShellRoot {
             // Caffeine: inhibit idle while enabled (needs a surface — the bar).
             IdleInhibitor {
                 window: barPanel
-                enabled: desk.caffeine
+                enabled: Desktop.caffeine
             }
 
             Rectangle {
@@ -320,8 +319,8 @@ ShellRoot {
                         onChipClicked: { barClock.popupOpen = false; unifiedPanel.open("sound") }
                     }
                     Microphone  { anchors.verticalCenter: parent.verticalCenter; barAccent: barPanel.screenAccent }
-                    Caffeine    { anchors.verticalCenter: parent.verticalCenter; barAccent: barPanel.screenAccent; active: desk.caffeine; onClicked: desk.toggleCaffeine() }
-                    GameMode    { anchors.verticalCenter: parent.verticalCenter; barAccent: barPanel.screenAccent; active: desk.gameMode; onClicked: desk.toggleGameMode() }
+                    Caffeine    { anchors.verticalCenter: parent.verticalCenter; barAccent: barPanel.screenAccent; active: Desktop.caffeine; onClicked: Desktop.toggleCaffeine() }
+                    GameMode    { anchors.verticalCenter: parent.verticalCenter; barAccent: barPanel.screenAccent; active: Desktop.gameMode; onClicked: Desktop.toggleGameMode() }
 
                     NotificationCenter {
                         id: notifChip
@@ -351,7 +350,7 @@ ShellRoot {
                     parentWindow: barPanel
                     barAccent: barPanel.screenAccent
                     screenTimeTracker: stTracker
-                    desktop: desk
+                    desktop: Desktop
                     notifModel:  shellRoot.globalNotifModel
                     dndEnabled:  shellRoot.dndEnabled
                     onDismissRequested:  function(id) { shellRoot.dismissNotif(id) }
@@ -374,8 +373,8 @@ ShellRoot {
         function toggle() {
             if (!shellRoot.launcherOpen) {
                 // Capture focused monitor before opening
-                shellRoot.launcherScreen = Hyprland.focusedMonitor != null
-                    ? Hyprland.focusedMonitor.name : null
+                shellRoot.launcherScreen = Hypr.focusedMonitor != null
+                    ? Hypr.focusedMonitor.name : null
             }
             shellRoot.launcherOpen = !shellRoot.launcherOpen
         }
@@ -414,8 +413,8 @@ ShellRoot {
         target: "wallpicker"
         function toggle() {
             if (!shellRoot.wallpickerOpen) {
-                shellRoot.wallpickerScreen = Hyprland.focusedMonitor != null
-                    ? Hyprland.focusedMonitor.name : null
+                shellRoot.wallpickerScreen = Hypr.focusedMonitor != null
+                    ? Hypr.focusedMonitor.name : null
             }
             shellRoot.wallpickerOpen = !shellRoot.wallpickerOpen
         }
@@ -451,13 +450,13 @@ ShellRoot {
     IpcHandler {
         target: "screenshot"
         function area() {
-            shellRoot.screenshotScreen = Hyprland.focusedMonitor != null
-                ? Hyprland.focusedMonitor.name : null
+            shellRoot.screenshotScreen = Hypr.focusedMonitor != null
+                ? Hypr.focusedMonitor.name : null
             shellRoot.screenshotMode = "area"
         }
         function screen() {
-            shellRoot.screenshotScreen = Hyprland.focusedMonitor != null
-                ? Hyprland.focusedMonitor.name : null
+            shellRoot.screenshotScreen = Hypr.focusedMonitor != null
+                ? Hypr.focusedMonitor.name : null
             shellRoot.screenshotMode = "screen"
         }
     }
@@ -494,8 +493,8 @@ ShellRoot {
         target: "overview"
         function toggle() {
             if (!shellRoot.overviewOpen) {
-                shellRoot.overviewScreen = Hyprland.focusedMonitor != null
-                    ? Hyprland.focusedMonitor.name : null
+                shellRoot.overviewScreen = Hypr.focusedMonitor != null
+                    ? Hypr.focusedMonitor.name : null
             }
             shellRoot.overviewOpen = !shellRoot.overviewOpen
         }
@@ -503,8 +502,8 @@ ShellRoot {
             shellRoot.overviewOpen = false
         }
         function open() {
-            shellRoot.overviewScreen = Hyprland.focusedMonitor != null
-                ? Hyprland.focusedMonitor.name : null
+            shellRoot.overviewScreen = Hypr.focusedMonitor != null
+                ? Hypr.focusedMonitor.name : null
             shellRoot.overviewOpen = true
         }
     }
@@ -621,7 +620,7 @@ ShellRoot {
                                 scale: h2.containsMouse ? 1.07 : 1.0
                                 Behavior on color { ColorAnimation { duration: 150 } }
                                 Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutBack } }
-                                MouseArea { id: h2; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { pLogout.running = true; sessionOpen = false } }
+                                MouseArea { id: h2; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { Hypr.dispatch("hl.dsp.exit()"); sessionOpen = false } }
                                 ColumnLayout { anchors.centerIn: parent; spacing: 5
                                     Text { text: "\uf2f5"; color: h2.containsMouse ? Theme.warning : Theme.textDimmer; font.pixelSize: 26; font.family: Theme.fontFamily; Layout.alignment: Qt.AlignHCenter; Behavior on color { ColorAnimation { duration: 150 } } }
                                     Text { text: "Logout"; color: h2.containsMouse ? Theme.warning : Theme.textDim; font.pixelSize: Theme.fontSm; font.bold: true; font.family: Theme.fontFamily; Layout.alignment: Qt.AlignHCenter; Behavior on color { ColorAnimation { duration: 150 } } }
@@ -660,7 +659,7 @@ ShellRoot {
                                 scale: h6.containsMouse ? 1.07 : 1.0
                                 Behavior on color { ColorAnimation { duration: 150 } }
                                 Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutBack } }
-                                MouseArea { id: h6; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { desk.enterGamingMode(); sessionOpen = false } }
+                                MouseArea { id: h6; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { Desktop.enterGamingMode(); sessionOpen = false } }
                                 ColumnLayout { anchors.centerIn: parent; spacing: 5
                                     Text { text: "\uf11b"; color: h6.containsMouse ? Theme.success : Theme.textDimmer; font.pixelSize: 26; font.family: Theme.fontFamily; Layout.alignment: Qt.AlignHCenter; Behavior on color { ColorAnimation { duration: 150 } } }
                                     Text { text: "Gaming"; color: h6.containsMouse ? Theme.success : Theme.textDim; font.pixelSize: Theme.fontSm; font.bold: true; font.family: Theme.fontFamily; Layout.alignment: Qt.AlignHCenter; Behavior on color { ColorAnimation { duration: 150 } } }
@@ -701,8 +700,8 @@ ShellRoot {
             WlrLayershell.layer: WlrLayer.Overlay
 
             visible: osdItem.osdVisible
-                     && Hyprland.focusedMonitor !== null
-                     && Hyprland.focusedMonitor.name === modelData.name
+                     && Hypr.focusedMonitor !== null
+                     && Hypr.focusedMonitor.name === modelData.name
 
             OSD {
                 id: osdItem
