@@ -59,6 +59,7 @@ qt6ct
 qt5ct
 xdg-user-dirs
 wl-clip-persist
+hypridle
 pacman-contrib
 udisks2
 udiskie

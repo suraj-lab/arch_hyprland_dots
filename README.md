@@ -105,7 +105,7 @@ gst-plugin-pipewire xdg-desktop-portal-hyprland networkmanager btop \
 fastfetch nwg-look nwg-displays adw-gtk-theme papirus-icon-theme \
 noto-fonts noto-fonts-emoji ttf-jetbrains-mono-nerd \
 ttf-nerd-fonts-symbols-common xdg-desktop-portal-gtk gnome-keyring \
-libsecret seahorse qt6ct qt5ct xdg-user-dirs wl-clip-persist \
+libsecret seahorse qt6ct qt5ct xdg-user-dirs wl-clip-persist hypridle \
 pacman-contrib udisks2 udiskie gvfs gvfs-mtp gvfs-smb bluez \
 bluez-utils ddcutil system-config-printer libqalculate
 ```

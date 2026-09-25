@@ -13,6 +13,7 @@ hl.on("hyprland.start", function()
 	hl.exec_cmd("systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP && systemctl --user stop xdg-desktop-portal.service xdg-desktop-portal-hyprland.service xdg-desktop-portal-gtk.service; systemctl --user reset-failed xdg-desktop-portal-hyprland.service xdg-desktop-portal.service xdg-desktop-portal-gtk.service")
 	hl.exec_cmd("wl-clip-persist --clipboard regular") -- keep copied text after the source app closes
 	hl.exec_cmd("hyprsunset") -- schedule: ~/.config/hypr/hyprsunset.conf
+	hl.exec_cmd("hypridle") -- lock on lock-session/before sleep; idle timers stay in the shell
 	hl.exec_cmd("~/.config/quickshell/scripts/apply-theme.sh")
 	hl.exec_cmd("mozillavpn activate")
 	-- Deck Mode: remove transient SDDM autologin + recover portals/pipewire

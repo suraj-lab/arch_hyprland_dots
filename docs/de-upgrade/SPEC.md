@@ -741,6 +741,20 @@ HDMI-A-1 stays readable (no inactive dimming), and everything is restored on exi
 - Writing monitor layout from the shell (use nwg-displays).
 
 ## Change log
+- 2026-09-25 — Task 2.7: hypridle, hooks only (Suraj). `.config/hypr/hypridle.conf` has
+  `lock_cmd`, `before_sleep_cmd = loginctl lock-session`, `after_sleep_cmd` dpms on,
+  `inhibit_sleep = 3`; no listeners (idle timers stay in DesktopServices.qml). hypridle 0.1.8
+  logs `Config has errors: No rules configured` and proceeds; expected. Started from autostart;
+  added to desktop-core. It now owns org.freedesktop.ScreenSaver (previously unowned), so app
+  idle inhibits reach hypridle, not the shell's IdleMonitor; end-to-end inhibition still needs testing.
+  Hyprland `hl.dsp.dpms` treats unknown `action` values as toggle (screens blanked once in
+  testing): use only on/off/enable/disable.
+  Verified by Suraj: `loginctl lock-session` locks; `systemctl suspend` → hyprlock on resume.
+  Found in that test: on resume, three xHCI controllers logged `xHC error in resume … Reinit`,
+  and the CalDigit TS4 audio device re-enumerated. Dock audio (default sink) stayed silent
+  although PipeWire/ALSA showed RUNNING; restarting pipewire/portal/shell didn't help,
+  a reboot did. Root cause and recurrence remain unconfirmed; USB audio re-binding was
+  suggested but not tested. Further suspend testing requires Suraj's approval.
 - 2026-09-25 — Task 2.5. Removed `.config/{waybar,mako,swaylock,wlogout,kitty,alacritty}` and
   all of `.config/hypr/scripts/` (volume, swww-random-*, plus awww-random-* replaced by
   wallpaper.lua and xdg-portal-hyprland made obsolete by 2.1); no references left. Kept the
