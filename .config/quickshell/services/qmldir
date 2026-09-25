@@ -1,4 +1,5 @@
 module services
+singleton Audio 1.0 Audio.qml
 singleton Config 1.0 Config.qml
 singleton Desktop 1.0 Desktop.qml
 singleton Hypr 1.0 Hypr.qml

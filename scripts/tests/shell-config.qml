@@ -31,6 +31,15 @@ ShellRoot {
         }
     }
 
+    // Audio with no PipeWire reachable: must load quietly and report "not ready".
+    Connections {
+        target: Audio
+        function onStatesChanged() {
+            console.log("AUDIO " + JSON.stringify({ ready: Audio.ready, volume: Audio.volume,
+                sinks: Audio.sinks.length, apps: Audio.apps.length, states: Audio.states }))
+        }
+    }
+
     // Exercise Notifs with fake notification objects once the Desktop wiring has settled.
     property bool notifsTested: false
     function notifsTest() {
@@ -72,7 +81,7 @@ ShellRoot {
         interval: 100; running: true; repeat: true
         onTriggered: {
             if (!Desktop._gameChecked) return
-            if (!root.notifsTested) { root.notifsTested = true; root.notifsTest() }
+            if (!root.notifsTested) { root.notifsTested = true; root.notifsTest(); Audio.refreshStates() }
             console.log("DESKTOP " + JSON.stringify({
                 lockSec: Desktop.lockTimeout, dpmsSec: Desktop.dpmsTimeout,
                 suspendSec: Desktop.suspendTimeout, dnd: Notifs.dndEnabled,

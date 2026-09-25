@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
-import Quickshell.Io
 import "../theme"
+import "../services"
 
 Item {
     id: root
@@ -9,9 +9,9 @@ Item {
     anchors.fill: parent
 
     // ── State ──────────────────────────────────────────────────────────────
-    property real volume: 0
+    readonly property real volume: Audio.volume
     property real prevVolume: -1
-    property bool muted: false
+    readonly property bool muted: Audio.muted
     property bool prevMuted: false
     property bool osdVisible: false
 
@@ -27,39 +27,23 @@ Item {
         onTriggered: osdVisible = false
     }
 
-    // ── Volume polling (wpctl) ─────────────────────────────────────────────
-    Process {
-        id: volProc
-        command: ["wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@"]
-        stdout: SplitParser {
-            onRead: data => {
-                var match = data.match(/Volume:\s*([\d.]+)(\s*\[MUTED\])?/)
-                if (!match) return
-                var newVol = parseFloat(match[1])
-                var newMuted = !!match[2]
-
-                root.volume = newVol
-                root.muted = newMuted
-
-                // Detect changes (skip initial read)
-                if (root.prevVolume >= 0) {
-                    if (Math.abs(newVol - root.prevVolume) > 0.005 || newMuted !== root.prevMuted)
-                        root.showOSD()
-                }
-                root.prevVolume = newVol
-                root.prevMuted = newMuted
-            }
-        }
+    // ── Show on change (skip the first reading), driven by PipeWire events ──
+    function check() {
+        if (!Audio.ready) return
+        // Read Audio directly: this handler may run before root.volume's binding updates.
+        var v = Audio.volume, m = Audio.muted
+        if (root.prevVolume >= 0 && (Math.abs(v - root.prevVolume) > 0.005 || m !== root.prevMuted))
+            root.showOSD()
+        root.prevVolume = v
+        root.prevMuted = m
     }
-
-    Timer {
-        interval: 500
-        running: true
-        repeat: true
-        onTriggered: volProc.running = true
+    Connections {
+        target: Audio
+        function onVolumeChanged() { root.check() }
+        function onMutedChanged() { root.check() }
+        function onReadyChanged() { root.check() }
     }
-
-    Component.onCompleted: volProc.running = true
+    Component.onCompleted: check()
 
     // ── Visual ─────────────────────────────────────────────────────────────
     Rectangle {

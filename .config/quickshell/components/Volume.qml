@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
-import Quickshell.Io
 import "../theme"
+import "../services"
 
 Item {
     id: root
@@ -13,54 +13,10 @@ Item {
 
     signal chipClicked()
 
-    property real vol: 0
-    property bool isMuted: false
-
-    // ── Read volume via wpctl ─────────────────────────────────────────────
-    function refreshVolume() { getVolumeProc.running = true }
-
-    Process {
-        id: getVolumeProc
-        command: ["wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@"]
-        stdout: SplitParser {
-            onRead: data => {
-                var match = data.match(/Volume:\s*([\d.]+)(\s*\[MUTED\])?/)
-                if (match) {
-                    root.vol = parseFloat(match[1])
-                    root.isMuted = !!match[2]
-                }
-            }
-        }
-    }
-
-    Timer {
-        interval: 1000
-        running: true
-        repeat: true
-        onTriggered: refreshVolume()
-    }
-
-    Component.onCompleted: refreshVolume()
-
-    // ── Write volume/mute via wpctl ───────────────────────────────────────
-    Process {
-        id: cmdProc
-        onRunningChanged: { if (!running) refreshVolume() }
-    }
-
-    function runCmd(args) {
-        cmdProc.command = args
-        cmdProc.running = true
-    }
-
-    function setVolume(v) {
-        var clamped = Math.max(0, Math.min(1.5, v)).toFixed(2)
-        runCmd(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", clamped])
-    }
-
-    function toggleMute() {
-        runCmd(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"])
-    }
+    readonly property real vol: Audio.volume
+    readonly property bool isMuted: Audio.muted
+    function setVolume(v) { Audio.setVolume(v) }
+    function toggleMute() { Audio.toggleMute() }
 
     // ── Bar chip ──────────────────────────────────────────────────────────
     RowLayout {

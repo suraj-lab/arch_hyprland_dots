@@ -12,19 +12,16 @@ Item {
     property color barAccent: "#00ffea"
     property bool viewActive: false
 
-    property real vol: 0
-    property bool isMuted: false
+    readonly property real vol: Audio.volume
+    readonly property bool isMuted: Audio.muted
 
     // ── Audio device picker state ────────────────────────────────────────
     property bool deviceViewOpen: false
     property bool appsViewOpen: false
     property string audioTab: "output"   // "output" | "input"
-    property var sinkList: []
-    property var sourceList: []
-    property var appList: []
-    property string defaultSinkName: ""
-    property string defaultSourceName: ""
-    property string defaultSinkDesc: ""
+    readonly property var sinkList: Audio.sinks
+    readonly property var sourceList: Audio.sources
+    readonly property var appList: Audio.apps
 
     // ── Media state ──────────────────────────────────────────────────────
     readonly property var playerList: Media.players
@@ -35,10 +32,6 @@ Item {
         return playerList[idx]
     }
     property real mediaPos: 0
-
-    // ── Expose for bar chip ──────────────────────────────────────────────
-    property real currentVolume: vol
-    property bool currentMuted: isMuted
 
     function playerColor(p) {
         if (!p) return root.barAccent
@@ -68,251 +61,15 @@ Item {
         function onPlaybackStateChanged() { root.mediaPos = root.activePlayer ? root.activePlayer.position : 0 }
     }
 
-    // ── Read volume via wpctl ──────────────────────────────────────────────
-    function refreshVolume() { getVolumeProc.running = true }
+    Component.onCompleted: refreshPlayers()
 
-    Process {
-        id: getVolumeProc
-        command: ["wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@"]
-        stdout: SplitParser {
-            onRead: data => {
-                var match = data.match(/Volume:\s*([\d.]+)(\s*\[MUTED\])?/)
-                if (match) {
-                    root.vol = parseFloat(match[1])
-                    root.isMuted = !!match[2]
-                }
-            }
-        }
-    }
-
-    Timer {
-        interval: 1000
-        running: true
-        repeat: true
-        onTriggered: refreshVolume()
-    }
-
-    Component.onCompleted: {
-        refreshVolume()
-        refreshPlayers()
-        defaultSinkProc.running = true
-    }
-
-    // ── Write volume/mute via wpctl ────────────────────────────────────────
-    Process {
-        id: cmdProc
-        onRunningChanged: { if (!running) refreshVolume() }
-    }
-
-    function runCmd(args) {
-        cmdProc.command = args
-        cmdProc.running = true
-    }
-
-    function setVolume(v) {
-        var clamped = Math.max(0, Math.min(1.5, v)).toFixed(2)
-        runCmd(["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", clamped])
-    }
-
-    function toggleMute() {
-        runCmd(["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"])
-    }
-
-    // ── Audio device scanning ─────────────────────────────────────────────
-    property var _sinkBuf: []
-    property var _sourceBuf: []
-    property var _appBuf: []
-    property var _clientBuf: []
-    property var clientMap: ({})
-
-    Process {
-        id: sinkScanProc
-        command: ["bash", "-c", "pactl -f json list sinks 2>/dev/null"]
-        stdout: SplitParser { onRead: function(line) { root._sinkBuf.push(line) } }
-        onRunningChanged: {
-            if (!running) {
-                var raw = root._sinkBuf.join(""); root._sinkBuf = []
-                try {
-                    var arr = JSON.parse(raw)
-                    var result = []
-                    for (var i = 0; i < arr.length; i++) {
-                        var s = arr[i]
-                        result.push({
-                            name: s.name || "",
-                            desc: s.description || s.name || "",
-                            state: (s.state || "").toLowerCase(),
-                            index: s.index || 0,
-                            isDefault: (s.name || "") === root.defaultSinkName
-                        })
-                    }
-                    root.sinkList = result
-                    for (var j = 0; j < result.length; j++) {
-                        if (result[j].isDefault) { root.defaultSinkDesc = result[j].desc; break }
-                    }
-                } catch(e) { root.sinkList = [] }
-            }
-        }
-    }
-
-    Process {
-        id: sourceScanProc
-        command: ["bash", "-c", "pactl -f json list sources 2>/dev/null"]
-        stdout: SplitParser { onRead: function(line) { root._sourceBuf.push(line) } }
-        onRunningChanged: {
-            if (!running) {
-                var raw = root._sourceBuf.join(""); root._sourceBuf = []
-                try {
-                    var arr = JSON.parse(raw)
-                    var result = []
-                    for (var i = 0; i < arr.length; i++) {
-                        var s = arr[i]
-                        var name = s.name || ""
-                        if (name.indexOf(".monitor") >= 0) continue
-                        result.push({
-                            name: name,
-                            desc: s.description || name,
-                            state: (s.state || "").toLowerCase(),
-                            index: s.index || 0,
-                            isDefault: name === root.defaultSourceName
-                        })
-                    }
-                    root.sourceList = result
-                } catch(e) { root.sourceList = [] }
-            }
-        }
-    }
-
-    Process {
-        id: clientScanProc
-        command: ["bash", "-c", "pactl -f json list clients 2>/dev/null"]
-        stdout: SplitParser { onRead: function(line) { root._clientBuf.push(line) } }
-        onRunningChanged: {
-            if (!running) {
-                var raw = root._clientBuf.join(""); root._clientBuf = []
-                try {
-                    var arr = JSON.parse(raw)
-                    var map = {}
-                    for (var i = 0; i < arr.length; i++) {
-                        var c = arr[i]
-                        var props = c.properties || {}
-                        var name = props["application.name"]
-                                   || props["application.process.binary"]
-                                   || ""
-                        if (name) map[String(c.index)] = name
-                    }
-                    root.clientMap = map
-                } catch(e) { root.clientMap = {} }
-                appScanProc.running = true
-            }
-        }
-    }
-
-    Process {
-        id: appScanProc
-        command: ["bash", "-c", "pactl -f json list sink-inputs 2>/dev/null"]
-        stdout: SplitParser { onRead: function(line) { root._appBuf.push(line) } }
-        onRunningChanged: {
-            if (!running) {
-                var raw = root._appBuf.join(""); root._appBuf = []
-                try {
-                    var arr = JSON.parse(raw)
-                    var result = []
-                    for (var i = 0; i < arr.length; i++) {
-                        var si = arr[i]
-                        var props = si.properties || {}
-                        var appName = props["application.name"] || ""
-                        if (!appName && si.client) {
-                            appName = root.clientMap[String(si.client)] || ""
-                        }
-                        if (!appName) {
-                            appName = props["application.process.binary"]
-                                      || props["node.name"]
-                                      || "Unknown"
-                        }
-                        var vol = 0
-                        if (si.volume) {
-                            var chans = Object.keys(si.volume)
-                            var total = 0; var chanCount = 0
-                            for (var c = 0; c < chans.length; c++) {
-                                var cv = si.volume[chans[c]]
-                                if (cv && typeof cv === "object" && cv.value_percent) {
-                                    total += parseInt(cv.value_percent.replace("%", "")) || 0
-                                    chanCount++
-                                }
-                            }
-                            if (chanCount > 0) vol = Math.round(total / chanCount)
-                        }
-                        result.push({
-                            index: si.index || 0,
-                            appName: appName,
-                            volume: vol,
-                            muted: si.mute || false
-                        })
-                    }
-                    root.appList = result
-                } catch(e) { root.appList = [] }
-            }
-        }
-    }
-
-    Process {
-        id: defaultSinkProc
-        command: ["pactl", "get-default-sink"]
-        stdout: SplitParser {
-            onRead: function(line) { var t = line.trim(); if (t) root.defaultSinkName = t }
-        }
-        onRunningChanged: { if (!running) sinkScanProc.running = true }
-    }
-
-    Process {
-        id: defaultSourceProc
-        command: ["pactl", "get-default-source"]
-        stdout: SplitParser {
-            onRead: function(line) { var t = line.trim(); if (t) root.defaultSourceName = t }
-        }
-        onRunningChanged: { if (!running) sourceScanProc.running = true }
-    }
-
-    Process {
-        id: audioSetProc
-        onRunningChanged: { if (!running) scanAudio() }
-    }
-
-    Process { id: appVolProc }
-
-    function scanAudio() {
-        defaultSinkProc.running = true
-        defaultSourceProc.running = true
-        clientScanProc.running = true
-    }
-
-    function setDefaultSink(sinkName) {
-        audioSetProc.command = ["pactl", "set-default-sink", sinkName]
-        audioSetProc.running = true
-    }
-
-    function setDefaultSource(sourceName) {
-        audioSetProc.command = ["pactl", "set-default-source", sourceName]
-        audioSetProc.running = true
-    }
-
-    function setAppVolume(sinkInputIndex, pct) {
-        appVolProc.command = ["bash", "-c", "pactl set-sink-input-volume " + sinkInputIndex + " " + pct + "%"]
-        appVolProc.running = true
-    }
-
-    function updateAppVolumeUI(listIndex, newVol) {
-        var list = []
-        for (var i = 0; i < root.appList.length; i++) {
-            if (i === listIndex) {
-                var old = root.appList[i]
-                list.push({ index: old.index, appName: old.appName, volume: newVol, muted: old.muted })
-            } else {
-                list.push(root.appList[i])
-            }
-        }
-        root.appList = list
-    }
+    // ── Audio (services/Audio: native PipeWire) ──────────────────────────
+    function setVolume(v) { Audio.setVolume(v) }
+    function toggleMute() { Audio.toggleMute() }
+    function scanAudio() { Audio.refreshStates() }   // device running/idle labels
+    function setDefaultSink(name) { Audio.setDefaultSink(name) }
+    function setDefaultSource(name) { Audio.setDefaultSource(name) }
+    function setAppVolume(id, pct) { Audio.setAppVolume(id, pct) }
 
     function appColor(name) {
         var n = name.toLowerCase()
@@ -1044,7 +801,6 @@ Item {
                                     var step = wheel.angleDelta.y > 0 ? 5 : -5
                                     var nv = Math.max(0, Math.min(100, appItem.appVol + step))
                                     root.setAppVolume(appItem.app.index, nv)
-                                    root.updateAppVolumeUI(index, nv)
                                 }
 
                                 Rectangle {
@@ -1058,13 +814,11 @@ Item {
                                         onClicked: function(mouse) {
                                             var pct = Math.max(0, Math.min(100, Math.round(mouse.x / parent.width * 100)))
                                             root.setAppVolume(appItem.app.index, pct)
-                                            root.updateAppVolumeUI(index, pct)
                                         }
                                         onPositionChanged: function(mouse) {
                                             if (pressed) {
                                                 var pct = Math.max(0, Math.min(100, Math.round(mouse.x / parent.width * 100)))
                                                 root.setAppVolume(appItem.app.index, pct)
-                                                root.updateAppVolumeUI(index, pct)
                                             }
                                         }
                                     }

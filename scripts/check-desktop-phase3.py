@@ -38,6 +38,7 @@ with tempfile.TemporaryDirectory(prefix=".p3-", dir=ROOT) as tmp:
         "hyprctl": "exit 1",
         "systemctl": "exit 1",
         "hyprlock": "exit 1",
+        "pactl": "printf '62\\tdock\\tPipeWire\\ts24le 2ch 48000Hz\\tRUNNING\\n'",
         "curl": 'printf "%s\\n" "$*" >> "$HOME/curl-args"; cat "$HOME/weather.json"',
     }.items():
         command = home / "bin" / name
@@ -54,7 +55,8 @@ with tempfile.TemporaryDirectory(prefix=".p3-", dir=ROOT) as tmp:
                DBUS_SYSTEM_BUS_ADDRESS="unix:path=/nonexistent", GSETTINGS_BACKEND="memory",
                QT_QPA_PLATFORM="offscreen", QT_QUICK_BACKEND="software",
                QML_DISABLE_DISK_CACHE="1", QT_LOGGING_RULES="qml.debug=true;*.warning=true;*.critical=true")
-    for key in ("HYPRLAND_INSTANCE_SIGNATURE", "WAYLAND_DISPLAY", "DISPLAY"):
+    for key in ("HYPRLAND_INSTANCE_SIGNATURE", "WAYLAND_DISPLAY", "DISPLAY",
+                "PIPEWIRE_REMOTE", "PIPEWIRE_RUNTIME_DIR", "PULSE_SERVER"):
         env.pop(key, None)
     for test in ("test_desktop_controller.js", "test_shell_services.js"):
         subprocess.run(["node", "scripts/tests/" + test],
@@ -118,6 +120,9 @@ with tempfile.TemporaryDirectory(prefix=".p3-", dir=ROOT) as tmp:
         }, notifs
         wait_for("WEATHER", lambda v: v == dict(location="London", temp="12", desc="Partly cloudy",
                                                 days=3, error=False), "the London forecast")
+        wait_for("AUDIO", lambda v: v == dict(ready=False, volume=0, sinks=0, apps=0,
+                                              states={"dock": "running"}),
+                 "Audio loaded without PipeWire, pactl states parsed")
         sysmon = wait_for("SYSMON", lambda v: True, "CPU/memory/temperature readings", timeout=8)
         assert 0 <= sysmon["cpu"] <= 100 and 0 < sysmon["mem"] <= 100, sysmon
         assert 0 < sysmon["temp"] < 120 and sysmon["path"].startswith("/sys/"), sysmon
@@ -150,13 +155,18 @@ with tempfile.TemporaryDirectory(prefix=".p3-", dir=ROOT) as tmp:
         urls = (home / "curl-args").read_text().split()
         assert "wttr.in/London?format=j1" in urls, urls
         assert "wttr.in/New%20York?format=j1" in urls, urls  # one encoded argument, no shell
-        bad = [line for line in log if any(marker in line for marker in (
+        # The sandbox deliberately has no PipeWire or D-Bus; these errors prove it stayed isolated.
+        expected = ("quickshell.service.pipewire.loop: Failed to connect pipewire context",)
+        for e in expected:
+            assert any(e in line for line in log), "harness may have reached the real session: " + e
+        bad = [line for line in log if not any(e in line for e in expected) and any(marker in line for marker in (
             " ERROR", "ReferenceError:", "TypeError:", "Binding loop", "Failed to load configuration"))]
         assert not bad, "".join(bad)
         print("PASS: Config defaults, file creation, watched/atomic edits, zero, partial/invalid settings")
         print("PASS: Desktop singleton startup, live timeout bindings and two-way DND wiring (stubbed commands)")
         print("PASS: Notifs toasts/history/badge/DND/dismiss/clear and media toasts; Weather fetch and "
-              "location reload (stubbed curl); Sysmon live /proc and CPU sensor readings")
+              "location reload (stubbed curl); Sysmon live /proc and CPU sensor readings; Audio "
+              "loads without PipeWire (stubbed pactl states)")
     finally:
         proc.terminate()
         try:

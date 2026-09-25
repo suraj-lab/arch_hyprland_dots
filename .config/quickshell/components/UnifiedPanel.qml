@@ -27,10 +27,6 @@ Item {
     signal dndToggled()
     signal panelOpened()
 
-    // Exposed for bar chips to read
-    property real currentVolume: soundView.currentVolume
-    property bool currentMuted: soundView.currentMuted
-
     function open(viewName) {
         // The bar is inside the focus grab, so re-clicking a chip must close here.
         if (panelOpen && currentView === viewName) { close(); return }

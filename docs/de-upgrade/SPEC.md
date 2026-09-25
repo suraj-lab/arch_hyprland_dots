@@ -742,6 +742,28 @@ HDMI-A-1 stays readable (no inactive dimming), and everything is restored on exi
 - Writing monitor layout from the shell (use nwg-displays).
 
 ## Change log
+- 2026-09-25 — Phase 3 slice 3a (Audio), deployed with Suraj's approval.
+  Measured before: ~8 wpctl processes/second all the time (Volume chip 1 s, OSD 0.5 s, Sound
+  tab 1 s; one each per monitor) plus 7 pactl calls per Sound-tab refresh. `Audio` now uses
+  Quickshell.Services.Pipewire: default sink/source volume and mute, sink/source lists
+  (PwNodeType AudioSink/AudioSource = pactl's sinks and non-monitor sources, checked live),
+  per-app playback streams (AudioOutStream = pactl sink-inputs), default device via
+  `Pipewire.preferredDefaultAudioSink/Source`. Volume scale checked live: identical to wpctl
+  (0.29 = 0.29), so percentages don't change; the 150% ceiling is kept. The OSD uses the same
+  rule (skip the first reading, then >0.5% or mute) on PipeWire change events, not a 500 ms
+  poll. PwNode has no running/idle state, so the device picker's state label still comes from
+  one `pactl list short` call when the picker opens (as before), not polling.
+  Removed as dead: `defaultSinkDesc`, and UnifiedPanel/SoundView `currentVolume/currentMuted`.
+  Microphone.qml already used native PipeWire; unchanged.
+  Checks: phase0/phase3 pass; unit tests run the real Audio functions against fake nodes and
+  the OSD rule; the harness loads Audio with PipeWire unreachable (its connect error is
+  asserted, proving isolation). qmllint 584 → 574, no new warnings.
+  SPEC correction (§6 Phase 3 settings example): `ddcutil detect --brief` shows DP-2 on I2C
+  bus 10 and HDMI-A-1 on bus 8 (the example had them the other way round). Current code sets
+  both buses together, so nothing was visibly wrong; fixed properly in slice 3c.
+  Live backup `phase3-audio-20260925-222822`. Restart verified: no wpctl/pactl process in
+  50 samples over 5 s (was ~8/s), no new log warnings, desktop IPC and notifications fine,
+  keybinds unchanged, volume and default sink/source unchanged by the restart.
 - 2026-09-25 — Phase 3 slice 2 (Notifs/Media/Weather/Sysmon), deployed with Suraj's approval.
   `Notifs`: NotificationServer (keepOnReload), toast/history models, unread count, DND,
   dismiss/clearAll moved verbatim out of ShellRoot; shell.qml keeps only the DND↔Desktop wiring.
