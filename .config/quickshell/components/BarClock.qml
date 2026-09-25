@@ -14,6 +14,7 @@ Item {
     Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutBack } }
     property bool popupOpen: false
     property color barAccent: "#00ffea"
+    property var parentWindow: null   // bar PanelWindow: clicking the clock must toggle, not clear+reopen
 
     SystemClock { id: clock; precision: SystemClock.Minutes }
 
@@ -141,7 +142,7 @@ Item {
 
     HyprlandFocusGrab {
         id: calGrab
-        windows: [calPopup]
+        windows: root.parentWindow ? [calPopup, root.parentWindow] : [calPopup]
         active: popupOpen && root._grabReady
         onCleared: popupOpen = false
     }

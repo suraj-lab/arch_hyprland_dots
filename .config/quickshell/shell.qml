@@ -304,6 +304,7 @@ ShellRoot {
                     id: barClock
                     anchors.centerIn: parent
                     barAccent: barPanel.screenAccent
+                    parentWindow: barPanel
                     onPopupOpenChanged: if (popupOpen) unifiedPanel.close()
                 }
 

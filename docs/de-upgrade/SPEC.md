@@ -741,6 +741,12 @@ HDMI-A-1 stays readable (no inactive dimming), and everything is restored on exi
 - Writing monitor layout from the shell (use nwg-displays).
 
 ## Change log
+- 2026-09-25 — Pre-existing bug found by Suraj during the Phase 3 check: re-clicking a bar chip did
+  not close its popup. UnifiedPanel's grab includes the bar, and `open()` never toggled; it now
+  closes when the same view's chip is clicked again. BarClock's grab excluded the bar, so the
+  click cleared the grab and then reopened; it now includes the bar window (as UnifiedPanel
+  does). Clicking elsewhere on the bar no longer closes the calendar (same as the panel).
+  Deployed; backup `panel-toggle-20260925-210815`.
 - 2026-09-25 — Task 2.7: hypridle, hooks only (Suraj). `.config/hypr/hypridle.conf` has
   `lock_cmd`, `before_sleep_cmd = loginctl lock-session`, `after_sleep_cmd` dpms on,
   `inhibit_sleep = 3`; no listeners (idle timers stay in DesktopServices.qml). hypridle 0.1.8
