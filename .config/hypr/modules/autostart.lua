@@ -11,7 +11,7 @@ hl.on("hyprland.start", function()
 	-- stale (xdg-desktop-portal-hyprland dies with the old compositor and hits start-limit).
 	-- After importing the new env, stop them; D-Bus re-activates them on first use.
 	hl.exec_cmd("systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP && systemctl --user stop xdg-desktop-portal.service xdg-desktop-portal-hyprland.service xdg-desktop-portal-gtk.service; systemctl --user reset-failed xdg-desktop-portal-hyprland.service xdg-desktop-portal.service xdg-desktop-portal-gtk.service")
-	hl.exec_cmd("wl-clipboard-history -t")
+	hl.exec_cmd("wl-clip-persist --clipboard regular") -- keep copied text after the source app closes
 	hl.exec_cmd("hyprsunset") -- schedule: ~/.config/hypr/hyprsunset.conf
 	hl.exec_cmd("~/.config/quickshell/scripts/apply-theme.sh")
 	hl.exec_cmd("mozillavpn activate")

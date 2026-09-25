@@ -741,6 +741,14 @@ HDMI-A-1 stays readable (no inactive dimming), and everything is restored on exi
 - Writing monitor layout from the shell (use nwg-displays).
 
 ## Change log
+- 2026-09-25 — Task 2.5. Removed `.config/{waybar,mako,swaylock,wlogout,kitty,alacritty}` and
+  all of `.config/hypr/scripts/` (volume, swww-random-*, plus awww-random-* replaced by
+  wallpaper.lua and xdg-portal-hyprland made obsolete by 2.1); no references left. Kept the
+  kitty/alacritty window-class matching in QML (icons for those apps) and kitty in frozen
+  daily-apps. autostart: `wl-clipboard-history -t` → `wl-clip-persist --clipboard regular`.
+  bootstrap copy list trimmed. Live dirs moved to a backup, not deleted (identical to git).
+  Suraj removes the packages waybar, mako (its D-Bus service could take the notification name
+  while the shell restarts), swaylock-effects-git, wlogout-git.
 - 2026-09-25 — Task 2.4. `.config/mimeapps.list`: Thunar, Firefox (web + PDF), Codium (text/code),
   Viewnior (images), mpv (video/audio; Suraj kept current apps), File Roller (archives). mpv and
   viewnior added to desktop-core (extra). `x-scheme-handler/terminal` skipped: Ghostty doesn't

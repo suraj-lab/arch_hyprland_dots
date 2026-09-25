@@ -442,10 +442,9 @@ copy_dotfiles() {
   say "Copying dotfiles into $TARGET_HOME"
   local paths=(
     .bashrc .zshrc
-    .config/alacritty .config/environment.d .config/gamescope .config/ghostty
-    .config/hypr .config/kitty .config/mako .config/matugen .config/mimeapps.list .config/nvim
-    .config/qt5ct .config/qt6ct .config/quickshell .config/starship.toml .config/swaylock
-    .config/waybar .config/wlogout .config/wofi .config/xdg-desktop-portal
+    .config/environment.d .config/gamescope .config/ghostty .config/hypr .config/matugen
+    .config/mimeapps.list .config/nvim .config/qt5ct .config/qt6ct .config/quickshell
+    .config/starship.toml .config/wofi .config/xdg-desktop-portal
   )
   local rel src dst
   sudo_run install -d -o "$TARGET_UID" -g "$TARGET_GID" "$BACKUP_ROOT/home"
