@@ -5,6 +5,7 @@ import Quickshell.Wayland
 import "../../theme"
 import "../../services"
 import "../views"
+import "surfaces"
 
 // One pill per screen on the Overlay layer (SPEC 3.1-3.3). States: rest, hover, surface,
 // hidden. The full-height window never resizes and reserves nothing, so windows never move
@@ -24,12 +25,13 @@ PanelWindow {
     // pin is the peek. hoverOpen: the bottom-edge dwell. visited: the pointer has been on
     // the pill since it opened, so leaving it may collapse it. A peek does not wait for a
     // visit: over a game the pointer rarely goes there, so it hides 800 ms after it's away.
-    // surface: "" or the open view (sound / notifs / system); it holds the pill open.
+    // surface: "" or the open view (sound / notifs / system / dashboard); it holds the
+    // pill open. "media" opens the dashboard on its Media tab (click on now-playing).
     property bool pinned: false
     property bool hoverOpen: false
     property bool visited: false
     property string surface: ""
-    readonly property var surfaces: ["sound", "notifs", "system"]
+    readonly property var surfaces: ["sound", "notifs", "system", "dashboard", "media"]
     readonly property bool edgeHovered: hotZone.containsMouse
     readonly property bool pillHovered: pillHover.hovered || baseHover.hovered || tierHover.hovered
     readonly property bool peeking: fullscreen && pinned
@@ -50,8 +52,12 @@ PanelWindow {
     // collapses as usual once the pointer is away.
     function openSurface(name, allowToggle) {
         if (surfaces.indexOf(name) < 0) return
-        if (allowToggle && surface === name) { closeSurface(); return }
-        surface = name
+        var target = name === "media" ? "dashboard" : name
+        if (allowToggle && surface === target && anchorKey === name) { closeSurface(); return }
+        if (target === "dashboard" && (name === "media" || surface !== "dashboard"))
+            dashView.tab = name === "media" ? "media" : "dashboard"
+        anchorKey = name
+        surface = target
         visited = true
         if (name === "notifs") Notifs.unreadCount = 0
     }
@@ -95,9 +101,13 @@ PanelWindow {
     readonly property int hoverWidth: Math.max(restWidth, Math.min(Theme.pillHoverMaxWidth,
         width - 2 * Theme.frameThickness - 2 * Theme.shoulderRadius - 40))
     readonly property var activeView: surface === "sound" ? soundView
-        : surface === "notifs" ? notifsView : surface === "system" ? systemView : null
-    readonly property int tierTarget: activeView ? Math.min(activeView.implicitHeight + Theme.surfacePadding,
-        height - Theme.frameThickness - Theme.pillHoverHeight - 60) : 0
+        : surface === "notifs" ? notifsView : surface === "system" ? systemView
+        : surface === "dashboard" ? dashView : null
+    // The tier rises only once the bar is fully wide (opening from the rest tab), so it
+    // never slides with a growing bar; closing mirrors this (see `expanded`).
+    readonly property int tierTarget: activeView && pill.width >= hoverWidth
+        ? Math.min(activeView.implicitHeight + Theme.surfacePadding,
+                   height - Theme.frameThickness - Theme.pillHoverHeight - 60) : 0
 
     visible: pillState !== "hidden"
     anchors { left: true; right: true; top: true; bottom: true }
@@ -114,6 +124,7 @@ PanelWindow {
     }
 
     property alias pillItem: pill
+    property alias dashboard: dashView
     property alias tierItem: tier
     property alias shape: shape
     PillShape {
@@ -171,14 +182,17 @@ PanelWindow {
     // gear), kept clear of the bar's rounded ends so the concave joins fit. The views keep
     // their classic content and width. All three stay loaded (as in the classic panel) so
     // switching is a morph, not a reload.
-    // The last opened surface, kept while the tier shrinks so it closes where it opened.
+    // The last opened surface and the element that opened it (clock or now-playing for
+    // the dashboard), kept while the tier shrinks so it closes where it opened.
     property string lastSurface: "sound"
-    readonly property real tierAnchor: bar.chipCenters[lastSurface]
+    property string anchorKey: "sound"
+    readonly property real tierAnchor: bar.chipCenters[anchorKey]
     readonly property real tierInset: Theme.pillRadiusSmall + Theme.shoulderRadius
     FocusScope {
         id: tier
         objectName: "tier"
-        width: Theme.surfaceWidth
+        width: Math.min(root.lastSurface === "dashboard" ? Theme.dashboardWidth : Theme.surfaceWidth,
+                        root.hoverWidth - 2 * root.tierInset)
         height: root.tierTarget
         x: Math.round(pill.x + Math.max(root.tierInset,
             Math.min(root.tierAnchor - width / 2, pill.width - root.tierInset - width)))
@@ -215,6 +229,13 @@ PanelWindow {
                 onDismissRequested: id => Notifs.dismiss(id)
                 onClearAllRequested: Notifs.clearAll()
                 onDndToggled: Notifs.dndEnabled = !Notifs.dndEnabled
+            }
+            Dashboard {
+                id: dashView
+                anchors { left: parent.left; right: parent.right; top: parent.top }
+                accent: root.accent
+                active: root.surface === "dashboard"
+                visible: root.surface === "dashboard"
             }
             SystemView {
                 id: systemView

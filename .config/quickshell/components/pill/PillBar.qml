@@ -15,18 +15,19 @@ Item {
     property color accent: Theme.accent
     property real progress: 0
     property bool showRest: true           // the 6 px handle rest style has no content
-    signal surfaceRequested(string name)   // sound / notifs / system
+    signal surfaceRequested(string name)   // sound / notifs / system / dashboard
     // Where each surface's chip sits (x centre in this item), so its surface grows from it.
     readonly property var chipCenters: ({
         sound: row.x + volChip.x + volChip.width / 2,
         notifs: row.x + notifChip.x + notifChip.width / 2,
-        system: row.x + ccChip.x + ccChip.width / 2
+        system: row.x + ccChip.x + ccChip.width / 2,
+        dashboard: root.width / 2,      // the dashboard is wide: it opens centred on the bar
+        media: root.width / 2
     })
     signal powerRequested()
 
     SystemClock { id: clock; precision: SystemClock.Minutes }
     readonly property string time: Qt.formatDateTime(clock.date, "HH:mm")
-    readonly property var nowPlaying: Media.players.find(function(p) { return p.isPlaying }) || null
 
     component BarText: Text {
         color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontBar
@@ -43,6 +44,18 @@ Item {
         visible: opacity > 0
         Workspaces { screenName: root.screenName; barAccent: root.accent; anchors.verticalCenter: parent.verticalCenter }
         BarText { text: root.time; font.bold: true; anchors.verticalCenter: parent.verticalCenter }
+    }
+
+    // Clock at the true centre of the bar, as on the rest tab; click opens the dashboard.
+    // (No now-playing text: the dashboard's Media tab and the media keys cover it.)
+    BarText {
+        id: clockText
+        objectName: "pillClock"
+        anchors.centerIn: parent
+        opacity: row.opacity
+        visible: opacity > 0
+        text: root.time; font.bold: true
+        MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.surfaceRequested("dashboard") }
     }
 
     // Hover: fades in over the last 40% of the morph.
@@ -63,22 +76,16 @@ Item {
             }
         }
         BarText {
-            Layout.maximumWidth: 280
+            id: titleText
+            // Stops short of the centred clock.
+            Layout.maximumWidth: Math.max(0, Math.min(280, (root.width - clockText.width) / 2 - titleText.x - row.x - 24))
             color: Theme.textDim
             text: Hyprland.activeToplevel ? Hyprland.activeToplevel.title : ""
         }
         Item { Layout.fillWidth: true }
-        BarText {
-            Layout.maximumWidth: 320
-            visible: root.nowPlaying !== null
-            color: Theme.media
-            text: root.nowPlaying ? "\uf001  " + root.nowPlaying.trackTitle
-                + (root.nowPlaying.trackArtist ? " · " + root.nowPlaying.trackArtist : "") : ""
-        }
-        Item { Layout.fillWidth: true }
         BarText { color: Theme.pink; text: "\ue266 " + (Sysmon.cpu < 0 ? "--" : Sysmon.cpu) + "%" }
         BarText { color: Theme.warning; text: "\uf2db " + (Sysmon.mem < 0 ? "--" : Sysmon.mem) + "%" }
-        TrayArea { menuEdge: Edges.Top }
+        TrayArea { menuEdge: Edges.Top; Layout.fillWidth: false }   // a nested layout fills by default
         BarText {
             color: Net.wifiEnabled && Net.ssid ? root.accent : Theme.textDimmer
             text: "\uf1eb"
@@ -96,7 +103,6 @@ Item {
             onChipClicked: root.surfaceRequested("notifs")
         }
         ControlCenter { id: ccChip; barAccent: root.accent; onChipClicked: root.surfaceRequested("system") }
-        BarText { text: root.time; font.bold: true }
         PowerMenu { onClicked: root.powerRequested() }
     }
 }

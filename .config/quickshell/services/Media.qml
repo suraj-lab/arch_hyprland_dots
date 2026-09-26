@@ -9,17 +9,29 @@ Singleton {
     id: root
 
     property var players: []            // controllable players (same filter as before)
+    // Spotify first (Suraj usually has Spotify and a browser playing together), then any
+    // other player that is playing, then the rest; ties keep MPRIS order.
+    readonly property var ordered: order(players)
+    function isSpotify(p) {
+        return ((p.identity || "") + " " + (p.desktopEntry || "")).toLowerCase().indexOf("spotify") >= 0
+    }
+    function rank(p) { return isSpotify(p) ? 0 : p.isPlaying ? 1 : 2 }
+    function order(list) {
+        return list.map(function(p, i) { return { p: p, i: i, r: rank(p) } })
+                   .sort(function(a, b) { return a.r - b.r || a.i - b.i })
+                   .map(function(x) { return x.p })
+    }
     signal trackChanged(var player)     // a new track started (not the first one seen)
     property string _lastTrackKey: ""
 
-    function refresh() {
-        var list = Mpris.players.values
-        var result = []
-        for (var i = 0; i < list.length; i++) {
-            if (list[i].canTogglePlaying || list[i].trackTitle) result.push(list[i])
-        }
-        root.players = result
+    // Controllable players only. playerctld is a proxy that mirrors the active player
+    // (same identity and track), so listing it would show that player twice.
+    function controllable(list) {
+        return list.filter(function(p) {
+            return (p.canTogglePlaying || p.trackTitle) && (p.dbusName || "").indexOf("playerctld") < 0
+        })
     }
+    function refresh() { root.players = controllable(Mpris.players.values) }
 
     function checkTrack() {
         try {

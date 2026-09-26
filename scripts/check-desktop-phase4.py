@@ -8,13 +8,14 @@ import json
 import os
 from pathlib import Path
 import select
+import signal
 import shutil
 import subprocess
 import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
-for command in ("Xvfb", "qs", "magick", "xdotool", "lua"):
+for command in ("Xvfb", "qs", "magick", "xdotool", "lua", "dbus-run-session"):
     if not shutil.which(command):
         raise SystemExit(f"Missing test dependency: {command} (nothing installed)")
 
@@ -236,6 +237,10 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
             pointer(60, 598)
             hover = wait_pill(lambda v: v["state"] == "hover" and v["w"] == 696 and v["h"] == 46,
                               "hover after the dwell")
+            # Only the spacer may stretch (a nested layout, e.g. the tray, fills by default and
+            # used to push CPU/RAM into the centre, under the now-playing text).
+            stretched = [s for s in hover["rowItems"] if s[1] - s[0] > s[2] + 1]
+            assert hover["rowItems"] and not stretched, hover["rowItems"]
             assert hover["x"] == 52 and hover["y"] == hover["winH"] - 10 - 46, hover
             pointer(400, 592); time.sleep(1.0)       # frame band under the pill (not the hot strip)
             assert pill()["state"] == "hover", "the frame band under the pill must count as the pill"
@@ -319,10 +324,14 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
             assert nt["anchor"] != snd["anchor"], "each surface grows from its own chip"
             assert nt["unread"] == 0, "opening Notifications clears the badge"
             assert ipc("pill", "notifs").returncode == 0      # same surface again closes it
-            closing = pill()
-            assert closing["surface"] == "" and closing["tierX"] == nt["tierX"], "must close where it opened"
-            closed = wait_pill(lambda v: v["surface"] == "" and v["tierH"] == 0, "re-open toggles closed")
-            assert closed["tierX"] == nt["tierX"], "the tier must not jump while closing"
+            # While the tier is still visible it must stay where it opened (sampled per frame).
+            deadline = time.monotonic() + 3
+            while time.monotonic() < deadline:
+                v = pill()
+                if v["tierH"] == 0:
+                    break
+                assert v["tierX"] == nt["tierX"], f"the tier moved while closing: {v}"
+            wait_pill(lambda v: v["surface"] == "" and v["tierH"] == 0, "re-open toggles closed")
             assert ipc("pill", "system").returncode == 0
             wait_pill(lambda v: v["surface"] == "system" and v["tierH"] == v["tierTarget"] > 100, "system surface")
             # No window manager on Xvfb: keys go to the window under the pointer, so point at
@@ -341,6 +350,31 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
             wait_pill(lambda v: v["state"] == "hidden" and v["surface"] == "", "fullscreen closes surfaces")
             assert ipc("fullscreen", "false", "false").returncode == 0
             wait_pill(lambda v: v["state"] == "rest", "back to rest")
+
+            # ---- 4.4 dashboard: from rest the bar widens first, then the tier rises ----
+            assert pill()["state"] == "rest"
+            assert ipc("pill", "dashboard").returncode == 0
+            deadline = time.monotonic() + 3
+            while time.monotonic() < deadline:
+                v = pill()
+                assert v["w"] >= v["hoverW"] or v["tierH"] == 0, f"tier rose before the bar was wide: {v}"
+                if v["tierH"] > 0:
+                    break
+                time.sleep(0.01)
+            dash = wait_pill(lambda v: v["surface"] == "dashboard" and v["tierH"] == v["tierTarget"] == 420,
+                             "dashboard settled at 920x420 (clamped on a small screen)")
+            assert dash["tierW"] == min(920, dash["hoverW"] - 2 * (16 + 22)) and dash["dashTab"] == "dashboard", dash
+            assert dash["x"] + 38 <= dash["tierX"] and dash["tierX"] + dash["tierW"] <= dash["x"] + dash["w"] - 38, dash
+            assert ipc("pill", "media").returncode == 0       # now-playing click: Media tab, no close
+            wait_pill(lambda v: v["surface"] == "dashboard" and v["dashTab"] == "media", "media tab")
+            assert ipc("pill", "media").returncode == 0       # same element again closes
+            wait_pill(lambda v: v["surface"] == "" and v["tierH"] == 0, "media toggles closed")
+            assert ipc("pill", "dashboard").returncode == 0
+            wait_pill(lambda v: v["dashTab"] == "dashboard" and v["tierH"] == 420, "clock opens the Dashboard tab")
+            assert ipc("pill", "sound").returncode == 0       # switch to a narrow surface
+            wait_pill(lambda v: v["surface"] == "sound" and v["tierW"] == 400, "switch to sound")
+            assert ipc("pill", "close").returncode == 0
+            wait_pill(lambda v: v["state"] == "rest", "closed")
 
             # Collapse delay setting: global, per monitor, invalid values fall back.
             configure({"appearance": {"layout": "frame"}, "pill": {"collapseDelayMs": 1500}},
@@ -363,6 +397,45 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
                 configure({"appearance": {"layout": invalid}}, empty, "invalid layout is classic")
             configure({}, empty, "removed sections return to classic")
             log.flush()
+            # ---- Media players: a second run on a private bus with fake Spotify + Firefox ----
+            # (no service activation: scripts/tests/private-bus.conf; the main run has no bus)
+            shell.terminate(); shell.wait(timeout=5)
+            settings.write_text(json.dumps({"appearance": {"layout": "frame"}}))   # the run above ended classic
+            for name, colour in (("spotify", "#1db954"), ("youtube", "#ff4e45")):
+                subprocess.run(["magick", "-size", "64x64", "xc:" + colour, str(home / f"{name}.png")], check=True)
+            fake = ROOT / "scripts/tests/fake_mpris.py"
+            mlog = (home / "mpris-shell.log").open("w+")
+            script = (f'python3 -W ignore "{fake}" 0 "{home}/spotify.png" & '
+                      f'python3 -W ignore "{fake}" 1 "{home}/youtube.png" & sleep 1; '
+                      f'exec qs --no-color --path "{fixture}"')
+            benv = {k: v for k, v in env.items() if k != "DBUS_SESSION_BUS_ADDRESS"}
+            shell = subprocess.Popen(["dbus-run-session", f"--config-file={ROOT}/scripts/tests/private-bus.conf",
+                                      "--", "sh", "-c", script], cwd=ROOT, env=benv, stdout=mlog, stderr=mlog,
+                                     start_new_session=True)   # own group: the fake players die with it
+            shell.group = True
+            try:
+                wait_state(lambda v: v["pills"] and v["pills"][0]["state"] == "rest", "shell on the private bus")
+            except AssertionError:
+                mlog.flush(); print((home / "mpris-shell.log").read_text()[-3000:]); raise
+            assert ipc("pill", "open").returncode == 0
+            bar = wait_pill(lambda v: v["w"] == 696 and v["clock"] is not None, "clock shown")
+            ck = bar["clock"]
+            assert abs((ck[0] + ck[1]) / 2 - bar["w"] / 2) <= 1 and ":" in ck[2], ck   # clock at the true centre
+            assert not [s for s in bar["rowItems"] if s[0] < ck[1] and s[1] > ck[0]], (ck, bar["rowItems"])
+            assert ipc("pill", "dashboard").returncode == 0
+            d = wait_pill(lambda v: v["dashMain"] == "Spotify" and v["dashOthers"] == ["Mozilla Firefox"],
+                          "Spotify main (even paused), Firefox listed")
+            assert ipc("dashChoose", "0").returncode == 0
+            wait_pill(lambda v: v["dashMain"] == "Mozilla Firefox" and v["dashOthers"] == ["Spotify"], "chosen player")
+            assert ipc("pill", "close").returncode == 0
+            wait_pill(lambda v: v["state"] == "rest", "closed")
+            assert ipc("pill", "dashboard").returncode == 0
+            wait_pill(lambda v: v["dashMain"] == "Spotify", "reopening starts with Spotify again")
+            mlog.flush()
+            (home / "shell.log").write_text((home / "shell.log").read_text() + (home / "mpris-shell.log").read_text())
+            print("PASS: media players (private bus, fake Spotify + Firefox): Spotify main even paused, others listed,")
+            print("      choosing and reset on reopen; centred bar clock clear of the row")
+
             lines = (home / "shell.log").read_text().splitlines()
             # No PipeWire or D-Bus in the sandbox: these errors prove it stayed isolated.
             isolated = ("quickshell.service.pipewire.loop: Failed to connect pipewire context",
@@ -381,6 +454,7 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
             print("      rest-only click-to-expand, collapse-delay setting, animations off (real pointer on Xvfb)")
             print("PASS: surfaces: open/switch/re-open toggle, Escape, stays open, badge clears on Notifications only,")
             print("      fullscreen closes them, tier over its chip, tier shape pixels (rounded corners, concave joins)")
+            print("PASS: dashboard: bar widens before the tier rises, 920x420 clamped, clock/now-playing tabs, toggle, switch")
             print("PASS: layers, per-surface namespaces, keyboard focus only for an open surface (static; Xvfb has no layer shell)")
             print("NOT TESTED: live Wayland exclusive zones, click-through, direct scanout or VRR")
         except Exception:
@@ -391,7 +465,13 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
             os.close(read_fd)
             for proc in (shell, display):
                 if proc is not None:
-                    proc.terminate()
+                    if getattr(proc, "group", False):
+                        try:
+                            os.killpg(proc.pid, signal.SIGTERM)
+                        except ProcessLookupError:
+                            pass
+                    else:
+                        proc.terminate()
                     try:
                         proc.wait(timeout=5)
                     except subprocess.TimeoutExpired:

@@ -120,3 +120,6 @@ hl.bind("SUPER + SUPER_L", function()
 		end
 	end, { timeout = 300, type = "oneshot" })
 end, { release = true, description = "Double-tap Super: expand the pill / peek over fullscreen" })
+
+-- Super+D toggles the dashboard surface of the pill (frame layout).
+hl.bind("SUPER + D", hl.dsp.exec_cmd("qs ipc call pill toggle dashboard"), { description = "Toggle the dashboard" })

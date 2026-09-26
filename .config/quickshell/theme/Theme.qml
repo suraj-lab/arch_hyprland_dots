@@ -82,6 +82,7 @@ QtObject {
     readonly property int shoulderRadius:    22
     readonly property int pillRadiusSurface: 26
     readonly property int surfaceWidth:      400   // re-hosted views keep their classic 380 px
+    readonly property int dashboardWidth:    920   // SPEC 3.2: dashboard 920x420
     readonly property int surfacePadding:    10
 
     // Pill motion (SPEC 5.2). Zeroed when animations are off or Game Mode is on.

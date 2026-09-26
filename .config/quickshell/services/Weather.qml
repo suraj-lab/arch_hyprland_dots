@@ -20,17 +20,19 @@ Singleton {
     readonly property string location: Config.weather.location
 
     // Weather code → Nerd Font icon mapping (wttr.in codes)
+    // wttr.in weather code -> Weather Icons glyph (U+E3xx, present in the Nerd Font; the
+    // old U+F6C4 "cloud-sun" is missing). Specific codes before the rain catch-all.
     function icon(code) {
         var c = parseInt(code)
-        if (c === 113) return "\uf185"  // sun — clear/sunny
-        if (c === 116) return "\uf6c4"  // cloud-sun — partly cloudy
-        if (c === 119 || c === 122) return "\uf0c2"  // cloud — cloudy/overcast
-        if (c === 143 || c === 248 || c === 260) return "\uf0c2"  // cloud — fog/mist
-        if (c >= 176 && c <= 314) return "\uf043"  // tint — rain variants
-        if (c >= 317 && c <= 338 || c === 179 || c === 182 || c === 185
-            || c === 227 || c === 230 || c === 350) return "\uf2dc"  // snowflake
-        if (c === 200 || c >= 386) return "\uf0e7"  // bolt — thunder
-        return "\uf0c2"  // cloud — fallback
+        if (c === 113) return "\ue30d"                                  // clear / sunny
+        if (c === 116) return "\ue302"                                  // partly cloudy
+        if (c === 119 || c === 122) return "\ue312"                     // cloudy / overcast
+        if (c === 143 || c === 248 || c === 260) return "\ue313"        // mist / fog
+        if ([200, 386, 389, 392, 395].indexOf(c) >= 0) return "\ue31d"  // thunder
+        if ([179, 227, 230, 323, 326, 329, 332, 335, 338, 368, 371].indexOf(c) >= 0)
+            return "\ue31a"                                             // snow
+        if (c >= 176) return "\ue318"                                   // rain, drizzle, sleet
+        return "\ue312"                                                 // unknown: cloud
     }
 
     // Throws on malformed data; the caller keeps the last good values.

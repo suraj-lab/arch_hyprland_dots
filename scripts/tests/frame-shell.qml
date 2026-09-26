@@ -46,9 +46,42 @@ ShellRoot {
                  surface: p.surface, tierW: p.tierItem.width, tierH: p.tierItem.height,
                  tierX: p.tierItem.x, tierY: p.tierItem.y, tierTarget: p.tierTarget, anchor: p.tierAnchor,
                  unread: Notifs.unreadCount, focusGrab: p.surface !== "" && p.grabReady,
+                 dashTab: p.dashboard.tab, hoverW: p.hoverWidth,
+                 dashMain: p.dashboard.player ? p.dashboard.player.identity : "",
+                 dashOthers: p.dashboard.others.map(function(o) { return o.identity }),
+                 rowItems: root.rowSpans(p), clock: root.clockSpan(p),
                  x: p.pillItem.x, y: p.pillItem.y, w: p.pillItem.width, h: p.pillItem.height,
                  winH: p.height, winW: p.width, hoverExpand: p.prefs.hoverExpand, animate: p.animate,
                  collapseMs: p.collapseDelay }
+    }
+
+    function find(item, name) {
+        if (item.objectName === name) return item
+        for (var i = 0; i < item.children.length; i++) {
+            var hit = find(item.children[i], name); if (hit) return hit
+        }
+        return null
+    }
+    function clockSpan(p) {
+        var t = find(p.pillItem, "pillClock")
+        return t && t.visible ? [t.x, t.x + t.width, t.text] : null
+    }
+    // x spans of the bar row's visible items, to check nothing sits under the centre text.
+    function rowSpans(p) {
+        var row = null, stack = [p.pillItem]
+        while (stack.length && !row) {
+            var it = stack.pop()
+            if (it.objectName === "pillRow") row = it
+            else for (var i = 0; i < it.children.length; i++) stack.push(it.children[i])
+        }
+        if (!row) return []
+        var spans = []
+        for (var j = 0; j < row.children.length; j++) {
+            var c = row.children[j]
+            if (c.visible && c.width > 0 && c.implicitWidth > 0)
+                spans.push([row.x + c.x, row.x + c.x + c.width, c.implicitWidth])
+        }
+        return spans
     }
 
     function frameState(frame) {
@@ -94,6 +127,10 @@ ShellRoot {
             else p.toggle()
         }
         function pillOn(name: string): void { root.pillNames = [name] }
+        function dashTab(name: string): void { pills.instances[0].dashboard.tab = name }
+        function dashChoose(index: int): void {
+            var d = pills.instances[0].dashboard; d.chosen = d.others[index]
+        }
         function pillCapture(): void {
             pills.instances[0].shape.grabToImage(function(result) {
                 result.saveToFile(Quickshell.env("HOME") + "/pill.png")

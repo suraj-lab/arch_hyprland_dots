@@ -60,8 +60,11 @@ assert.deepEqual([w.temp, w.desc, w.feels, w.humidity, w.wind, w.code],
 assert.deepEqual(JSON.parse(JSON.stringify(w.forecastDays.map(d => d.code))), ['113', '266', '338']); // 3 days, midday code (copy: vm arrays have another prototype)
 assert.throws(() => wx.parse(''));
 assert.throws(() => wx.parse('{"current_condition": []}'));
-assert.equal(wx.icon('113'), '\uf185');
-assert.equal(wx.icon('338'), '\uf2dc');
+for (const [code, glyph] of [['113', '\ue30d'], ['116', '\ue302'], ['122', '\ue312'], ['248', '\ue313'],
+                             ['200', '\ue31d'], ['392', '\ue31d'], ['179', '\ue31a'], ['230', '\ue31a'],
+                             ['338', '\ue31a'], ['371', '\ue31a'], ['176', '\ue318'], ['266', '\ue318'],
+                             ['308', '\ue318'], ['350', '\ue318'], ['', '\ue312'], ['999', '\ue318']])
+    assert.equal(wx.icon(code), glyph, `weather code ${code}`);   // thunder/snow before the rain range
 console.log('PASS: Weather parsing, 3-day forecast and malformed-response rejection');
 
 // Audio: the real functions against fake PipeWire nodes.
@@ -209,3 +212,39 @@ assert.deepEqual(JSON.parse(JSON.stringify(config.validBuses({
     'DP-5': 1.5, 'DP-6': Infinity, 'DP-7': 2147483648, '$(touch pwned)': 5
 }))), {'DP-2': 10, 'HDMI-A-1': 8, 'DP-1-1': 0});
 console.log('PASS: Config validates optional connector-to-bus overrides');
+
+// Dashboard pure helpers.
+const dash = load('components/pill/surfaces/Dashboard.qml', ['formatUptime', 'parseDf', 'gib', 'monthOffset', 'formatTime']);
+assert.equal(dash.formatUptime(59), 'up 0m');
+assert.equal(dash.formatUptime(25921.76), 'up 7h 12m');
+assert.equal(dash.formatUptime(2 * 86400 + 3 * 3600 + 59), 'up 2d 3h');
+assert.equal(dash.formatUptime(NaN), '');
+assert.equal(dash.formatUptime(-5), '');
+assert.deepEqual(JSON.parse(JSON.stringify(dash.parseDf('     1B-blocks          Used\n999653638144 438086393856\n'))),
+                 {size: 999653638144, used: 438086393856});
+assert.equal(dash.parseDf(''), null);
+assert.equal(dash.parseDf('Size Used\n0 0\n'), null);                  // no division by zero later
+assert.equal(dash.parseDf('Size Used\nabc def\n'), null);
+assert.equal(dash.gib(1724985344), '1.6 GiB');
+assert.equal(dash.gib(999653638144), '931 GiB');
+assert.equal(dash.monthOffset(2026, 8), 1);                             // 1 Sep 2026 is a Tuesday (Mon-first)
+assert.equal(dash.monthOffset(2026, 10), 6);                            // 1 Nov 2026 is a Sunday
+for (const [sec, text] of [[0, '0:00'], [9.9, '0:09'], [75, '1:15'], [3599, '59:59'], [3605, '1:00:05'], [NaN, '0:00'], [-3, '0:00']])
+    assert.equal(dash.formatTime(sec), text, `formatTime(${sec})`);
+console.log('PASS: Dashboard uptime, df parsing, GiB, Monday-first calendar offset, track times');
+
+// Media: Spotify first, then playing players, then the rest (stable).
+const media = load('services/Media.qml', ['isSpotify', 'rank', 'order', 'controllable']);
+const pl = (identity, isPlaying, desktopEntry = '') => ({identity, isPlaying, desktopEntry});
+const mFirefox = pl('Mozilla Firefox', true), mSpotify = pl('Spotify', false), mVlc = pl('VLC media player', false),
+      mMpv = pl('mpv', true), mSpotifyDesk = pl('', false, 'spotify-launcher');
+const names = list => Array.from(media.order(list)).map(p => p.identity || p.desktopEntry);
+assert.deepEqual(names([mFirefox, mVlc, mSpotify, mMpv]), ['Spotify', 'Mozilla Firefox', 'mpv', 'VLC media player']);
+assert.deepEqual(names([mVlc, mFirefox]), ['Mozilla Firefox', 'VLC media player']);
+assert.deepEqual(names([mSpotifyDesk, mFirefox]), ['spotify-launcher', 'Mozilla Firefox']);   // matched by desktop entry
+assert.deepEqual(names([]), []);
+const bus = (dbusName, extra = {}) => Object.assign({dbusName, canTogglePlaying: true, trackTitle: 't'}, extra);
+assert.deepEqual(Array.from(media.controllable([bus('org.mpris.MediaPlayer2.spotify'), bus('org.mpris.MediaPlayer2.playerctld'),
+    bus('org.mpris.MediaPlayer2.firefox.instance_1_42'), bus('org.mpris.MediaPlayer2.idle', {canTogglePlaying: false, trackTitle: ''})]))
+    .map(p => p.dbusName), ['org.mpris.MediaPlayer2.spotify', 'org.mpris.MediaPlayer2.firefox.instance_1_42']);
+console.log('PASS: Media order (Spotify first, then playing, stable); playerctld proxy and idle players filtered');

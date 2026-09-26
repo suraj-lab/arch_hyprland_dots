@@ -268,7 +268,7 @@ before shipping Phase 4.
 | Keys | Action | Lua |
 |---|---|---|
 | Double-tap Super (release, alone) | peek / expand pill | `hl.bind("SUPER + SUPER_L", <Lua function counting taps in a 300 ms hl.timer window>, { release = true })`; only a double tap runs `qs ipc call pill peek` |
-| `Super+D` | dashboard surface | `hl.dsp.exec_cmd("qs ipc call pill open dashboard")` |
+| `Super+D` | dashboard surface (toggle) | `hl.dsp.exec_cmd("qs ipc call pill toggle dashboard")` |
 | `Super+slash` | keybind cheatsheet | `hl.dsp.exec_cmd("qs ipc call cheatsheet toggle")` |
 
 Add `{ description = "…" }` to **every** bind in `binds.lua` (the key and action stay
@@ -760,6 +760,58 @@ HDMI-A-1 stays readable (no inactive dimming), and everything is restored on exi
 - Writing monitor layout from the shell (use nwg-displays).
 
 ## Change log
+- 2026-09-26 - Phase 4.4 (dashboard), deployed with Suraj's approval; not yet committed.
+  `components/pill/surfaces/Dashboard.qml`, a 920x420 surface (clamped to the bar on small
+  screens) with Dashboard / Media / Performance / Weather tabs. Opens from the clock (Dashboard
+  tab), from now-playing (Media tab; the tier grows from whichever was clicked) and Super+D,
+  which toggles (spec said open; toggle lets the same key close it). IPC open/toggle accept
+  dashboard and media. Opening from the rest tab now widens the bar first and only then
+  raises the tier, mirroring the close fix, so no surface slides while the bar resizes.
+  Dashboard tab: user card (initial when ~/.face is absent, as here; ~/.face is watched and
+  loaded only if it exists), uptime and kernel from /proc, current weather, a Monday-first
+  month calendar with navigation, media card with art and controls. Media tab: large art,
+  details and controls. Performance: CPU (Sysmon), RAM (Sysmon), the GPU driving a connected
+  display (found at runtime: the RX 9070 XT, card1; busy %, edge temperature, VRAM) and `/`
+  (df), read every 2 s / 30 s only while that tab is shown. Weather: current details and the
+  forecast. Deviations: wttr.in's JSON has 3 forecast days, not 7; cava bars skipped (spec:
+  optional). Fixed in the shared Weather service: U+F6C4 ("partly cloudy") has no glyph in
+  the installed Nerd Font, and the rain range was checked before snow/thunder (patchy snow,
+  blizzard and thundery outbreaks showed rain; snow showers fell through to a cloud). Now
+  one Weather Icons set (U+E3xx, verified rendered) with specific codes first; the classic
+  clock popup benefits too. Checks: phase0/phase3 pass; phase4 x3 adds dashboard open from
+  rest (tier waits for the bar), size/clamp, clock vs now-playing tabs, toggle and switching;
+  unit tests for uptime, df parsing, GiB and the calendar offset; visual render of all four
+  tabs at 1920x1080 with real CPU/GPU/disk readings, no QML errors. Live backup
+  `phase4-dashboard-20260926-144754`.
+  Feedback round (Suraj: Spotify and YouTube usually play together, Spotify should be the
+  main one; media name and dashboard not centred; look at the UI). Deployed, backup
+  `phase4-media-20260926-150432`:
+  - Media service: `ordered` = Spotify first (identity or desktop entry), then playing, then
+    the rest (stable), used by the bar and the dashboard. `playerctld` (a proxy that mirrors
+    the active player, found live as a second "Spotify") is filtered out; the Sound panel's
+    duplicate Spotify tab goes with it.
+  - Dashboard: Spotify is the main player even when paused; other players are listed ("Also
+    playing" on the Media tab with art, title and play/pause; chips on the Dashboard tab's
+    media card); a click makes one the main player until the dashboard closes. Media tab is
+    centred with a seekable progress bar and times; the media card has progress too; the
+    weather card shows the forecast days. The dashboard opens centred on the bar.
+  - Bar: now-playing sits at the true centre (elided to the room between the title and the
+    right-hand items) and prefers Spotify when it plays. Found while checking: the tray is a
+    nested RowLayout, which fills by default, so since 4.2 it split the free space with the
+    spacer and parked CPU/RAM in the middle of the bar (now `Layout.fillWidth: false`).
+  - Clock, not the track name, sits at the bar's centre (Suraj: the media name was redundant
+    beside the Media tab and the media keys, and the clock is what a centred slot should
+    hold). Clicking it still opens the dashboard; the Media tab stays reachable from the
+    dashboard and `qs ipc call pill open media`. The bar title stops short of the clock.
+  - Tests: phase4 adds a second run on a private bus (scripts/tests/private-bus.conf: no
+    service activation, so no portals/gvfs get started) with two fake MPRIS players
+    (scripts/tests/fake_mpris.py: Spotify paused, Firefox playing): Spotify main, Firefox
+    listed, choosing and reset, now-playing shown and clear of the row; the harness now
+    asserts only the spacer stretches. Unit tests for ordering, the playerctld filter and
+    track times. A first probe used a default private bus, which activated real portal/gvfs
+    services on that private bus; they exited with it (verified: only the login-session
+    processes remain) and three orphaned test helpers were stopped by PID.
+
 - 2026-09-26 - Phase 4.3 (surfaces), deployed with Suraj's approval; confirmed by Suraj
   (panels, close in place, and Caffeine under the new Background-layer inhibitor window).
   Sound / Notifications / System now open inside the pill: a 400 px tier (the views keep
