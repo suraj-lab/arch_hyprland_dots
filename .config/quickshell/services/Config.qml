@@ -42,7 +42,26 @@ QtObject {
         return result
     }
 
-    readonly property var sections: ["idle", "weather", "brightness"]
+    readonly property var appearance: {
+        settingsFile.text()
+        var values = settingsData.appearance || {}
+        return { layout: values.layout === "frame" ? "frame" : "classic" }
+    }
+
+    // Only restStyle is needed for the fixed bottom reserve in 4.1. Other pill
+    // preferences arrive with their consumers; monitor overrides fall back to global.
+    function pillFor(monitorName) {
+        settingsFile.text()
+        var global = settingsData.pill || {}
+        var monitors = settingsData.monitors || {}
+        var monitor = monitors[monitorName] || {}
+        var local = monitor.pill || {}
+        var style = local.restStyle === "tab" || local.restStyle === "handle"
+            ? local.restStyle : global.restStyle
+        return { restStyle: style === "handle" ? "handle" : "tab" }
+    }
+
+    readonly property var sections: ["idle", "weather", "brightness", "appearance", "pill", "monitors"]
     function resetSections(data) {
         for (var i = 0; i < sections.length; i++)
             if (!data || !(sections[i] in data)) settingsData[sections[i]] = ({})
@@ -58,6 +77,9 @@ QtObject {
         property var idle: ({})
         property var weather: ({})
         property var brightness: ({})
+        property var appearance: ({})
+        property var pill: ({})
+        property var monitors: ({})
     }
 
     property FileView settingsFile: FileView {

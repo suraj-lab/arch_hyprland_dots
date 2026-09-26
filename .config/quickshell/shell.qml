@@ -6,6 +6,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import "theme"
 import "components"
+import "components/frame"
 import "services"
 
 ShellRoot {
@@ -86,6 +87,16 @@ ShellRoot {
     Process { id: pSuspend; command: ["systemctl", "suspend"]               }
     Process { id: pReboot;  command: ["systemctl", "reboot"]                }
     Process { id: pOff;     command: ["systemctl", "poweroff"]              }
+
+    // Phase 4.1 preview: no extra windows in classic mode. Keep the working bar
+    // below until the pill takes over its controls and Caffeine surface in 4.2/4.3.
+    Variants {
+        model: Config.appearance.layout === "frame" ? Quickshell.screens : []
+        Frame {
+            required property ShellScreen modelData
+            screen: modelData
+        }
+    }
 
     // ── Per-screen bar ──────────────────────────────────────────────────────
     Variants {

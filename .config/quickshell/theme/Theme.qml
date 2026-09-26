@@ -68,6 +68,13 @@ QtObject {
     readonly property int popupRadius:   12
     readonly property int popupPadding:  12
 
+    // Frame / resting pill (logical pixels; classic stays unchanged)
+    readonly property color frameBg:         "#110d17"
+    readonly property int frameThickness:    10
+    readonly property int frameRadius:       22
+    readonly property int pillRestTabHeight: 30
+    readonly property int pillRestHandleHeight: 6
+
     // OSD
     readonly property int osdWidth:      350
     readonly property int osdHeight:     48

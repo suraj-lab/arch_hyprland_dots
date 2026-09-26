@@ -753,6 +753,30 @@ HDMI-A-1 stays readable (no inactive dimming), and everything is restored on exi
 - Writing monitor layout from the shell (use nwg-displays).
 
 ## Change log
+- 2026-09-26 - Phase 4.1 (frame + reserves), deployed (classic default) with Suraj's approval.
+  Gaming Mode round-trip deferred to final acceptance at Suraj's request (still required).
+  `Config.appearance.layout` = "classic" (default; any invalid value) | "frame". Classic
+  creates no extra windows. Frame mode adds, per screen, `components/frame/Frame.qml`
+  (Top layer, namespace quickshell-frame, empty input mask, no keyboard focus, ignores
+  reserves so it draws at the physical edges; odd-even ShapePath with frameRadius inner
+  corners) and four `Reserve.qml` strips (empty masks, fixed exclusive zones: 10 px
+  top/left/right, bottom 10 + rest height = 40 tab / 16 handle). Rest style comes from
+  `Config.pillFor(monitor)`: `monitors.<name>.pill.restStyle` overrides `pill.restStyle`;
+  invalid values fall back to "tab". Frame and reserves hide on per-monitor fullscreen.
+  Tokens added to Theme: frameBg, frameThickness, frameRadius, pillRest{Tab,Handle}Height.
+  `gaps_out` left at 11: already ~12 px inside the frame, so no Hyprland change.
+  Deviation: the classic top bar stays in frame mode until the pill (4.2/4.3) takes over
+  its controls and the Caffeine inhibitor surface; frame mode is a preview until then.
+  Checks: new `scripts/check-desktop-phase4.py` runs on a private Xvfb (Quickshell has
+  no offscreen PanelWindow backend); classic default, switch/reset, invalid settings,
+  reserve zones/anchors/masks/focus, per-monitor fullscreen, hotplug, rest-style overrides,
+  and frame pixels (opaque edges, transparent interior, rounded corners). Layer-shell
+  properties are checked statically (Xvfb has no layer shell). Not tested offline: live
+  Wayland exclusive zones, click-through, direct scanout/VRR. phase0/phase3 still pass.
+  Live backup `phase4-frame-20260926-090052`. Restart verified in classic mode: identical
+  layer namespaces to before (no frame surfaces), no new runtime warnings, keybinds and
+  Hyprland config unchanged, notifications on Quickshell, Caffeine restored to on.
+  Pending: Suraj previews frame mode live (placement, click-through, fullscreen hide).
 - 2026-09-26 - Review follow-up, commit/deployment approved by Suraj; deployed.
   The previous Phase 3 completion report overstated acceptance: the service extraction
   was finished, but visual checks and the Gaming Mode round-trip are still outstanding.
