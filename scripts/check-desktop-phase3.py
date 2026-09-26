@@ -44,18 +44,32 @@ with tempfile.TemporaryDirectory(prefix=".p3-", dir=ROOT) as tmp:
         command = home / "bin" / name
         command.write_text("#!/bin/sh\n" + body + "\n")
         command.chmod(0o700)
-    (home / "bin" / "ddcutil").write_text("#!/bin/sh\n" + "\n".join([
-'if [ "$1" = detect ]; then cat <<\'EOF\'',
-'Display 1',
-'   I2C bus:          /dev/i2c-8',
-'   DRM connector:    card1-HDMI-A-1',
-'',
-'Display 2',
-'   I2C bus:          /dev/i2c-10',
-'   DRM connector:    card1-DP-2',
-'EOF',
-'elif [ "$1" = getvcp ]; then echo \'VCP 10 C 28 100\'',
-'fi']) + "\n")
+    (home / "bin" / "ddcutil").write_text('''#!/usr/bin/python3
+import json, os, sys, time
+from pathlib import Path
+home = Path(os.environ["HOME"])
+args = sys.argv[1:]
+with (home / "ddc-calls").open("a") as log:
+    log.write(json.dumps(args) + "\\n")
+if args[0] == "detect":
+    print("Display 1\\n I2C bus: /dev/i2c-8\\n DRM connector: card1-HDMI-A-1")
+    print("Display 2\\n I2C bus: /dev/i2c-10\\n DRM connector: card1-DP-2")
+else:
+    bus = args[args.index("--bus") + 1]
+    state = home / ("ddc-value-" + bus)
+    if args[0] == "getvcp":
+        if bus == "77":
+            sys.exit(2)
+        if bus == "78":
+            print("VCP 10 ERR")
+            sys.exit(0)
+        print("VCP 10 C", state.read_text() if state.exists() else "28", "100")
+    elif args[0] == "setvcp":
+        time.sleep(0.1)  # keep Process busy while the fixture drags again
+        if bus == "10" and args[2] == "60":
+            sys.exit(3)  # one monitor fails; the combined write must report failure
+        state.write_text(args[2])
+''')
     (home / "bin" / "ddcutil").chmod(0o700)
     (config.parent / "scripts").mkdir()
     (config.parent / "scripts/desktop-gamemode.py").write_text(
@@ -89,11 +103,11 @@ with tempfile.TemporaryDirectory(prefix=".p3-", dir=ROOT) as tmp:
     reader = threading.Thread(target=collect, daemon=True)
     reader.start()
 
-    def wait_for(tag, accept, what, timeout=5):
+    def wait_for(tag, accept, what, timeout=5, since=0):
         # Scan the whole log: expect() may already have taken the line off the queue.
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
-            for line in list(log):
+            for line in list(log)[since:]:
                 if tag + " " in line:
                     value = json.loads(line.split(tag + " ", 1)[1])
                     if accept(value):
@@ -140,6 +154,14 @@ with tempfile.TemporaryDirectory(prefix=".p3-", dir=ROOT) as tmp:
                  "Net/Bt loaded without D-Bus")
         wait_for("BRIGHT", lambda v: v["ready"] and abs(v["brightness"] - 0.28) < 0.001
                  and v["buses"] == 2, "Brightness detect -> read with stubbed ddcutil")
+        wait_for("BRIGHT_WRITE", lambda v: v == 0.9, "rapid drag ends at 90%")
+        wait_for("BRIGHT_FAILURE", lambda v: v["value"] == 0.6 and "write failed (3)" in v["error"],
+                 "partial write failure remains visible after readback")
+        wait_for("BRIGHT_RECOVER", lambda v: v == dict(value=0.5, error=""), "successful retry")
+        calls = [json.loads(line) for line in (home / "ddc-calls").read_text().splitlines()]
+        writes = [(args[2], args[args.index("--bus") + 1]) for args in calls if args[0] == "setvcp"]
+        assert writes == [(str(value), str(bus)) for value in (40, 90, 60, 50) for bus in (8, 10)], writes
+        assert sum(args[0] == "detect" for args in calls) == 1, calls
         sysmon = wait_for("SYSMON", lambda v: True, "CPU/memory/temperature readings", timeout=8)
         assert 0 <= sysmon["cpu"] <= 100 and 0 < sysmon["mem"] <= 100, sysmon
         assert 0 < sysmon["temp"] < 120 and sysmon["path"].startswith("/sys/"), sysmon
@@ -169,6 +191,24 @@ with tempfile.TemporaryDirectory(prefix=".p3-", dir=ROOT) as tmp:
         expect()
         config.write_text('{"weather":{"location":"' + "x" * 101 + '"}}')
         expect()
+        config.write_text('{"brightness":{"buses":{"DP-2":20,"DP-3":"bad"}}}')
+        wait_for("BUS_OVERRIDES", lambda v: v == {"DP-2": 20}, "validated brightness override")
+        wait_for("BRIGHT_MAP", lambda v: v == {"HDMI-A-1": 8, "DP-2": 20}, "override merged with detection")
+        since = len(log)
+        config.write_text('{}')
+        wait_for("BUS_OVERRIDES", lambda v: v == {}, "removed override resets to auto", since=since)
+        wait_for("BRIGHT_MAP", lambda v: v == {"HDMI-A-1": 8, "DP-2": 10}, "detected buses restored", since=since)
+        config.write_text('{"brightness":{"buses":{"HDMI-A-1":77}}}')
+        wait_for("BRIGHT_ERROR", lambda v: v == "Brightness read failed (2)", "read failure is not hidden by a pipe")
+        config.write_text('{"brightness":{"buses":{"HDMI-A-1":78}}}')
+        wait_for("BRIGHT_ERROR", lambda v: v == "Invalid DDC brightness reading", "malformed read is rejected")
+        since = len(log)
+        config.write_text('{}')
+        wait_for("BRIGHT_ERROR", lambda v: v == "", "explicit refresh clears read error", since=since)
+        wait_for("BRIGHT_MAP", lambda v: v == {"HDMI-A-1": 8, "DP-2": 10}, "auto buses restored again", since=since)
+        assert (home / "ddc-value-8").read_text() == (home / "ddc-value-10").read_text() == "50"
+        calls = [json.loads(line) for line in (home / "ddc-calls").read_text().splitlines()]
+        assert sum(args[0] == "setvcp" for args in calls) == 8, "Config edits must not change brightness"
         urls = (home / "curl-args").read_text().split()
         assert "wttr.in/London?format=j1" in urls, urls
         assert "wttr.in/New%20York?format=j1" in urls, urls  # one encoded argument, no shell
@@ -180,12 +220,12 @@ with tempfile.TemporaryDirectory(prefix=".p3-", dir=ROOT) as tmp:
         bad = [line for line in log if not any(e in line for e in expected) and any(marker in line for marker in (
             " ERROR", "ReferenceError:", "TypeError:", "Binding loop", "Failed to load configuration"))]
         assert not bad, "".join(bad)
-        print("PASS: Config defaults, file creation, watched/atomic edits, zero, partial/invalid settings")
+        print("PASS: Config defaults, file creation, watched/atomic edits, zero, partial/invalid settings, bus overrides/reset")
         print("PASS: Desktop singleton startup, live timeout bindings and two-way DND wiring (stubbed commands)")
         print("PASS: Notifs toasts/history/badge/DND/dismiss/clear and media toasts; Weather fetch and "
               "location reload (stubbed curl); Sysmon live /proc and CPU sensor readings; Audio "
               "loads without PipeWire (stubbed pactl states); Net/Bt load without D-Bus; "
-              "Brightness detect->read (stubbed ddcutil)")
+              "Brightness detect/read, rapid writes, partial failure and recovery (stubbed ddcutil)")
     finally:
         proc.terminate()
         try:

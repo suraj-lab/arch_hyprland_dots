@@ -149,7 +149,10 @@ bt.adapter = null; bt.toggle();                                       // no adap
 console.log('PASS: Bt power toggle');
 
 // Brightness: parse the real `ddcutil detect --brief` output into connector → bus.
-const br = load('services/Brightness.qml', ['parseDetect']);
+const io = {running: false, command: [], writing: false};
+const br = load('services/Brightness.qml', ['parseDetect', 'parseReading', 'read', 'set', 'flush'], {ioProc: io});
+Object.assign(br, {root: br, ready: true, buses: [8, 10], readBus: 8,
+    pendingValue: -1, readRequested: false, brightness: 0, error: ''});
 const detect = `Display 1
    I2C bus:          /dev/i2c-8
    DRM connector:    card1-HDMI-A-1
@@ -164,4 +167,45 @@ Display 2
 `;
 assert.deepEqual(JSON.parse(JSON.stringify(br.parseDetect(detect))), {'HDMI-A-1': 8, 'DP-2': 10});
 assert.deepEqual(JSON.parse(JSON.stringify(br.parseDetect('garbage\nI2C bus: /dev/i2c-7\nno connector'))), {});
-console.log('PASS: Brightness detect parses connector → bus and ignores partial entries');
+assert.deepEqual(JSON.parse(JSON.stringify(br.parseDetect(detect + `
+Invalid display
+   I2C bus: /dev/i2c-12
+   DRM connector: card1-DP-3
+   DDC communication failed
+Display 3
+   DRM connector: card1-DP-4
+`))), {'HDMI-A-1': 8, 'DP-2': 10});
+assert.deepEqual(JSON.parse(JSON.stringify(br.parseDetect(`Display 1
+   I2C bus: /dev/i2c-0
+   DRM connector: card0-DP-1
+`))), {'DP-1': 0});
+assert.equal(br.parseReading('VCP 10 C 28 100\n'), 0.28);
+assert.equal(br.parseReading('VCP 10 C 50 200\n'), 0.25);
+for (const invalid of ['', 'VCP 10 ERR', 'VCP 10 C 0 0', 'VCP 10 C 101 100', 'VCP 10 C -1 100'])
+    assert.equal(br.parseReading(invalid), -1);
+br.set(0.4);
+const firstCommand = JSON.stringify(io.command);
+br.set(0.7); br.set(0.9); br.read();
+assert.equal(JSON.stringify(io.command), firstCommand);              // never replace a running command
+assert.equal(br.pendingValue, 90);
+io.running = false; br.flush();
+assert.equal(io.command[4], '90');                                  // latest drag value, not the intermediate 70
+assert.deepEqual(Array.from(io.command).slice(5), ['8', '10']);
+io.running = false; br.flush();
+assert.deepEqual(Array.from(io.command), ['ddcutil', 'getvcp', '10', '--bus', '8', '--brief']);
+assert.equal(br.readRequested, false);
+io.running = false;
+for (const invalid of [NaN, Infinity, -Infinity, '0.5', null]) br.set(invalid);
+assert.equal(io.running, false);
+br.ready = false; br.set(0.5); assert.equal(io.running, false);
+br.ready = true; br.set(-1); assert.equal(io.command[4], '5');
+console.log('PASS: Brightness detection, read validation, latest-value queue and invalid-input guards');
+
+const config = load('services/Config.qml', ['validBuses']);
+for (const invalid of [null, [], '8', 8, true])
+    assert.deepEqual(JSON.parse(JSON.stringify(config.validBuses(invalid))), {});
+assert.deepEqual(JSON.parse(JSON.stringify(config.validBuses({
+    'DP-2': 10, 'HDMI-A-1': 8, 'DP-1-1': 0, 'DP-3': '7', 'DP-4': -1,
+    'DP-5': 1.5, 'DP-6': Infinity, 'DP-7': 2147483648, '$(touch pwned)': 5
+}))), {'DP-2': 10, 'HDMI-A-1': 8, 'DP-1-1': 0});
+console.log('PASS: Config validates optional connector-to-bus overrides');

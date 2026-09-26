@@ -24,7 +24,25 @@ QtObject {
         return { location: location && location.length <= 100 ? location : "London" }
     }
 
-    readonly property var sections: ["idle", "weather"]
+    readonly property var brightness: {
+        settingsFile.text()
+        var values = settingsData.brightness || {}
+        return { buses: validBuses(values.buses) }
+    }
+
+    function validBuses(values) {
+        var result = {}
+        if (!values || typeof values !== "object" || Array.isArray(values)) return result
+        Object.keys(values).forEach(function(connector) {
+            var bus = values[connector]
+            if (/^[A-Za-z][A-Za-z0-9]*(?:-[A-Za-z0-9]+)+$/.test(connector)
+                && typeof bus === "number" && Number.isInteger(bus) && bus >= 0 && bus <= 2147483647)
+                result[connector] = bus
+        })
+        return result
+    }
+
+    readonly property var sections: ["idle", "weather", "brightness"]
     function resetSections(data) {
         for (var i = 0; i < sections.length; i++)
             if (!data || !(sections[i] in data)) settingsData[sections[i]] = ({})
@@ -39,6 +57,7 @@ QtObject {
         id: settingsData
         property var idle: ({})
         property var weather: ({})
+        property var brightness: ({})
     }
 
     property FileView settingsFile: FileView {

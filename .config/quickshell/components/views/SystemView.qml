@@ -149,6 +149,7 @@ Item {
         MouseArea {
             Layout.fillWidth: true
             implicitHeight: brightCol.implicitHeight
+            enabled: Brightness.ready
             Layout.leftMargin: 12; Layout.rightMargin: 12; Layout.topMargin: 10
             onWheel: wheel => {
                 var step = wheel.angleDelta.y / 120 * 0.05
@@ -164,7 +165,11 @@ Item {
                     Layout.fillWidth: true
                     Text { text: "\uf185  Brightness"; color: Theme.warning; font.pixelSize: Theme.fontBar; font.bold: true; font.family: Theme.fontFamily }
                     Item { Layout.fillWidth: true }
-                    Text { text: Math.round(root.brightness * 100) + "%"; color: Theme.warning; font.pixelSize: Theme.fontBar; font.bold: true; font.family: Theme.fontFamily }
+                    Text {
+                        text: !Brightness.ready ? "Unavailable" : Brightness.error ? "DDC error" : Math.round(root.brightness * 100) + "%"
+                        Accessible.description: Brightness.error
+                        color: Theme.warning; font.pixelSize: Theme.fontBar; font.bold: true; font.family: Theme.fontFamily
+                    }
                 }
 
                 Rectangle {

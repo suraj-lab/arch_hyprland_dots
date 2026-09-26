@@ -17,11 +17,13 @@ ShellRoot {
 
     function report() {
         console.log("CONFIG " + JSON.stringify({ idle: Config.idle, weather: Config.weather }))
+        console.log("BUS_OVERRIDES " + JSON.stringify(Config.brightness.buses))
     }
     Connections {
         target: Config
         function onIdleChanged() { root.report() }
         function onWeatherChanged() { root.report() }
+        function onBrightnessChanged() { root.report() }
     }
     Connections {
         target: Weather
@@ -34,10 +36,33 @@ ShellRoot {
     // Brightness with stubbed ddcutil: detect must resolve both buses and read 28%.
     Connections {
         target: Brightness
+        function onBusMapChanged() { console.log("BRIGHT_MAP " + JSON.stringify(Brightness.busMap)) }
+        function onErrorChanged() { console.log("BRIGHT_ERROR " + JSON.stringify(Brightness.error)) }
         function onBrightnessChanged() {
             if (!Brightness.ready) return
             console.log("BRIGHT " + JSON.stringify({ ready: Brightness.ready,
                 brightness: Brightness.brightness, buses: Brightness.buses.length }))
+        }
+    }
+
+    property int brightnessStage: 0
+    Timer {
+        interval: 100; running: root.brightnessStage < 4; repeat: true
+        onTriggered: {
+            if (!Brightness.ready || Brightness.busy || Brightness.pendingValue >= 0 || Brightness.readRequested) return
+            if (root.brightnessStage === 0) {
+                if (Brightness.brightness !== 0.28) return
+                Brightness.set(0.4); Brightness.set(0.7); Brightness.set(0.9)
+            } else if (root.brightnessStage === 1) {
+                console.log("BRIGHT_WRITE " + JSON.stringify(Brightness.brightness))
+                Brightness.set(0.6) // stub fails on bus 10
+            } else if (root.brightnessStage === 2) {
+                console.log("BRIGHT_FAILURE " + JSON.stringify({ value: Brightness.brightness, error: Brightness.error }))
+                Brightness.set(0.5)
+            } else {
+                console.log("BRIGHT_RECOVER " + JSON.stringify({ value: Brightness.brightness, error: Brightness.error }))
+            }
+            root.brightnessStage++
         }
     }
 

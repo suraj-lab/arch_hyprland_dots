@@ -507,6 +507,11 @@ Honour a global `appearance.animations` config switch too.
 - Check: `loginctl lock-session` locks. `systemctl suspend` → hyprlock is visible on resume.
 
 ### Phase 3 — Shell restructure (no visual change yet)
+**Status (reviewed 2026-09-26):** service extraction is implemented, but Phase 3 has
+not passed all acceptance gates. Brightness review fixes are deployed with Suraj's
+approval. Wi-Fi/Bluetooth/brightness visual checks and the supervised Gaming Mode
+round-trip are still required before starting Phase 4.
+
 Move logic out of `shell.qml` into **singletons** under `.config/quickshell/services/`
 (`pragma Singleton`, registered via a `qmldir`), so both the old bar and the new pill can
 use them during the migration.
@@ -532,13 +537,19 @@ use them during the migration.
     "idle": { "lockSec": 600, "dpmsSec": 900, "suspendSec": 0 },
     "nightLight": { "warmK": 4500, "on": "19:30", "off": "09:00" },
     "weather": { "location": "London" },
-    "brightness": { "buses": { "DP-2": 8, "HDMI-A-1": 10 } },
+    "brightness": { "buses": { "DP-2": 10, "HDMI-A-1": 8 } },
     "appearance": { "animations": true },
     "monitors": { "HDMI-A-1": { "pill": { "hoverExpand": false } } }
   }
   ```
-  (Confirm the DP-2 = bus 8 mapping on the machine; the current code writes to both
-  buses 8 and 10.)
+  Implemented settings: `idle`, `weather`, and optional `brightness.buses` overrides.
+  Omit `brightness.buses` (or use `{}`) for startup detection; explicit connector-to-bus
+  entries override detected entries and reset to detection when removed. Only nonnegative
+  integer bus numbers are accepted. DP-2 = 10 and HDMI-A-1 = 8 were observed on this host;
+  these are examples, not portable defaults. The classic slider still sets all detected/
+  configured buses; per-monitor controls remain deferred. Other settings in this target
+  schema arrive with their consumers: pill/appearance/monitor layout in Phase 4, night-light
+  schedule editing in Phase 6 (the current schedule stays in hyprsunset.conf).
 - Check: the old top bar still works, with identical behaviour, on top of the singletons.
   `nmcli`/`bluetoothctl` polling loops are gone (`rg 'nmcli|bluetoothctl' .config/quickshell`
   shows only fallbacks, if any). Editing `settings.json` live-updates the shell.
@@ -742,6 +753,27 @@ HDMI-A-1 stays readable (no inactive dimming), and everything is restored on exi
 - Writing monitor layout from the shell (use nwg-displays).
 
 ## Change log
+- 2026-09-26 - Review follow-up, commit/deployment approved by Suraj; deployed.
+  The previous Phase 3 completion report overstated acceptance: the service extraction
+  was finished, but visual checks and the Gaming Mode round-trip are still outstanding.
+  Brightness review found dropped drag updates while Process was running, invalid/partial
+  display blocks accepted as usable buses, bus zero ignored, and missing Config overrides.
+  Regression tests reproduced the detection bug. Brightness now serializes I/O, keeps
+  the latest queued slider value, reads back after the final write, propagates command
+  failure (including one monitor failing), and validates direct getvcp output instead of
+  hiding errors behind awk/wait. No new polling. Unavailable/error states are visible.
+  Config now validates optional brightness.buses overrides; deleting them restores auto
+  detection. Corrected the reversed bus mapping in the settings example (not just this log).
+  Checks: phase0 and expanded phase3 harness; stubbed slow writes, coalescing, partial
+  failure/recovery, malformed/failed reads, override/reset, and pure parser/input tests.
+  Live backup: `phase3-review-20260926-082625`. Copied only Brightness.qml, Config.qml
+  and SystemView.qml, then restarted Quickshell. Verified: live files match the repo,
+  no new runtime warnings/errors, desktop IPC healthy, notifications owned by Quickshell,
+  keybinds unchanged and no Hyprland config errors. Restored the pre-restart Caffeine
+  setting (on). Read-only detection confirmed HDMI-A-1 bus 8 and DP-2 bus 10.
+  No brightness write, network toggle, suspend or Gaming Mode transition was run live.
+  Next gate: visually verify controls, then run §7.3 while Suraj is present. Only then
+  start 4.1 behind the default-classic layout switch.
 - 2026-09-25 — Phase 3 slice 3c (Brightness), deployed with Suraj's approval.
   `Brightness` singleton owns ddcutil. `ddcutil detect --brief` runs once at startup and maps
   DRM connector → I2C bus (verified live: HDMI-A-1→8, DP-2→10), so the hardcoded 8/10 in
