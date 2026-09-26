@@ -37,7 +37,12 @@ binds = ".config/hypr/modules/binds.lua"
 NEW_BINDS = "\n-- New binds added by the DE upgrade (SPEC §4.2)"
 current = Path(binds).read_text()
 old, _, added = current.partition(NEW_BINDS)
-assert old == run("git", "show", f"{BASE}:{binds}").replace("qs msg ", "qs ipc call "), "keybind semantics changed"
+# The one sanctioned command change: Super+V's wofi picker becomes the launcher's
+# clipboard mode (SPEC §5.1); the key itself stays.
+WOFI_CLIPBOARD = "killall wofi || cliphist list | wofi --dmenu | cliphist decode | wl-copy"
+expected = run("git", "show", f"{BASE}:{binds}").replace("qs msg ", "qs ipc call ")
+assert expected.count(WOFI_CLIPBOARD) == 1, "base Super+V bind not found"
+assert old == expected.replace(WOFI_CLIPBOARD, "qs ipc call launcher clipboard"), "keybind semantics changed"
 added_keys = re.findall(r'hl\.bind\("([^"]+)"', added)
 assert set(added_keys) <= {"SUPER + SUPER_L", "SUPER + D", "SUPER + slash"}, f"unlisted new binds: {added_keys}"
 for directory in [Path(".config/hypr"), Path(".config/quickshell")]:

@@ -120,7 +120,7 @@ Item {
 
         FastBlur {
             anchors.fill: parent
-            source: popupBlurArt.status === Image.Ready ? popupBlurArt : null
+            source: popupBlurArt   // never null: a null source makes the shader warn on every art change
             radius: 32
             visible: popupBlurArt.status === Image.Ready
         }

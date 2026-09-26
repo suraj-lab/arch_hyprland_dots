@@ -248,3 +248,36 @@ assert.deepEqual(Array.from(media.controllable([bus('org.mpris.MediaPlayer2.spot
     bus('org.mpris.MediaPlayer2.firefox.instance_1_42'), bus('org.mpris.MediaPlayer2.idle', {canTogglePlaying: false, trackTitle: ''})]))
     .map(p => p.dbusName), ['org.mpris.MediaPlayer2.spotify', 'org.mpris.MediaPlayer2.firefox.instance_1_42']);
 console.log('PASS: Media order (Spotify first, then playing, stable); playerctld proxy and idle players filtered');
+
+// Launcher (SPEC 5.1): app filter/ranking, categories, actions filter, cliphist parsing.
+const launcher = load('components/pill/surfaces/Launcher.qml',
+    ['appCategories', 'filterApps', 'filterActions', 'parseClips']);
+const catMap = {Game: 'Games', Network: 'Internet', WebBrowser: 'Internet', Utility: 'Utilities'};
+const appList = [
+    {name: 'Firefox', genericName: 'Web Browser', categories: ['Network', 'WebBrowser'], keywords: ['internet']},
+    {name: 'Steam', genericName: '', categories: ['Game'], keywords: []},
+    {name: 'Kitty', genericName: 'Terminal', categories: ['Utility'], keywords: ['shell', 'prompt']},
+    {name: 'Thunar', genericName: 'File Manager', categories: null, keywords: null},
+];
+const appNames = list => Array.from(list).map(a => a.name);
+assert.deepEqual(Array.from(launcher.appCategories(appList, catMap)), ['All', 'Internet', 'Games', 'Utilities']);
+assert.deepEqual(appNames(launcher.filterApps(appList, '', 'All', catMap)), ['Firefox', 'Steam', 'Kitty', 'Thunar']);
+assert.deepEqual(appNames(launcher.filterApps(appList, '', 'Internet', catMap)), ['Firefox']);
+assert.deepEqual(appNames(launcher.filterApps(appList, 'SHELL', 'All', catMap)), ['Kitty']);   // keywords, any case
+assert.deepEqual(appNames(launcher.filterApps(appList, 'file', 'All', catMap)), ['Thunar']);   // generic name
+// Names starting with the query rank first, the rest by name ("te": Firefox via the keyword
+// "internet", Kitty via "Terminal", Steam by name).
+assert.deepEqual(appNames(launcher.filterApps([...appList, {name: 'Terminator', categories: []}], 'te', 'All', catMap)),
+    ['Terminator', 'Firefox', 'Kitty', 'Steam']);
+assert.deepEqual(appNames(launcher.filterApps(appList, 'steam', 'Internet', catMap)), []);
+const acts = [{id: 'reboot', title: 'Reboot'}, {id: 'screenshot', title: 'Screenshot'}, {id: 'dnd', title: 'Do Not Disturb'}];
+assert.deepEqual(Array.from(launcher.filterActions(acts, '')).map(a => a.id), ['reboot', 'screenshot', 'dnd']);
+assert.deepEqual(Array.from(launcher.filterActions(acts, 'S')).map(a => a.id), ['screenshot', 'dnd']);  // starts-with first
+assert.deepEqual(Array.from(launcher.filterActions(acts, 'dnd')).map(a => a.id), ['dnd']);              // by id too
+const clips = launcher.parseClips('12\thello world\n11\t[[ binary data 36 KiB png 1052x516 ]]\n'
+    + '10\t  tabs\tinside  \n9\t[[ binary data 2 MiB jpeg 4000x3000 ]]\nnot a line\n\n');
+assert.deepEqual(Array.from(clips).map(c => [c.id, c.text, c.ext]),
+    [['12', 'hello world', ''], ['11', '[[ binary data 36 KiB png 1052x516 ]]', 'png'],
+     ['10', '  tabs\tinside  ', ''], ['9', '[[ binary data 2 MiB jpeg 4000x3000 ]]', 'jpeg']]);
+assert.equal(clips[2].line, '10\t  tabs\tinside  ');   // the raw line goes back to cliphist unchanged
+console.log('PASS: Launcher app filter/ranking/categories, actions filter, cliphist parsing');

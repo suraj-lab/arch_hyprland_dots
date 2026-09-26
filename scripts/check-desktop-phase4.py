@@ -36,9 +36,26 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
     for name, body in {"gamemoded": "printf 'gamemode is inactive\\n'", "pgrep": "exit 1",
                        "pkill": "exit 1", "hyprctl": "exit 1", "systemctl": "exit 1",
                        "hyprlock": "exit 1", "pactl": "exit 0", "curl": "exit 1",
-                       "ddcutil": "exit 1"}.items():
+                       "ddcutil": "exit 1",
+                       # Launcher (5.1): fake calculator, clipboard history and wl-copy.
+                       "qalc": 'printf "%s\\n" "$@" > "$HOME/qalc-args"; echo "\u221242"',   # real qalc: U+2212 minus
+                       "wl-copy": 'if [ "$1" = "--" ]; then printf "%s" "$2"; else cat; fi > "$HOME/copied"',
+                       "cliphist": 'case "$1" in\n'
+                                   'list) printf "3\\thello clipboard\\n2\\t[[ binary data 1 KiB png 4x4 ]]\\n'
+                                   '1\\tsecond entry\\n" | if [ -f "$HOME/clip-deleted" ];'
+                                   ' then grep -vxF -f "$HOME/clip-deleted"; else cat; fi ;;\n'
+                                   'decode) IFS= read -r line; if [ "${line%%\t*}" = 2 ]; then cat "$HOME/clip.png";'
+                                   ' else printf "%s" "${line#*\t}"; fi ;;\n'
+                                   'delete) IFS= read -r line; printf "%s\\n" "$line" >> "$HOME/clip-deleted" ;;\n'
+                                   'esac'}.items():
         (home / "bin" / name).write_text("#!/bin/sh\n" + body + "\n")
         (home / "bin" / name).chmod(0o700)
+    # Launcher (5.1): a findable app whose launch leaves a mark, and a clipboard image.
+    apps = home / ".local/share/applications"
+    apps.mkdir(parents=True)
+    (apps / "zyxtest.desktop").write_text("[Desktop Entry]\nType=Application\nName=Zyxtest Launcher\n"
+                                         f"Exec=touch {home}/launched\n")
+    subprocess.run(["magick", "-size", "4x4", "xc:#ff00ff", str(home / "clip.png")], check=True)
     (config_dir / "scripts").mkdir()
     (config_dir / "scripts/desktop-gamemode.py").write_text('print(\'{"gameMode":false,"dnd":false}\')\n')
     # Xvfb has no layer shell, so its attached properties cannot be created there.
@@ -48,8 +65,10 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
                             ("pill/PillOverlay.qml", '"quickshell-pill"')):
         source = (ROOT / ".config/quickshell/components" / name).read_text()
         layer = "Overlay" if name.startswith("pill/") else "Top"
-        # The pill takes keyboard focus only while a surface is open (Escape closes it).
-        focus = ('surface !== "" ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None'
+        # The pill takes keyboard focus only while a surface is open (Escape closes it);
+        # exclusively for the launcher, which is typed into at once.
+        focus = ('surface === "launcher" ? WlrKeyboardFocus.Exclusive : surface !== "" '
+                 '? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None'
                  if name.startswith("pill/") else "WlrKeyboardFocus.None")
         for line in ("WlrLayershell.layer: WlrLayer." + layer, "WlrLayershell.namespace: " + namespace,
                      "WlrLayershell.keyboardFocus: " + focus):
@@ -57,9 +76,9 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
         copy = config_dir / "components" / name
         copy.write_text("\n".join(l for l in source.splitlines()
                                   if not l.strip().startswith("WlrLayershell.")) + "\n")
-    # Frame mode: no classic top bar, OSD or toast windows (the edge drawers replace them).
+    # Frame mode: no classic top bar, OSD, toast or launcher windows (the pill replaces them).
     assert (ROOT / ".config/quickshell/shell.qml").read_text().count(
-        "model: shellRoot.frameLayout ? [] : Quickshell.screens") == 3, "classic-only windows in frame mode"
+        "model: shellRoot.frameLayout ? [] : Quickshell.screens") == 4, "classic-only windows in frame mode"
     fixture = config_dir / "shell.qml"
     fixture.write_text((ROOT / "scripts/tests/frame-shell.qml").read_text().replace(
         "../../.config/quickshell/", ""))
@@ -434,6 +453,95 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
             assert ipc("fullscreen", "false", "false").returncode == 0
             wait_pill(lambda v: v["visible"] and v["state"] == "rest", "back from fullscreen")
 
+            # ---- 5.1 launcher: apps, "=" calculator, ">" actions, clipboard; keyboard only ----
+            def focus_surface():
+                pointer(400, pill()["tierY"] + 30); time.sleep(0.2)   # over the search field
+                top = subprocess.run(["xdotool", "getmouselocation", "--shell"], env=env, capture_output=True,
+                                     text=True, timeout=5).stdout
+                win = dict(line.split("=", 1) for line in top.split())["WINDOW"]
+                subprocess.run(["xdotool", "windowfocus", "--sync", win], env=env, timeout=5)
+                return win
+
+            def keys(win, *names):
+                subprocess.run(["xdotool", "key", "--window", win, *names], env=env, check=True, timeout=5)
+
+            def type_text(win, text):
+                subprocess.run(["xdotool", "type", "--window", win, "--delay", "30", text], env=env,
+                               check=True, timeout=10)
+
+            def open_launcher(name="launcher"):
+                assert ipc("pill", name).returncode == 0
+                v = wait_pill(lambda v: v["surface"] == "launcher" and v["tierH"] == v["tierTarget"] > 0, name)
+                return v, focus_surface()
+
+            def wait_file(path, expected, timeout=3):
+                deadline = time.monotonic() + timeout
+                while time.monotonic() < deadline:
+                    if path.exists() and path.read_bytes() == expected:
+                        return
+                    time.sleep(0.05)
+                raise AssertionError(f"{path}: {path.read_bytes() if path.exists() else 'missing'!r}, wanted {expected!r}")
+
+            lv, win = open_launcher()
+            assert lv["tierW"] == min(640, lv["hoverW"] - 76) and lv["tierH"] == 470, lv   # 640x470, clamped
+            assert lv["launcher"]["mode"] == "apps" and lv["launcher"]["query"] == "", lv
+            type_text(win, "zyxtest")
+            wait_pill(lambda v: v["launcher"]["query"] == "zyxtest" and v["launcher"]["count"] == 1, "app found")
+            keys(win, "Return")
+            wait_pill(lambda v: v["surface"] == "", "launching closes the launcher")
+            wait_file(home / "launched", b"")
+
+            _, win = open_launcher()                      # reopens empty
+            assert pill()["launcher"]["query"] == ""
+            type_text(win, "=1+2")
+            wait_pill(lambda v: v["launcher"]["mode"] == "calc" and v["launcher"]["first"] == "\u221242", "calculator")
+            wait_file(home / "qalc-args", b"-t\n--\n1+2\n")   # terse; no -e (that downloads exchange rates)
+            keys(win, "Return")
+            wait_pill(lambda v: v["surface"] == "", "Enter copies the result and closes")
+            wait_file(home / "copied", b"-42")                # pasted with a plain minus
+
+            _, win = open_launcher()
+            type_text(win, ">reb")
+            wait_pill(lambda v: v["launcher"]["mode"] == "actions" and v["launcher"]["count"] == 1, "reboot action")
+            keys(win, "Return")
+            armed = wait_pill(lambda v: v["launcher"]["armed"] == "reboot", "first Enter arms reboot")
+            assert armed["surface"] == "launcher" and armed["lastAction"] == "", armed
+            keys(win, "Return")
+            wait_pill(lambda v: v["surface"] == "" and v["lastAction"] == "reboot", "second Enter runs it after closing")
+            _, win = open_launcher()
+            type_text(win, ">power")
+            keys(win, "Return")
+            wait_pill(lambda v: v["launcher"]["armed"] == "poweroff", "power off armed")
+            time.sleep(3.3)
+            assert pill()["launcher"]["armed"] == "" and pill()["lastAction"] == "reboot", "arming expires after 3 s"
+            keys(win, "ctrl+a", "BackSpace")
+            type_text(win, ">caff")
+            keys(win, "Return")                           # not destructive: one Enter
+            wait_pill(lambda v: v["surface"] == "" and v["lastAction"] == "caffeine", "caffeine action")
+
+            _, win = open_launcher("clipboard")
+            cb = wait_pill(lambda v: v["launcher"]["mode"] == "clipboard" and v["launcher"]["count"] == 3, "clipboard")
+            assert cb["launcher"]["first"] == "hello clipboard", cb
+            wait_file(runtime / "quickshell-clip/2.png", (home / "clip.png").read_bytes())   # image thumbnail
+            keys(win, "Delete")                           # empty search, cursor at the end: delete the entry
+            wait_pill(lambda v: v["launcher"]["count"] == 2 and v["launcher"]["first"].startswith("[[ binary"),
+                      "Delete removes the entry")
+            wait_file(home / "clip-deleted", b"3\thello clipboard\n")
+            type_text(win, "second")
+            wait_pill(lambda v: v["launcher"]["count"] == 1, "typing filters the clipboard")
+            keys(win, "Return")
+            wait_pill(lambda v: v["surface"] == "", "Enter copies the entry and closes")
+            wait_file(home / "copied", b"second entry")
+            assert ipc("pill", "launcher").returncode == 0
+            wait_pill(lambda v: v["surface"] == "launcher" and v["launcher"]["mode"] == "apps", "launcher")
+            assert ipc("pill", "clipboard").returncode == 0   # Super+V over the launcher switches to the clipboard
+            wait_pill(lambda v: v["surface"] == "launcher" and v["launcher"]["mode"] == "clipboard", "switch")
+            assert ipc("pill", "clipboard").returncode == 0   # Super+V again closes
+            wait_pill(lambda v: v["surface"] == "" and v["tierH"] == 0, "Super+V toggles")
+            win = open_launcher()[1]
+            keys(win, "Escape")
+            wait_pill(lambda v: v["surface"] == "", "Escape closes the launcher")
+
             # Collapse delay setting: global, per monitor, invalid values fall back.
             configure({"appearance": {"layout": "frame"}, "pill": {"collapseDelayMs": 1500}},
                       lambda v: v["pills"] and v["pills"][0]["collapseMs"] == 1500, "global delay")
@@ -517,6 +625,9 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
             print("PASS: edge drawers: toasts grow from the top-right corner (392 px, max 4, timeout, dismiss")
             print("      closes it, shape pixels), OSD 52x220 from the right edge (pixels, hides after 2 s, mic),")
             print("      both hide on fullscreen; classic OSD/toast windows only in classic (static)")
+            print("PASS: launcher (5.1) by keyboard: 640x470 clamped, app search + launch, calculator (qalc -t, copy),")
+            print("      actions (destructive need two Enters within 3 s, run after closing), clipboard (list,")
+            print("      image thumbnail, Delete, filter, copy), Super+V switch/toggle, Escape")
             print("PASS: layers, per-surface namespaces, keyboard focus only for an open surface (static; Xvfb has no layer shell)")
             print("NOT TESTED: live Wayland exclusive zones, click-through, direct scanout or VRR")
         except Exception:

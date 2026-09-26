@@ -20,18 +20,20 @@ PanelWindow {
     readonly property var prefs: Config.pillFor(monitorName)
     readonly property bool animate: Config.appearance.animations && !Desktop.gameMode
     signal powerRequested()
+    signal shellAction(string id)   // launcher ">" actions, run by the shell (runShellAction)
 
     // pinned: double-tap Super, a click on the rest tab, or IPC. On a fullscreen monitor a
     // pin is the peek. hoverOpen: the bottom-edge dwell. visited: the pointer has been on
     // the pill since it opened, so leaving it may collapse it. A peek does not wait for a
     // visit: over a game the pointer rarely goes there, so it hides 800 ms after it's away.
     // surface: "" or the open view (sound / notifs / system / dashboard); it holds the
-    // pill open. "media" opens the dashboard on its Media tab (IPC).
+    // pill open. "media" opens the dashboard on its Media tab (IPC); "clipboard" the
+    // launcher in clipboard mode (Super+V).
     property bool pinned: false
     property bool hoverOpen: false
     property bool visited: false
     property string surface: ""
-    readonly property var surfaces: ["sound", "notifs", "system", "dashboard", "media"]
+    readonly property var surfaces: ["sound", "notifs", "system", "dashboard", "media", "launcher", "clipboard"]
     readonly property bool edgeHovered: hotZone.containsMouse
     readonly property bool pillHovered: pillHover.hovered || baseHover.hovered || tierHover.hovered
     readonly property bool peeking: fullscreen && pinned
@@ -52,16 +54,25 @@ PanelWindow {
     // collapses as usual once the pointer is away.
     function openSurface(name, allowToggle) {
         if (surfaces.indexOf(name) < 0) return
-        var target = name === "media" ? "dashboard" : name
+        var target = name === "media" ? "dashboard" : name === "clipboard" ? "launcher" : name
         if (allowToggle && surface === target && anchorKey === name) { closeSurface(); return }
         if (target === "dashboard" && (name === "media" || surface !== "dashboard"))
             dashView.tab = name === "media" ? "media" : "dashboard"
+        if (target === "launcher") launcherView.clipboard = name === "clipboard"
         anchorKey = name
         surface = target
         visited = true
         if (name === "notifs") Notifs.unreadCount = 0
     }
     function closeSurface() { surface = "" }
+    // A launcher action runs once the tier has closed (a screenshot must not catch it).
+    property string pendingAction: ""
+    function runAction(id) { pendingAction = id; closeSurface(); actionDelay.restart() }
+    Timer {
+        id: actionDelay
+        interval: root.animate ? Theme.morphDuration + 50 : 0
+        onTriggered: root.shellAction(root.pendingAction)
+    }
 
     onPillHoveredChanged: if (pillHovered && expanded) visited = true
     onFullscreenChanged: close()   // entering or leaving fullscreen ends a peek (SPEC 3.3)
@@ -102,7 +113,7 @@ PanelWindow {
         width - 2 * Theme.frameThickness - 2 * Theme.shoulderRadius - 40))
     readonly property var activeView: surface === "sound" ? soundView
         : surface === "notifs" ? notifsView : surface === "system" ? systemView
-        : surface === "dashboard" ? dashView : null
+        : surface === "dashboard" ? dashView : surface === "launcher" ? launcherView : null
     // The tier rises only once the bar is fully wide (opening from the rest tab), so it
     // never slides with a growing bar; closing mirrors this (see `expanded`).
     readonly property int tierTarget: activeView && pill.width >= hoverWidth
@@ -115,7 +126,8 @@ PanelWindow {
     color: "transparent"
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "quickshell-pill"
-    WlrLayershell.keyboardFocus: surface !== "" ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+    // The launcher is typed into straight away; the other surfaces only need Escape.
+    WlrLayershell.keyboardFocus: surface === "launcher" ? WlrKeyboardFocus.Exclusive : surface !== "" ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
     mask: Region {
         item: pill
         Region { item: base }
@@ -126,6 +138,7 @@ PanelWindow {
 
     property alias pillItem: pill
     property alias dashboard: dashView
+    property alias launcher: launcherView
     property alias tierItem: tier
     property alias shape: shape
     PillShape {
@@ -192,7 +205,8 @@ PanelWindow {
     FocusScope {
         id: tier
         objectName: "tier"
-        width: Math.min(root.lastSurface === "dashboard" ? Theme.dashboardWidth : Theme.surfaceWidth,
+        width: Math.min(root.lastSurface === "dashboard" ? Theme.dashboardWidth
+                        : root.lastSurface === "launcher" ? Theme.launcherSurfaceWidth : Theme.surfaceWidth,
                         root.hoverWidth - 2 * root.tierInset)
         height: root.tierTarget
         x: Math.round(pill.x + Math.max(root.tierInset,
@@ -237,6 +251,15 @@ PanelWindow {
                 accent: root.accent
                 active: root.surface === "dashboard"
                 visible: root.surface === "dashboard"
+            }
+            Launcher {
+                id: launcherView
+                anchors { left: parent.left; right: parent.right; top: parent.top }
+                accent: root.accent
+                active: root.surface === "launcher"
+                visible: root.surface === "launcher"
+                onCloseRequested: root.closeSurface()
+                onActionRequested: id => root.runAction(id)
             }
             SystemView {
                 id: systemView

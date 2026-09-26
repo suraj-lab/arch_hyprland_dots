@@ -21,8 +21,10 @@ Item {
         sound: row.x + volChip.x + volChip.width / 2,
         notifs: row.x + notifChip.x + notifChip.width / 2,
         system: row.x + ccChip.x + ccChip.width / 2,
-        dashboard: root.width / 2,      // the dashboard is wide: it opens centred on the bar
-        media: root.width / 2
+        dashboard: root.width / 2,      // the wide surfaces open centred on the bar
+        media: root.width / 2,
+        launcher: root.width / 2,
+        clipboard: root.width / 2
     })
     signal powerRequested()
 

@@ -764,6 +764,49 @@ HDMI-A-1 stays readable (no inactive dimming), and everything is restored on exi
 - Writing monitor layout from the shell (use nwg-displays).
 
 ## Change log
+- 2026-09-26 - Phase 5.1 (launcher + clipboard), deployed and committed with Suraj's approval. Backup
+  `phase5-launcher-20260926-212413` (`new-files.txt`; `files/hypr/binds.lua`).
+  - `components/pill/surfaces/Launcher.qml`, the pill's `launcher` surface (640x470,
+    clamped to the bar; opens centred). Modes by prefix: apps (the classic launcher's search
+    over name / generic name / keywords, starts-with first, categories; Tab cycles them; a
+    GridView keeps the selection in view), `=` calculator, `>` actions; clipboard mode is
+    opened by Super+V. One search field; arrows move, Enter runs, Escape closes.
+  - Calculator: `qalc -t -- <expr>`, 140 ms debounce, Enter copies via `wl-copy` (never a
+    stale result). Deviation: no `-e` - in qalc that is `--exrates`, a download of exchange
+    rates on every calculation (checked in qalc(1)). Missing qalc shows "install
+    libqalculate" (it is in desktop-core.txt but was not installed; Suraj installed it).
+    Checked with the real qalc 5.12: `--` handles a leading minus, currency conversions use
+    the bundled rates without prompting or downloading (auto_update_exchange_rates=-1),
+    errors (e.g. "20% of 80") show "No result". qalc prints U+2212 for minus, so the copy
+    replaces it with "-"; the hint shows "80 * 20%", which qalc accepts.
+  - Actions: gaming, gamemode, caffeine, nightlight, dnd, wallpaper, overview, screenshot,
+    lock, suspend, logout, reboot, poweroff -> `runShellAction(id)` in shell.qml, reusing the
+    existing processes / IPC handlers. Log out, reboot and power off need a second Enter
+    within 3 s (the row turns red). Actions run once the surface has closed, so a screenshot
+    never catches it. `cheatsheet` arrives with 5.2.
+  - Clipboard: `cliphist list`; Enter runs `printf '%s' "$line" | cliphist decode | wl-copy`;
+    Delete (cursor at the end of the search) or middle-click runs `cliphist delete`; typing
+    filters. Image entries get a thumbnail decoded lazily (visible rows only) into
+    `$XDG_RUNTIME_DIR/quickshell-clip/` (tmpfs, cleared at logout).
+  - Super+V: `qs ipc call launcher clipboard` replaces the wofi pipeline in binds.lua (same
+    key). The Phase 0 bind guard allows exactly this one command change. Over an open
+    launcher it switches to the clipboard; again closes. Super+Space unchanged
+    (`launcher toggle`), now the pill surface in frame mode. The launcher layer takes
+    keyboard focus exclusively while open (the other surfaces stay on-demand).
+  - Classic keeps its old launcher overlay (created only in classic now); classic has no
+    clipboard view, so `launcher clipboard` only logs a warning there.
+  - wofi: no longer used. Its config dir `.config/wofi` and the bootstrap link to it remain
+    until Suraj approves deleting them.
+  - Found live: `SoundView`'s FastBlur got a null source while album art loaded, so every
+    track change logged "ShaderEffect: Texture t1 is not assigned a valid texture provider"
+    (twice: one Sound view per monitor, since 4.3). Its source is now always the art Image.
+  - Tests: unit tests for app filter/ranking/categories, actions filter and cliphist
+    parsing. phase4 drives the real launcher by keyboard on Xvfb with stubbed qalc, cliphist
+    and wl-copy: 640x470 clamped, app search and launch, calculator args and copy, two-Enter
+    destructive actions and 3 s expiry, one-Enter caffeine, clipboard list / thumbnail /
+    Delete / filter / copy, Super+V switch and toggle, Escape. Live: clean restart, no
+    config errors, bind set unchanged apart from Super+V's command, `launcher clipboard`
+    opens and closes on the focused monitor.
 - 2026-09-26 - Frame is the default layout (Suraj). `Config.appearance.layout` is "classic"
   only when set to exactly that; missing or invalid values now mean frame. Fresh installs
   and the repo's `settings.json` (no `appearance` section) get the frame; Suraj's live

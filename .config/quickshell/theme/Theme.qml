@@ -84,6 +84,8 @@ QtObject {
     readonly property int surfaceWidth:      400   // re-hosted views keep their classic 380 px
     readonly property int dashboardWidth:    920   // SPEC 3.2: dashboard 920x420
     readonly property int surfacePadding:    10
+    readonly property int launcherSurfaceWidth:  640   // SPEC 3.2: launcher 640x470
+    readonly property int launcherSurfaceHeight: 470
     readonly property int notifDrawerWidth:  360   // SPEC 5.2 edge drawers
     readonly property int osdTabWidth:       52
     readonly property int osdTabHeight:      220

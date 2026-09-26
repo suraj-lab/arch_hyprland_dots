@@ -89,6 +89,26 @@ ShellRoot {
     Process { id: pReboot;  command: ["systemctl", "reboot"]                }
     Process { id: pOff;     command: ["systemctl", "poweroff"]              }
 
+    // Launcher ">" actions (SPEC 5.1), run after the launcher has closed.
+    function runShellAction(id) {
+        switch (id) {
+        case "gaming": Desktop.enterGamingMode(); break
+        case "gamemode": Desktop.toggleGameMode(); break
+        case "caffeine": Desktop.toggleCaffeine(); break
+        case "nightlight": Desktop.toggleNightLight(); break
+        case "dnd": Notifs.dndEnabled = !Notifs.dndEnabled; break
+        case "wallpaper": wallpickerIpc.toggle(); break
+        case "overview": overviewIpc.toggle(); break
+        case "screenshot": screenshotIpc.area(); break
+        case "lock": pLock.running = true; break
+        case "suspend": pSuspend.running = true; break
+        case "logout": Hypr.dispatch("hl.dsp.exit()"); break
+        case "reboot": pReboot.running = true; break
+        case "poweroff": pOff.running = true; break
+        default: console.warn("runShellAction: unknown action", id)
+        }
+    }
+
     // Layout switch (SPEC Phase 4): "frame" = frame + pill, "classic" = the top bar below.
     // Classic creates no frame/pill windows; frame creates no top bar.
     // A bool only changes on a real switch; Config rebuilds its objects on every edit.
@@ -109,6 +129,7 @@ ShellRoot {
             accent: shellRoot.accentFor(modelData.name)
             screenTimeTracker: stTracker
             onPowerRequested: shellRoot.sessionOpen = !shellRoot.sessionOpen
+            onShellAction: id => shellRoot.runShellAction(id)
         }
     }
 
@@ -296,7 +317,12 @@ ShellRoot {
 
     IpcHandler {
         target: "launcher"
+        // Frame: the pill's launcher surface on the focused monitor. Classic: the old overlay.
         function toggle() {
+            if (shellRoot.frameLayout) {
+                var p = shellRoot.focusedPill(); if (p) p.openSurface("launcher", true)
+                return
+            }
             if (!shellRoot.launcherOpen) {
                 // Capture focused monitor before opening
                 shellRoot.launcherScreen = Hypr.focusedMonitor != null
@@ -304,10 +330,16 @@ ShellRoot {
             }
             shellRoot.launcherOpen = !shellRoot.launcherOpen
         }
+        // Super+V (replaces wofi). Frame layout only: classic has no clipboard view.
+        function clipboard(): void {
+            var p = shellRoot.frameLayout ? shellRoot.focusedPill() : null
+            if (p) p.openSurface("clipboard", true)
+            else console.warn("launcher clipboard: needs the frame layout")
+        }
     }
 
     Variants {
-        model: Quickshell.screens
+        model: shellRoot.frameLayout ? [] : Quickshell.screens
 
         PanelWindow {
             required property ShellScreen modelData
@@ -336,6 +368,7 @@ ShellRoot {
     property var wallpickerScreen: null
 
     IpcHandler {
+        id: wallpickerIpc
         target: "wallpicker"
         function toggle() {
             if (!shellRoot.wallpickerOpen) {
@@ -374,6 +407,7 @@ ShellRoot {
 
     // ── Screenshot overlay (focused monitor only) ────────────────────────────
     IpcHandler {
+        id: screenshotIpc
         target: "screenshot"
         function area() {
             shellRoot.screenshotScreen = Hypr.focusedMonitor != null
@@ -416,6 +450,7 @@ ShellRoot {
 
     // ── Workspace overview overlay (focused monitor only) ──────────────
     IpcHandler {
+        id: overviewIpc
         target: "overview"
         function toggle() {
             if (!shellRoot.overviewOpen) {

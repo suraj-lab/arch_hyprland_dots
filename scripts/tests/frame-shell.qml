@@ -31,6 +31,7 @@ ShellRoot {
     }
 
     property var pillNames: ["DP-2"]   // one at a time: pills on the same test screen overlap
+    property string lastAction: ""     // launcher ">" actions (runShellAction in the real shell)
     Variants {
         id: pills
         model: root.frameLayout ? root.pillNames : []
@@ -39,6 +40,7 @@ ShellRoot {
             screen: Quickshell.screens[0]
             monitorName: modelData
             fullscreen: modelData === "DP-2" ? root.mainFullscreen : root.secondaryFullscreen
+            onShellAction: id => root.lastAction = id
         }
     }
     function pillState(p) {
@@ -54,7 +56,11 @@ ShellRoot {
                  winH: p.height, winW: p.width, hoverExpand: p.prefs.hoverExpand, animate: p.animate,
                  collapseMs: p.collapseDelay,
                  toasts: Notifs.toastModel.count, toast: root.box(p.drawers.toastArea),
-                 osd: root.box(p.drawers.osdArea), osdKind: p.drawers.osdKind, osdShown: p.drawers.osdShown }
+                 osd: root.box(p.drawers.osdArea), osdKind: p.drawers.osdKind, osdShown: p.drawers.osdShown,
+                 launcher: { mode: p.launcher.mode, query: p.launcher.query, count: p.launcher.count,
+                             current: p.launcher.current, armed: p.launcher.armed,
+                             first: p.launcher.rows.length ? (p.launcher.rows[0].text || p.launcher.rows[0].title) : "" },
+                 lastAction: root.lastAction }
     }
 
     function box(item) { return [item.x, item.y, item.width, item.height] }
