@@ -10,8 +10,7 @@ PanelWindow {
     id: root
     property string monitorName: screen ? screen.name : ""
     property bool fullscreen: Hypr.isFullscreen(monitorName)
-    // Spec target is all true. shell.qml turns both off while the classic bar still owns
-    // the top edge and no pill exists yet (4.2), so the frame adds only its thickness.
+    // Both true in the real layout; the test fixture exercises them off.
     property bool reserveTop: true
     property bool pillShown: true
     readonly property int bottomReserve: Theme.frameThickness + (!pillShown ? 0

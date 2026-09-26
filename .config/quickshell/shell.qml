@@ -89,8 +89,8 @@ ShellRoot {
     Process { id: pReboot;  command: ["systemctl", "reboot"]                }
     Process { id: pOff;     command: ["systemctl", "poweroff"]              }
 
-    // Phase 4 preview: no extra windows in classic mode. The classic bar below stays
-    // until 4.3 moves its popups (and the Caffeine inhibitor) into the pill.
+    // Layout switch (SPEC Phase 4): "frame" = frame + pill, "classic" = the top bar below.
+    // Classic creates no frame/pill windows; frame creates no top bar.
     // A bool only changes on a real switch; Config rebuilds its objects on every edit.
     readonly property bool frameLayout: Config.appearance.layout === "frame"
     Variants {
@@ -98,7 +98,6 @@ ShellRoot {
         Frame {
             required property ShellScreen modelData
             screen: modelData
-            reserveTop: false   // the classic bar below already reserves the top edge
         }
     }
     Variants {
@@ -108,13 +107,29 @@ ShellRoot {
             required property ShellScreen modelData
             screen: modelData
             accent: shellRoot.accentFor(modelData.name)
-            // ponytail: until 4.3 re-hosts these views in the pill, open the classic panel
-            // on the same screen; remove with the classic bar in frame mode.
-            onSurfaceRequested: name => {
-                var bar = bars.instances.find(function(b) { return b.modelData === modelData })
-                if (bar) bar.panel.open(name)
-            }
+            screenTimeTracker: stTracker
             onPowerRequested: shellRoot.sessionOpen = !shellRoot.sessionOpen
+        }
+    }
+
+    // Caffeine in frame mode. An idle inhibitor needs a mapped surface; the frame and pill
+    // unmap on fullscreen, so it gets its own invisible 1x1 window on the Background layer
+    // (below everything, never in the way of direct scanout). Classic keeps the bar's.
+    PanelWindow {
+        id: inhibitorWindow
+        visible: shellRoot.frameLayout
+        anchors { top: true; left: true }
+        implicitWidth: 1
+        implicitHeight: 1
+        exclusionMode: ExclusionMode.Ignore
+        color: "transparent"
+        mask: Region {}
+        WlrLayershell.layer: WlrLayer.Background
+        WlrLayershell.namespace: "quickshell-inhibitor"
+        WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+        IdleInhibitor {
+            window: inhibitorWindow
+            enabled: Desktop.caffeine && shellRoot.frameLayout
         }
     }
 
@@ -127,22 +142,28 @@ ShellRoot {
     IpcHandler {
         target: "pill"
         function peek(): void { var p = shellRoot.focusedPill(); if (p) p.toggle() }
-        // Surfaces (dashboard, sound, ...) arrive in 4.3/4.4; for now every name opens the bar row.
-        function open(name: string): void { var p = shellRoot.focusedPill(); if (p) p.open() }
+        // name: sound / notifs / system opens that surface; anything else ("", "bar") the
+        // bar row. The dashboard surface arrives in 4.4.
+        function open(name: string): void {
+            var p = shellRoot.focusedPill(); if (!p) return
+            if (p.surfaces.indexOf(name) >= 0) p.openSurface(name, false); else p.open()
+        }
         function close(): void { var p = shellRoot.focusedPill(); if (p) p.close() }
-        function toggle(name: string): void { var p = shellRoot.focusedPill(); if (p) p.toggle() }
+        function toggle(name: string): void {
+            var p = shellRoot.focusedPill(); if (!p) return
+            if (p.surfaces.indexOf(name) >= 0) p.openSurface(name, true); else p.toggle()
+        }
         function status(): string {
             return JSON.stringify(pills.instances.map(function(p) {
-                return { monitor: p.monitorName, state: p.pillState, pinned: p.pinned,
-                         fullscreen: p.fullscreen }
+                return { monitor: p.monitorName, state: p.pillState, surface: p.surface,
+                         pinned: p.pinned, fullscreen: p.fullscreen }
             }))
         }
     }
 
-    // ── Per-screen bar ──────────────────────────────────────────────────────
+    // ── Per-screen bar (classic layout only) ────────────────────────────────
     Variants {
-        id: bars
-        model: Quickshell.screens
+        model: shellRoot.frameLayout ? [] : Quickshell.screens
 
         PanelWindow {
             id: barPanel
@@ -151,13 +172,10 @@ ShellRoot {
 
             property color screenAccent: shellRoot.accentFor(modelData.name)
             Behavior on screenAccent { ColorAnimation { duration: 500 } }
-            readonly property var panel: unifiedPanel   // opened by the pill's chips (4.2 bridge)
 
             anchors { top: true; left: true; right: true }
-            // In frame mode the bar floats inside the frame with its usual gap. The side
-            // reserves already push it in; only the top (no reserve beside the bar) needs this.
             margins {
-                top:   Theme.barMarginTop + (shellRoot.frameLayout ? Theme.frameThickness : 0)
+                top:   Theme.barMarginTop
                 left:  Theme.barMarginSide
                 right: Theme.barMarginSide
             }

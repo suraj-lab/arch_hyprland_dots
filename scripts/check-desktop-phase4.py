@@ -47,8 +47,11 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
                             ("pill/PillOverlay.qml", '"quickshell-pill"')):
         source = (ROOT / ".config/quickshell/components" / name).read_text()
         layer = "Overlay" if name.startswith("pill/") else "Top"
+        # The pill takes keyboard focus only while a surface is open (Escape closes it).
+        focus = ('surface !== "" ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None'
+                 if name.startswith("pill/") else "WlrKeyboardFocus.None")
         for line in ("WlrLayershell.layer: WlrLayer." + layer, "WlrLayershell.namespace: " + namespace,
-                     "WlrLayershell.keyboardFocus: WlrKeyboardFocus.None"):
+                     "WlrLayershell.keyboardFocus: " + focus):
             assert line in source, f"{name}: missing {line}"
         copy = config_dir / "components" / name
         copy.write_text("\n".join(l for l in source.splitlines()
@@ -206,21 +209,22 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
             configure({"appearance": {"layout": "frame"}},
                       lambda v: len(v["pills"]) == 1 and v["pills"][0]["state"] == "rest", "pill at rest")
             rest = wait_pill(lambda v: v["state"] == "rest" and v["w"] == 230 and v["h"] == 30, "settled rest")
-            win_top = 600 - rest["winH"]                      # bottom-anchored overlay window
-            assert (rest["w"], rest["h"], rest["winH"]) == (230, 30, 56), rest
+            win_top = 544                   # the pill's 56 px bottom strip (window is full-height)
+            assert (rest["w"], rest["h"], rest["winH"]) == (230, 30, 600), rest
             assert rest["x"] == 285 and rest["y"] == rest["winH"] - 10 - 30, rest  # centred, on the frame edge
             assert rest["visible"] and rest["hoverExpand"] and rest["animate"], rest
             assert rest["collapseMs"] == 700, rest
 
-            # Pixels at rest (shape image = overlay window, 800x56): rounded top corners and
+            # Pixels at rest (shape image = overlay window, 800x600): rounded top corners and
             # concave shoulders joining the frame edge (baseY 46, shoulder radius 30-16 = 14).
             assert ipc("pillCapture").returncode == 0
             image = home / "pill.png"
             deadline = time.monotonic() + 5
             while not image.exists() and time.monotonic() < deadline:
                 time.sleep(0.05)
-            points = [(400, 30), (400, 10), (300, 20), (286, 17), (283, 45), (272, 33),
-                      (265, 50), (285, 50), (514, 17), (517, 45), (528, 33)]
+            points = [(x, y + win_top) for x, y in
+                      [(400, 30), (400, 10), (300, 20), (286, 17), (283, 45), (272, 33),
+                       (265, 50), (285, 50), (514, 17), (517, 45), (528, 33)]]
             fmt = " ".join(f"%[fx:p{{{x},{y}}}.a]" for x, y in points)
             alpha = [round(float(v)) for v in subprocess.check_output(
                 ["magick", str(image), "-format", fmt, "info:"], text=True).split()]
@@ -280,6 +284,64 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
             wait_pill(lambda v: v["state"] == "rest", "collapse after the click visit")
             assert ipc("pillOn", "DP-2").returncode == 0
 
+            # ---- 4.3 surfaces: the classic views rise from the bar row ----
+            assert ipc("pill", "unread").returncode == 0
+            assert ipc("pill", "sound").returncode == 0
+            snd = wait_pill(lambda v: v["state"] == "surface" and v["surface"] == "sound"
+                            and v["tierTarget"] > 100 and v["tierH"] == v["tierTarget"] and v["w"] == 696,
+                            "sound surface settled")
+            # The surface grows from its chip (right half of the row), clamped inside the bar ends.
+            inset = 16 + 22
+            expect_x = round(snd["x"] + max(inset, min(snd["anchor"] - 200, snd["w"] - inset - 400)))
+            assert snd["anchor"] > snd["w"] / 2 and snd["tierX"] == expect_x, snd
+            assert snd["tierW"] == 400 and snd["tierY"] == snd["y"] - snd["tierH"], snd
+            assert snd["x"] + inset <= snd["tierX"] and snd["tierX"] + 400 <= snd["x"] + snd["w"] - inset, snd
+            assert snd["unread"] == 3, "opening Sound must not clear the notification badge"
+            # Pixels: tier corners rounded (radius 26), concave joins into the bar top.
+            (home / "pill.png").unlink(missing_ok=True)
+            assert ipc("pillCapture").returncode == 0
+            deadline = time.monotonic() + 5
+            while not (home / "pill.png").exists() and time.monotonic() < deadline:
+                time.sleep(0.05)
+            ty, by = snd["tierY"], snd["y"]          # tier top, bar top (window coords)
+            sx0, sx1 = snd["tierX"], snd["tierX"] + 400
+            pts = [(sx0 + 200, ty + 5), (sx0 + 200, ty - 3), (sx0 + 2, ty + 2), (sx0 + 15, ty + 13),
+                   (sx0 - 10, by - 2), (sx0 - 20, by - 12), (sx0 - 1, by - 1), (sx1 + 10, by - 2),
+                   (sx1 + 20, by - 12), (sx1 - 2, ty + 2)]
+            fmt = " ".join(f"%[fx:p{{{x},{y}}}.a]" for x, y in pts)
+            alpha = [round(float(v)) for v in subprocess.check_output(
+                ["magick", str(home / "pill.png"), "-format", fmt, "info:"], text=True).split()]
+            assert alpha == [1, 0, 0, 1, 1, 0, 1, 1, 0, 0], alpha
+            pointer(400, 300); time.sleep(1.2)                 # a surface never auto-collapses
+            assert pill()["state"] == "surface", "a surface must stay open without the pointer"
+            assert ipc("pill", "notifs").returncode == 0      # switch directly
+            nt = wait_pill(lambda v: v["surface"] == "notifs" and v["tierH"] == v["tierTarget"], "switch to notifs")
+            assert nt["anchor"] != snd["anchor"], "each surface grows from its own chip"
+            assert nt["unread"] == 0, "opening Notifications clears the badge"
+            assert ipc("pill", "notifs").returncode == 0      # same surface again closes it
+            closing = pill()
+            assert closing["surface"] == "" and closing["tierX"] == nt["tierX"], "must close where it opened"
+            closed = wait_pill(lambda v: v["surface"] == "" and v["tierH"] == 0, "re-open toggles closed")
+            assert closed["tierX"] == nt["tierX"], "the tier must not jump while closing"
+            assert ipc("pill", "system").returncode == 0
+            wait_pill(lambda v: v["surface"] == "system" and v["tierH"] == v["tierTarget"] > 100, "system surface")
+            # No window manager on Xvfb: keys go to the window under the pointer, so point at
+            # the surface first (live, the pill takes focus on demand while a surface is open).
+            sysv = pill()
+            pointer(400, sysv["tierY"] + 40); time.sleep(0.2)
+            top = subprocess.run(["xdotool", "getmouselocation", "--shell"], env=env, capture_output=True,
+                                 text=True, timeout=5).stdout
+            window = dict(line.split("=", 1) for line in top.split())["WINDOW"]
+            subprocess.run(["xdotool", "windowfocus", "--sync", window], env=env, timeout=5)
+            subprocess.run(["xdotool", "key", "--window", window, "Escape"], env=env, check=True, timeout=5)
+            wait_pill(lambda v: v["surface"] == "", "Escape closes the surface")
+            assert ipc("pill", "sound").returncode == 0
+            wait_pill(lambda v: v["surface"] == "sound", "sound again")
+            assert ipc("fullscreen", "true", "false").returncode == 0
+            wait_pill(lambda v: v["state"] == "hidden" and v["surface"] == "", "fullscreen closes surfaces")
+            assert ipc("fullscreen", "false", "false").returncode == 0
+            wait_pill(lambda v: v["state"] == "rest", "back to rest")
+
             # Collapse delay setting: global, per monitor, invalid values fall back.
             configure({"appearance": {"layout": "frame"}, "pill": {"collapseDelayMs": 1500}},
                       lambda v: v["pills"] and v["pills"][0]["collapseMs"] == 1500, "global delay")
@@ -317,7 +379,9 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
             print("PASS: pill rest geometry and shape pixels, edge dwell/pass-through, collapse, IPC pin/toggle,")
             print("      frame band counts as the pill, fullscreen hide + peek (hides untouched after 800 ms),")
             print("      rest-only click-to-expand, collapse-delay setting, animations off (real pointer on Xvfb)")
-            print("PASS: Top layer, per-surface namespaces and no keyboard focus (static; Xvfb has no layer shell)")
+            print("PASS: surfaces: open/switch/re-open toggle, Escape, stays open, badge clears on Notifications only,")
+            print("      fullscreen closes them, tier over its chip, tier shape pixels (rounded corners, concave joins)")
+            print("PASS: layers, per-surface namespaces, keyboard focus only for an open surface (static; Xvfb has no layer shell)")
             print("NOT TESTED: live Wayland exclusive zones, click-through, direct scanout or VRR")
         except Exception:
             log.flush()

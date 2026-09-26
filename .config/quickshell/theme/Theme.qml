@@ -80,9 +80,13 @@ QtObject {
     readonly property int pillHoverMaxWidth: 1200
     readonly property int pillRadiusSmall:   16
     readonly property int shoulderRadius:    22
+    readonly property int pillRadiusSurface: 26
+    readonly property int surfaceWidth:      400   // re-hosted views keep their classic 380 px
+    readonly property int surfacePadding:    10
 
     // Pill motion (SPEC 5.2). Zeroed when animations are off or Game Mode is on.
-    readonly property int glideDuration:  240
+    readonly property int glideDuration:  240   // rest <-> hover
+    readonly property int morphDuration:  420   // surfaces
     readonly property var morphCurve:     [0.16, 1, 0.3, 1, 1, 1]
     readonly property int hoverDwell:     150
     readonly property int collapseDelay:  700   // SPEC said 300; too eager in use (settings: pill.collapseDelayMs)

@@ -43,6 +43,9 @@ ShellRoot {
     }
     function pillState(p) {
         return { name: p.monitorName, state: p.pillState, visible: p.visible, pinned: p.pinned,
+                 surface: p.surface, tierW: p.tierItem.width, tierH: p.tierItem.height,
+                 tierX: p.tierItem.x, tierY: p.tierItem.y, tierTarget: p.tierTarget, anchor: p.tierAnchor,
+                 unread: Notifs.unreadCount, focusGrab: p.surface !== "" && p.grabReady,
                  x: p.pillItem.x, y: p.pillItem.y, w: p.pillItem.width, h: p.pillItem.height,
                  winH: p.height, winW: p.width, hoverExpand: p.prefs.hoverExpand, animate: p.animate,
                  collapseMs: p.collapseDelay }
@@ -84,7 +87,11 @@ ShellRoot {
         }
         function pill(action: string): void {
             var p = pills.instances[0]
-            if (action === "open") p.open(); else if (action === "close") p.close(); else p.toggle()
+            if (action === "open") p.open(); else if (action === "close") p.close()
+            else if (action === "closeSurface") p.closeSurface()
+            else if (action === "unread") Notifs.unreadCount = 3
+            else if (p.surfaces.indexOf(action) >= 0) p.openSurface(action, true)
+            else p.toggle()
         }
         function pillOn(name: string): void { root.pillNames = [name] }
         function pillCapture(): void {

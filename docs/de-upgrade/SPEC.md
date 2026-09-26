@@ -760,6 +760,33 @@ HDMI-A-1 stays readable (no inactive dimming), and everything is restored on exi
 - Writing monitor layout from the shell (use nwg-displays).
 
 ## Change log
+- 2026-09-26 - Phase 4.3 (surfaces), deployed with Suraj's approval; confirmed by Suraj
+  (panels, close in place, and Caffeine under the new Background-layer inhibitor window).
+  Sound / Notifications / System now open inside the pill: a 400 px tier (the views keep
+  their classic 380 px content) rises from the bar row above the chip that opened it
+  (Suraj: growing from the centre felt wrong), kept 38 px (corner + join radius) inside the
+  bar's ends; on a 1200 px bar the right-hand chips all land at that clamp, i.e. where the
+  classic panel hung under them. Drawn as part of the
+  same ShapePath (radius-26 corners, concave joins into the bar top); 420 ms morph, content
+  fades in over the last 40%. The bar row stays underneath, so its chips switch surfaces
+  directly or close the open one (same chip again). Escape (keyboard focus on demand only
+  while a surface is open), a click elsewhere (HyprlandFocusGrab, as the classic panel) and
+  IPC close it; a surface never auto-collapses; fullscreen changes close it. IPC `pill`
+  open/toggle accept sound / notifs / system. The notification badge now clears only when
+  Notifications opens (the classic panel cleared it for any tab). The overlay window is now
+  full-height (spec 3.1) but its input mask stays pill + tier + hot strip; no backdrop.
+  Frame mode no longer creates the classic top bar: the frame reserves its top edge again
+  (reserved [10, 10, 10, 40] live). Caffeine's idle inhibitor moved to a 1x1 invisible
+  Background-layer window (quickshell-inhibitor), mapped even under fullscreen; classic mode
+  keeps the bar's. The 4.2 bridge to the classic panel is gone. The clock's calendar/weather
+  popup is not in frame mode until the 4.4 dashboard.
+  Checks: phase0/phase3 pass; phase4 x3 adds surface open/switch/toggle, Escape, stay-open,
+  badge, fullscreen close and tier shape pixels; visual render of all three surfaces at
+  1920x1080, no QML errors. Live backups `phase4-surfaces-20260926-141817`,
+  `phase4-surface-anchor-20260926-142821`, `phase4-surface-close-20260926-143208`.
+  Closing fix (Suraj: it jumped to the middle before closing): the tier keeps the last
+  surface's chip as its anchor while it shrinks, and the bar stays wide until the tier has
+  fully closed, so neither slides; phase4 asserts the tier x is unchanged while closing.
 - 2026-09-26 - Phase 4.2 live feedback from Suraj, fixed and deployed (backups
   `phase4-pill-20260926-111731`, `phase4-pill-timing-20260926-114821`).
   1. A peek never hid: it waited for the pointer to visit first, which over a game it rarely

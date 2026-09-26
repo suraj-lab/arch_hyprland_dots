@@ -15,7 +15,13 @@ Item {
     property color accent: Theme.accent
     property real progress: 0
     property bool showRest: true           // the 6 px handle rest style has no content
-    signal surfaceRequested(string name)   // sound / notifs / system (surfaces arrive in 4.3)
+    signal surfaceRequested(string name)   // sound / notifs / system
+    // Where each surface's chip sits (x centre in this item), so its surface grows from it.
+    readonly property var chipCenters: ({
+        sound: row.x + volChip.x + volChip.width / 2,
+        notifs: row.x + notifChip.x + notifChip.width / 2,
+        system: row.x + ccChip.x + ccChip.width / 2
+    })
     signal powerRequested()
 
     SystemClock { id: clock; precision: SystemClock.Minutes }
@@ -78,17 +84,18 @@ Item {
             text: "\uf1eb"
         }
         BarText { visible: Bt.enabled; color: Theme.purple; text: "\uf294" }
-        Volume { barAccent: root.accent; onChipClicked: root.surfaceRequested("sound") }
+        Volume { id: volChip; barAccent: root.accent; onChipClicked: root.surfaceRequested("sound") }
         Microphone { barAccent: root.accent }
         Caffeine { visible: Desktop.caffeine; barAccent: root.accent; active: true; onClicked: Desktop.toggleCaffeine() }
         GameMode { visible: Desktop.gameMode; barAccent: root.accent; active: true; onClicked: Desktop.toggleGameMode() }
         NotificationCenter {
+            id: notifChip
             barAccent: root.accent
             externalUnreadCount: Notifs.unreadCount
             dndEnabled: Notifs.dndEnabled
             onChipClicked: root.surfaceRequested("notifs")
         }
-        ControlCenter { barAccent: root.accent; onChipClicked: root.surfaceRequested("system") }
+        ControlCenter { id: ccChip; barAccent: root.accent; onChipClicked: root.surfaceRequested("system") }
         BarText { text: root.time; font.bold: true }
         PowerMenu { onClicked: root.powerRequested() }
     }
