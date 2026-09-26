@@ -24,7 +24,8 @@ Item {
         dashboard: root.width / 2,      // the wide surfaces open centred on the bar
         media: root.width / 2,
         launcher: root.width / 2,
-        clipboard: root.width / 2
+        clipboard: root.width / 2,
+        cheatsheet: root.width / 2
     })
     signal powerRequested()
 

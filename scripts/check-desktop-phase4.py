@@ -34,7 +34,9 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
     # controller, service or session command may run from the sandbox.
     (home / "bin").mkdir()
     for name, body in {"gamemoded": "printf 'gamemode is inactive\\n'", "pgrep": "exit 1",
-                       "pkill": "exit 1", "hyprctl": "exit 1", "systemctl": "exit 1",
+                       "pkill": "exit 1", "systemctl": "exit 1",
+                       # Cheatsheet (5.2) reads `hyprctl binds -j`; nothing else may reach Hyprland.
+                       "hyprctl": 'if [ "$*" = "binds -j" ]; then cat "$HOME/binds.json"; else exit 1; fi',
                        "hyprlock": "exit 1", "pactl": "exit 0", "curl": "exit 1",
                        "ddcutil": "exit 1",
                        # Launcher (5.1): fake calculator, clipboard history and wl-copy.
@@ -56,6 +58,12 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
     (apps / "zyxtest.desktop").write_text("[Desktop Entry]\nType=Application\nName=Zyxtest Launcher\n"
                                          f"Exec=touch {home}/launched\n")
     subprocess.run(["magick", "-size", "4x4", "xc:#ff00ff", str(home / "clip.png")], check=True)
+    bind = lambda mods, key, text: {"modmask": mods, "key": key, "description": text, "has_description": bool(text),
+                                    "dispatcher": "__lua", "arg": "1"}
+    (home / "binds.json").write_text(json.dumps([
+        bind(64, "return", "Apps: Terminal"), bind(64, "C", "Windows: Close"), bind(64, "E", "Apps: File manager"),
+        bind(65, "left", "Windows: Move left"), bind(64, "SUPER_L", "Shell: Double-tap Super expands the pill"),
+        bind(64, "slash", "Shell: Keybind cheatsheet"), bind(0, "XF86AudioMute", "Media: Mute audio")]))
     (config_dir / "scripts").mkdir()
     (config_dir / "scripts/desktop-gamemode.py").write_text('print(\'{"gameMode":false,"dnd":false}\')\n')
     # Xvfb has no layer shell, so its attached properties cannot be created there.
@@ -67,8 +75,8 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
         layer = "Overlay" if name.startswith("pill/") else "Top"
         # The pill takes keyboard focus only while a surface is open (Escape closes it);
         # exclusively for the launcher, which is typed into at once.
-        focus = ('surface === "launcher" ? WlrKeyboardFocus.Exclusive : surface !== "" '
-                 '? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None'
+        focus = ('surface === "launcher" || surface === "cheatsheet" ? WlrKeyboardFocus.Exclusive : '
+                 'surface !== "" ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None'
                  if name.startswith("pill/") else "WlrKeyboardFocus.None")
         for line in ("WlrLayershell.layer: WlrLayer." + layer, "WlrLayershell.namespace: " + namespace,
                      "WlrLayershell.keyboardFocus: " + focus):
@@ -542,6 +550,25 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
             keys(win, "Escape")
             wait_pill(lambda v: v["surface"] == "", "Escape closes the launcher")
 
+            # ---- 5.2 cheatsheet: hyprctl binds -j, grouped by description prefix, filter ----
+            assert ipc("pill", "cheatsheet").returncode == 0
+            cs = wait_pill(lambda v: v["surface"] == "cheatsheet" and v["tierH"] == v["tierTarget"] > 0
+                           and v["sheet"]["groups"], "cheatsheet open")
+            # 920x520, clamped to the bar and to the screen height (600 here: 600 - 10 - 46 - 60 = 484)
+            assert cs["tierW"] == min(920, cs["hoverW"] - 76) and cs["tierH"] == min(520, cs["winH"] - 116), cs
+            assert cs["sheet"]["groups"] == ["Apps", "Windows", "Shell", "Media"], cs["sheet"]
+            assert cs["sheet"]["items"] == 7 and cs["sheet"]["other"] == 0, cs["sheet"]
+            win = focus_surface()
+            type_text(win, "file")
+            wait_pill(lambda v: v["sheet"]["shown"] == ["Apps"] and v["sheet"]["items"] == 1, "filter")
+            keys(win, "Escape")
+            wait_pill(lambda v: v["surface"] == "", "Escape closes the cheatsheet")
+            assert ipc("pill", "cheatsheet").returncode == 0      # reopens unfiltered
+            wait_pill(lambda v: v["surface"] == "cheatsheet" and v["sheet"]["query"] == ""
+                      and len(v["sheet"]["shown"]) == 4, "reopened unfiltered")
+            assert ipc("pill", "cheatsheet").returncode == 0      # Super+/ again closes
+            wait_pill(lambda v: v["surface"] == "" and v["tierH"] == 0, "Super+/ toggles")
+
             # Collapse delay setting: global, per monitor, invalid values fall back.
             configure({"appearance": {"layout": "frame"}, "pill": {"collapseDelayMs": 1500}},
                       lambda v: v["pills"] and v["pills"][0]["collapseMs"] == 1500, "global delay")
@@ -628,6 +655,8 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
             print("PASS: launcher (5.1) by keyboard: 640x470 clamped, app search + launch, calculator (qalc -t, copy),")
             print("      actions (destructive need two Enters within 3 s, run after closing), clipboard (list,")
             print("      image thumbnail, Delete, filter, copy), Super+V switch/toggle, Escape")
+            print("PASS: cheatsheet (5.2): hyprctl binds -j grouped by prefix, 920x520 clamped, filter by")
+            print("      keyboard, Escape, reopens unfiltered, Super+/ toggles")
             print("PASS: layers, per-surface namespaces, keyboard focus only for an open surface (static; Xvfb has no layer shell)")
             print("NOT TESTED: live Wayland exclusive zones, click-through, direct scanout or VRR")
         except Exception:

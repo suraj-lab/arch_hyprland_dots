@@ -764,6 +764,33 @@ HDMI-A-1 stays readable (no inactive dimming), and everything is restored on exi
 - Writing monitor layout from the shell (use nwg-displays).
 
 ## Change log
+- 2026-09-26 - Phase 5.2 (keybind cheatsheet), deployed and committed with Suraj's approval. Backup
+  `phase5-cheatsheet-20260926-222209` (`new-files.txt`; `files/hypr/binds.lua` and
+  `binds.lua.pre-labels`).
+  - `components/pill/surfaces/Cheatsheet.qml`, the pill's `cheatsheet` surface (920x520,
+    clamped to the bar and the screen height; opens centred): `hyprctl binds -j` read on
+    every open, modmask bits decoded (SPEC 5.2), key names made readable (Enter, arrows,
+    Scroll up/down, Left/Right drag, Vol +, Mic mute; double-tap Super shows "Super x2"),
+    grouped by the description prefix into three columns balanced by size (biggest groups
+    first, each column in the original order). Typing filters by text, keys or group;
+    Escape closes; typing needs the exclusive keyboard focus the launcher already uses.
+  - Super+/ (`qs ipc call pill toggle cheatsheet`, an allowed §4.2 addition) toggles it; the
+    launcher has a `> Keybind cheatsheet` action (`runShellAction("cheatsheet")`).
+  - Every bind in binds.lua has a description (Media / Screenshot / Apps / Windows /
+    Workspaces / Session / Shell). In this Hyprland every bind reports as `__lua` with an
+    opaque function id, so the description is the only readable text. Suraj approved the
+    label on the frozen Gaming Mode key (Super+Shift+S); key and command are unchanged.
+    The Phase 0 guard strips description labels and still compares keys and commands byte
+    for byte (checked: changing a command fails it), and it requires a description on
+    every bind. Live: 53 of 53 binds described, the parser run on the live list gives 7
+    groups and no "Other".
+  - Classic has no pill, so Super+/ does nothing there.
+  - Tests: unit tests for modmask decoding, key labels, grouping (double-tap, no
+    description, no prefix), filtering and column balance (including the live group sizes);
+    phase4 opens the cheatsheet on Xvfb with a stubbed `hyprctl binds -j` (the stub still
+    fails every other hyprctl call): size, groups, keyboard filter, Escape, reopen
+    unfiltered, Super+/ toggle. Previewed at 1920x1080 with the live binds; four long
+    labels were shortened so none elide.
 - 2026-09-26 - wofi removed from the repo with Suraj's approval: `.config/wofi` (config,
   style.css) and its entry in `scripts/bootstrap-arch.sh`. The live `~/.config/wofi` and the
   installed wofi package are left alone (`sudo pacman -Rns wofi` if wanted).

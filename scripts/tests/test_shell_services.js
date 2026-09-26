@@ -281,3 +281,44 @@ assert.deepEqual(Array.from(clips).map(c => [c.id, c.text, c.ext]),
      ['10', '  tabs\tinside  ', ''], ['9', '[[ binary data 2 MiB jpeg 4000x3000 ]]', 'jpeg']]);
 assert.equal(clips[2].line, '10\t  tabs\tinside  ');   // the raw line goes back to cliphist unchanged
 console.log('PASS: Launcher app filter/ranking/categories, actions filter, cliphist parsing');
+
+// Cheatsheet (SPEC 5.2): modmask decoding, key labels, grouping by description prefix.
+const sheet = load('components/pill/surfaces/Cheatsheet.qml',
+    ['modNames', 'keyLabel', 'parseBinds', 'filterGroups', 'balance']);
+assert.deepEqual(Array.from(sheet.modNames(0)), []);
+assert.deepEqual(Array.from(sheet.modNames(64 | 1)), ['Super', 'Shift']);
+assert.deepEqual(Array.from(sheet.modNames(4 | 8 | 1)), ['Ctrl', 'Alt', 'Shift']);
+assert.deepEqual(Array.from(sheet.modNames(255)), ['Super', 'Ctrl', 'Alt', 'Shift', 'Caps', 'Mod2', 'Mod3', 'Mod5']);
+assert.deepEqual(['return', 'Space', 'slash', 'left', 'mouse:272', 'mouse_down', 'XF86AudioMicMute', 'c', 'F', '6', 'Print']
+    .map(k => sheet.keyLabel(k)), ['Enter', 'Space', '/', '\u2190', 'Left drag', 'Scroll down', 'Mic mute', 'C', 'F', '6', 'Print']);
+const bind = (modmask, key, description) =>
+    ({modmask, key, description: description || '', has_description: !!description, dispatcher: '__lua', arg: '1'});
+const groups = sheet.parseBinds([
+    bind(64, 'return', 'Apps: Terminal'), bind(64, 'C', 'Windows: Close'), bind(64, 'E', 'Apps: File manager'),
+    bind(65, 'left', 'Windows: Move left'), bind(64, 'SUPER_L', 'Shell: Double-tap Super expands the pill'),
+    bind(0, 'XF86AudioMute', 'Media: Mute audio'), bind(8, 'M', ''), bind(64, 'X', 'Label without a group'),
+]);
+assert.deepEqual(Array.from(groups).map(g => g.name), ['Apps', 'Windows', 'Shell', 'Media', 'Other']);
+assert.deepEqual(JSON.parse(JSON.stringify(groups[0].items)),
+    [{keys: ['Super', 'Enter'], text: 'Terminal'}, {keys: ['Super', 'E'], text: 'File manager'}]);
+assert.deepEqual(Array.from(groups[1].items[1].keys), ['Super', 'Shift', '\u2190']);
+assert.deepEqual(Array.from(groups[2].items[0].keys), ['Super \u00d72']);        // double-tap, not "Super + Super_L"
+assert.deepEqual(Array.from(groups[3].items[0].keys), ['Mute']);                 // no modifiers
+assert.deepEqual(JSON.parse(JSON.stringify(groups[4].items)),                    // no prefix / no description
+    [{keys: ['Alt', 'M'], text: 'No description'}, {keys: ['Super', 'X'], text: 'Label without a group'}]);
+assert.deepEqual(Array.from(sheet.filterGroups(groups, '')).length, 5);
+assert.deepEqual(JSON.parse(JSON.stringify(sheet.filterGroups(groups, 'FILE'))), [{name: 'Apps', items: [{keys: ['Super', 'E'], text: 'File manager'}]}]);
+assert.deepEqual(Array.from(sheet.filterGroups(groups, 'windows')[0].items).length, 2);   // a group name keeps all
+assert.deepEqual(Array.from(sheet.filterGroups(groups, 'shift')).map(g => g.name), ['Windows']);   // by key
+assert.deepEqual(Array.from(sheet.filterGroups(groups, 'nothing here')), []);
+const cols = sheet.balance([{name: 'A', items: [1, 2, 3, 4, 5, 6]}, {name: 'B', items: [1]}, {name: 'C', items: [1]},
+    {name: 'D', items: [1, 2]}], 3);
+assert.deepEqual(Array.from(cols).map(c => Array.from(c).map(g => g.name)), [['A'], ['D'], ['B', 'C']]);
+// The live shape: one big late group must not stack onto an early column.
+const sizes = {Media: 8, Screenshot: 2, Apps: 3, Windows: 15, Shell: 7, Session: 2, Workspaces: 16};
+const live = sheet.balance(Object.entries(sizes).map(([name, n]) => ({name, items: Array(n).fill(0)})), 3);
+const rows = Array.from(live).map(c => Array.from(c).reduce((s, g) => s + g.items.length + 1.5, 0));
+assert.ok(Math.max(...rows) - Math.min(...rows) <= 2, rows);
+assert.deepEqual(Array.from(live).map(c => Array.from(c).map(g => g.name)),
+    [['Screenshot', 'Workspaces'], ['Apps', 'Windows'], ['Media', 'Shell', 'Session']]);   // original order kept
+console.log('PASS: Cheatsheet modmask decoding, key labels, grouping, filter, balanced columns');

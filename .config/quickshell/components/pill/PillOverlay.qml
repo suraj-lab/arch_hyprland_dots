@@ -33,7 +33,7 @@ PanelWindow {
     property bool hoverOpen: false
     property bool visited: false
     property string surface: ""
-    readonly property var surfaces: ["sound", "notifs", "system", "dashboard", "media", "launcher", "clipboard"]
+    readonly property var surfaces: ["sound", "notifs", "system", "dashboard", "media", "launcher", "clipboard", "cheatsheet"]
     readonly property bool edgeHovered: hotZone.containsMouse
     readonly property bool pillHovered: pillHover.hovered || baseHover.hovered || tierHover.hovered
     readonly property bool peeking: fullscreen && pinned
@@ -113,7 +113,8 @@ PanelWindow {
         width - 2 * Theme.frameThickness - 2 * Theme.shoulderRadius - 40))
     readonly property var activeView: surface === "sound" ? soundView
         : surface === "notifs" ? notifsView : surface === "system" ? systemView
-        : surface === "dashboard" ? dashView : surface === "launcher" ? launcherView : null
+        : surface === "dashboard" ? dashView : surface === "launcher" ? launcherView
+        : surface === "cheatsheet" ? cheatsheetView : null
     // The tier rises only once the bar is fully wide (opening from the rest tab), so it
     // never slides with a growing bar; closing mirrors this (see `expanded`).
     readonly property int tierTarget: activeView && pill.width >= hoverWidth
@@ -126,8 +127,8 @@ PanelWindow {
     color: "transparent"
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "quickshell-pill"
-    // The launcher is typed into straight away; the other surfaces only need Escape.
-    WlrLayershell.keyboardFocus: surface === "launcher" ? WlrKeyboardFocus.Exclusive : surface !== "" ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+    // The launcher and cheatsheet are typed into straight away; the others only need Escape.
+    WlrLayershell.keyboardFocus: surface === "launcher" || surface === "cheatsheet" ? WlrKeyboardFocus.Exclusive : surface !== "" ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
     mask: Region {
         item: pill
         Region { item: base }
@@ -139,6 +140,7 @@ PanelWindow {
     property alias pillItem: pill
     property alias dashboard: dashView
     property alias launcher: launcherView
+    property alias cheatsheet: cheatsheetView
     property alias tierItem: tier
     property alias shape: shape
     PillShape {
@@ -205,7 +207,7 @@ PanelWindow {
     FocusScope {
         id: tier
         objectName: "tier"
-        width: Math.min(root.lastSurface === "dashboard" ? Theme.dashboardWidth
+        width: Math.min(root.lastSurface === "dashboard" || root.lastSurface === "cheatsheet" ? Theme.dashboardWidth
                         : root.lastSurface === "launcher" ? Theme.launcherSurfaceWidth : Theme.surfaceWidth,
                         root.hoverWidth - 2 * root.tierInset)
         height: root.tierTarget
@@ -260,6 +262,14 @@ PanelWindow {
                 visible: root.surface === "launcher"
                 onCloseRequested: root.closeSurface()
                 onActionRequested: id => root.runAction(id)
+            }
+            Cheatsheet {
+                id: cheatsheetView
+                anchors { left: parent.left; right: parent.right; top: parent.top }
+                accent: root.accent
+                active: root.surface === "cheatsheet"
+                visible: root.surface === "cheatsheet"
+                onCloseRequested: root.closeSurface()
             }
             SystemView {
                 id: systemView

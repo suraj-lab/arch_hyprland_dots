@@ -42,7 +42,14 @@ old, _, added = current.partition(NEW_BINDS)
 WOFI_CLIPBOARD = "killall wofi || cliphist list | wofi --dmenu | cliphist decode | wl-copy"
 expected = run("git", "show", f"{BASE}:{binds}").replace("qs msg ", "qs ipc call ")
 assert expected.count(WOFI_CLIPBOARD) == 1, "base Super+V bind not found"
-assert old == expected.replace(WOFI_CLIPBOARD, "qs ipc call launcher clipboard"), "keybind semantics changed"
+# Description labels (the cheatsheet, SPEC 5.2) are metadata: drop them before comparing,
+# so the keys and commands themselves must still match byte for byte.
+DESC = r'"[^"]*"(?: \.\. \w+)?'
+undescribed = re.sub(r", description = " + DESC + r" \}", " }", re.sub(r", \{ description = " + DESC + r" \}", "", old))
+assert "description" not in undescribed, "a description label the guard cannot strip"
+assert undescribed == expected.replace(WOFI_CLIPBOARD, "qs ipc call launcher clipboard"), "keybind semantics changed"
+# Every bind has a description, so the cheatsheet can show it.
+assert current.count("hl.bind(") == current.count("description = "), "a bind without a description"
 added_keys = re.findall(r'hl\.bind\("([^"]+)"', added)
 assert set(added_keys) <= {"SUPER + SUPER_L", "SUPER + D", "SUPER + slash"}, f"unlisted new binds: {added_keys}"
 for directory in [Path(".config/hypr"), Path(".config/quickshell")]:

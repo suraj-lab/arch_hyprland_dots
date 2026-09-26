@@ -60,7 +60,12 @@ ShellRoot {
                  launcher: { mode: p.launcher.mode, query: p.launcher.query, count: p.launcher.count,
                              current: p.launcher.current, armed: p.launcher.armed,
                              first: p.launcher.rows.length ? (p.launcher.rows[0].text || p.launcher.rows[0].title) : "" },
-                 lastAction: root.lastAction }
+                 lastAction: root.lastAction,
+                 sheet: { query: p.cheatsheet.query,
+                          groups: p.cheatsheet.groups.map(function(g) { return g.name }),
+                          shown: p.cheatsheet.shown.map(function(g) { return g.name }),
+                          items: p.cheatsheet.shown.reduce(function(n, g) { return n + g.items.length }, 0),
+                          other: p.cheatsheet.groups.filter(function(g) { return g.name === "Other" }).length } }
     }
 
     function box(item) { return [item.x, item.y, item.width, item.height] }

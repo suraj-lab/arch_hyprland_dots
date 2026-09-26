@@ -115,6 +115,7 @@ Item {
         { id: "dnd", icon: "\uf1f6", title: "Do Not Disturb", subtitle: "Toggle" },
         { id: "wallpaper", icon: "\uf03e", title: "Wallpaper", subtitle: "Open the picker" },
         { id: "overview", icon: "\uf009", title: "Overview", subtitle: "Workspaces" },
+        { id: "cheatsheet", icon: "\uf11c", title: "Keybind cheatsheet", subtitle: "Super + /" },
         { id: "screenshot", icon: "\uf030", title: "Screenshot", subtitle: "Select an area" },
         { id: "lock", icon: "\uf023", title: "Lock", subtitle: "hyprlock" },
         { id: "suspend", icon: "\uf236", title: "Suspend", subtitle: "Sleep" },
