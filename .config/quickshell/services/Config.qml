@@ -41,19 +41,27 @@ QtObject {
 
     readonly property var appearance: {
         var values = settingsData.appearance || {}
-        return { layout: values.layout === "frame" ? "frame" : "classic" }
+        return { layout: values.layout === "frame" ? "frame" : "classic",
+                 animations: values.animations !== false }
     }
 
-    // Only restStyle is needed for the fixed bottom reserve in 4.1. Other pill
-    // preferences arrive with their consumers; monitor overrides fall back to global.
+    // Pill preferences; monitors.<name>.pill overrides the global pill section.
+    // hoverExpand false = rest-only, click (or double-tap Super) to expand.
     function pillFor(monitorName) {
         var global = settingsData.pill || {}
         var monitors = settingsData.monitors || {}
         var monitor = monitors[monitorName] || {}
         var local = monitor.pill || {}
-        var style = local.restStyle === "tab" || local.restStyle === "handle"
-            ? local.restStyle : global.restStyle
-        return { restStyle: style === "handle" ? "handle" : "tab" }
+        function pick(key, valid) {
+            return valid(local[key]) ? local[key] : valid(global[key]) ? global[key] : undefined
+        }
+        var style = pick("restStyle", function(v) { return v === "tab" || v === "handle" })
+        var hover = pick("hoverExpand", function(v) { return typeof v === "boolean" })
+        var delay = pick("collapseDelayMs", function(v) {
+            return typeof v === "number" && Number.isInteger(v) && v >= 0 && v <= 5000 })
+        return { restStyle: style === "handle" ? "handle" : "tab",
+                 hoverExpand: hover !== false,
+                 collapseDelayMs: delay === undefined ? -1 : delay }   // -1: the Theme default
     }
 
     function timeout(value, fallback) {

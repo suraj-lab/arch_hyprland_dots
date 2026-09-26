@@ -32,7 +32,14 @@ assert not run("git", "ls-files", "--others", "--exclude-standard", "--", *froze
 restore = '\thl.exec_cmd("/usr/local/bin/gaming-desktop-restore")\n'
 assert restore in Path(".config/hypr/modules/autostart.lua").read_text(), "gaming-desktop-restore line changed"
 binds = ".config/hypr/modules/binds.lua"
-assert Path(binds).read_text() == run("git", "show", f"{BASE}:{binds}").replace("qs msg ", "qs ipc call "), "keybind semantics changed"
+# Existing binds keep their exact text; new binds may only be appended after this marker
+# (SPEC §4.2 lists the allowed ones: double-tap Super, Super+D, Super+slash).
+NEW_BINDS = "\n-- New binds added by the DE upgrade (SPEC §4.2)"
+current = Path(binds).read_text()
+old, _, added = current.partition(NEW_BINDS)
+assert old == run("git", "show", f"{BASE}:{binds}").replace("qs msg ", "qs ipc call "), "keybind semantics changed"
+added_keys = re.findall(r'hl\.bind\("([^"]+)"', added)
+assert set(added_keys) <= {"SUPER + SUPER_L", "SUPER + D", "SUPER + slash"}, f"unlisted new binds: {added_keys}"
 for directory in [Path(".config/hypr"), Path(".config/quickshell")]:
     for file in directory.rglob("*"):
         if file.is_file() and file.suffix in (".qml", ".lua", ".sh"):

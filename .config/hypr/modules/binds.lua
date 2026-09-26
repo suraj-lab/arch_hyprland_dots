@@ -100,3 +100,23 @@ hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 -- Native scratchpad keybinds
 hl.bind("ALT + M", hl.dsp.workspace.toggle_special("spotify"))
 hl.bind("ALT + return", hl.dsp.workspace.toggle_special("term"))
+
+-- New binds added by the DE upgrade (SPEC §4.2); the lines above stay exactly as they were.
+-- Double-tap Super (pressed and released alone) toggles the pill / fullscreen peek.
+-- Hyprland has no double-tap bind, so count taps here: only a real double-tap spawns qs.
+local super_tap = { pending = false, seq = 0 }
+hl.bind("SUPER + SUPER_L", function()
+	if super_tap.pending then
+		super_tap.pending = false
+		hl.exec_cmd("qs ipc call pill peek")
+		return
+	end
+	super_tap.pending = true
+	super_tap.seq = super_tap.seq + 1
+	local seq = super_tap.seq
+	hl.timer(function()
+		if super_tap.seq == seq then
+			super_tap.pending = false
+		end
+	end, { timeout = 300, type = "oneshot" })
+end, { release = true, description = "Double-tap Super: expand the pill / peek over fullscreen" })

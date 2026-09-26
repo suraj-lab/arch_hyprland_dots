@@ -6,5 +6,12 @@
   },
   "weather": {
     "location": "London"
+  },
+  "monitors": {
+    "HDMI-A-1": {
+      "pill": {
+        "hoverExpand": false
+      }
+    }
   }
 }

@@ -7,7 +7,9 @@ import Quickshell.Services.SystemTray
 import "../theme"
 
 RowLayout {
+    id: tray
     spacing: 6
+    property int menuEdge: Edges.Bottom   // the pill at the bottom of the screen opens menus upward
 
     Repeater {
         model: SystemTray.items
@@ -51,8 +53,8 @@ RowLayout {
                 id: menuPopup
                 visible: trayItem.menuOpen && modelData.hasMenu
                 anchor.item: trayItem
-                anchor.edges: Edges.Bottom
-                anchor.gravity: Edges.Bottom
+                anchor.edges: tray.menuEdge
+                anchor.gravity: tray.menuEdge
 
                 implicitWidth: Math.max(160, menuCol.implicitWidth + 16)
                 implicitHeight: menuCol.implicitHeight + 12

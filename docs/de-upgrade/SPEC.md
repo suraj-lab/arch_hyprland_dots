@@ -199,7 +199,7 @@ All sizes are logical px at scale 1. Clamp widths to
 |---|---|---|---|
 | `rest` (style `tab`, default) | 230×30 | default | workspace dots (active one elongated) + clock |
 | `rest` (style `handle`) | 120×6 | default when `pill.restStyle = "handle"` | none (thin line). Reserve drops to `frame + 6` |
-| `hover` | min(1200, clamp)×46 | pointer in the bottom 4 px strip for ≥150 ms (dwell), or `Super+grave` | full bar row (§3.4) |
+| `hover` | min(1200, clamp)×46 | pointer in the bottom 4 px strip for ≥150 ms (dwell), or double-tap Super | full bar row (§3.4) |
 | `dashboard` | 920×420 | click clock or media in the bar, `Super+D`, `qs ipc call pill open dashboard` | Dashboard / Media / Performance / Weather tabs |
 | `launcher` | 640×470 | `Super+Space` (unchanged), `Super+V` (clipboard mode) | search + results (Phase 5) |
 | `sound` / `network` / `bluetooth` / `notifs` / `system` / `power` / `devices` / `settings` | per surface, ≤ 920×560 | click the matching bar item | re-hosted views (Phase 4/6) |
@@ -212,7 +212,7 @@ All sizes are logical px at scale 1. Clamp widths to
   morphs directly from the first (no close-then-open).
 
 ### 3.3 Fullscreen peek
-`Super+grave` toggles `peek` on the focused monitor. Peeking maps the pill in its
+Double-tapping Super toggles `peek` on the focused monitor. Peeking maps the pill in its
 `hover` state over the fullscreen window. The frame stays hidden. It un-peeks on
 `Escape`, on pointer leave (after 800 ms), or when the fullscreen state changes.
 
@@ -267,7 +267,7 @@ before shipping Phase 4.
 ### 4.2 New binds (and only these)
 | Keys | Action | Lua |
 |---|---|---|
-| `Super+grave` | peek / expand pill | `hl.dsp.exec_cmd("qs ipc call pill peek")` |
+| Double-tap Super (release, alone) | peek / expand pill | `hl.bind("SUPER + SUPER_L", <Lua function counting taps in a 300 ms hl.timer window>, { release = true })`; only a double tap runs `qs ipc call pill peek` |
 | `Super+D` | dashboard surface | `hl.dsp.exec_cmd("qs ipc call pill open dashboard")` |
 | `Super+slash` | keybind cheatsheet | `hl.dsp.exec_cmd("qs ipc call cheatsheet toggle")` |
 
@@ -571,7 +571,7 @@ Build this behind a switch: `Config.appearance.layout = "frame" | "classic"`, de
   a 4 px `MouseArea` hot zone along the bottom edge inside the overlay mask, plus
   `HoverHandler` on the pill.
 - `PillBar.qml` renders the rest content and the full bar row (§3.4) from the singletons.
-- Fullscreen hide and `Super+grave` peek (§3.3). IPC target `pill`: `peek()`,
+- Fullscreen hide and double-tap-Super peek (§3.3). IPC target `pill`: `peek()`,
   `open(name)`, `close()`, `toggle(name)`.
 
 **4.3 Re-host existing surfaces** inside the pill: `sound` (SoundView), `notifs`
@@ -736,11 +736,18 @@ HDMI-A-1 stays readable (no inactive dimming), and everything is restored on exi
 ---
 
 ## 8. Open decisions (defaults in bold; ASK before Phase 4 ships)
-1. Pill rest style: **tab** / handle.
-2. Expand trigger: **bottom-edge hover with 150 ms dwell + `Super+grave`** / Super tap
-   (release bind) / click only.
-3. HDMI-A-1 pill: same as main / **rest-only, click to expand**.
-4. Lock-before-sleep: **small logind listener service** / hypridle for sleep hooks only.
+1. Pill rest style: **tab** / handle. DECIDED 2026-09-26: tab.
+2. Expand trigger: bottom-edge hover with 150 ms dwell + `Super+grave` / Super tap
+   (release bind) / click only. DECIDED 2026-09-26: **hover dwell + double-tap Super**.
+   `Super+grave` rejected: on Suraj's Moonlander grave is a tap-dance key (hold = Ctrl,
+   ~200 ms tap delay). Live test of `SUPER + SUPER_L` with `release = true`: fires only
+   when Super is pressed and released alone (not after Super+1, Super+Space or
+   Super+drag); observed double-tap intervals 151 and 165 ms, so 300 ms is the window.
+   Hyprland has no double-tap bind, so binds.lua counts taps (Lua function + oneshot
+   hl.timer) and only a double tap spawns `qs ipc call pill peek`.
+3. HDMI-A-1 pill: same as main / **rest-only, click to expand**. DECIDED 2026-09-26: default.
+4. Lock-before-sleep: small logind listener service / **hypridle for sleep hooks only**.
+   DECIDED in Task 2.7 (hypridle hooks, commit 00a8b8b).
 5. KDE Connect: install or skip.
 6. Keyring SSH agent: yes / **no**.
 
@@ -753,6 +760,45 @@ HDMI-A-1 stays readable (no inactive dimming), and everything is restored on exi
 - Writing monitor layout from the shell (use nwg-displays).
 
 ## Change log
+- 2026-09-26 - Phase 4.2 live feedback from Suraj, fixed and deployed (backups
+  `phase4-pill-20260926-111731`, `phase4-pill-timing-20260926-114821`).
+  1. A peek never hid: it waited for the pointer to visit first, which over a game it rarely
+     does. A peek now hides 800 ms after it opens whenever the pointer is not on it.
+  2. Collapse felt too aggressive: the 6 px frame band between the bottom hot strip and
+     the pill counted as "outside", and 300 ms was short. The band and shoulders now count
+     as the pill (input mask + HoverHandler), and the delay is 700 ms by default
+     (deviation from §5.2's 300 ms), tunable live via `pill.collapseDelayMs` (global or
+     `monitors.<name>.pill`, integer 0-5000; invalid values fall back).
+  phase4 check covers the frame band, the untouched peek and the delay setting.
+- 2026-09-26 - Phase 4.2 (pill), repository only; not committed or deployed.
+  `components/pill/`: PillOverlay (one per screen, Overlay layer, namespace quickshell-pill,
+  bottom-anchored 56 px window that never resizes or reserves; input mask = pill + a 4 px
+  bottom hot strip that only hovers), PillShape (pill + concave shoulders as one ShapePath,
+  filled down through the frame edge; shoulders shrink to fit the 30 px tab), PillBar (rest:
+  workspace dots + clock; hover: the SPEC 3.4 row reusing the existing chips, scroll on
+  workspaces switches; cross-fade driven by the animated height). States rest / hover /
+  hidden: 150 ms edge dwell, collapse 300 ms after leaving (800 ms when peeking), IPC or
+  click pins until the pointer has visited and left, fullscreen unmaps it and a pin is the
+  peek, fullscreen changes end a peek. `pill.hoverExpand` (global or per monitor) = false
+  gives rest-only / click to expand; the repo settings.json sets it for HDMI-A-1 (§8.3).
+  `appearance.animations` and Desktop Game Mode zero the morph. IPC `pill`: peek, open,
+  close, toggle, status (surface names are accepted but open the bar row until 4.3/4.4).
+  Double-tap Super: counted in binds.lua (§4.2, §8.2); the Phase 0 guard now allows only
+  the §4.2 binds, appended after a marker, and existing binds must stay byte-identical.
+  Preview bridge (ponytail-marked): the pill's Sound/Notifications/System chips open the
+  classic panel on the same screen until 4.3; the classic top bar stays in frame mode.
+  TrayArea gains `menuEdge` so pill tray menus open upward. Frame reserves the rest tab again.
+  Checks: phase0/phase3 pass; phase4 (3 consecutive runs) adds a real xdotool pointer on
+  the private Xvfb: rest geometry and shape pixels, edge pass-through vs dwell, collapse,
+  IPC pin/toggle, fullscreen hide + peek, rest-only click, animations off; the harness now
+  stubs session commands like phase3. Lua test drives the real binds.lua tap counter with a
+  fake `hl` (single, double, slow, triple/quadruple taps). Visual check on a 1920x1080 Xvfb:
+  row layout fits 1200 px; isolated shape render shows the rounded corners and shoulders.
+- 2026-09-26 - Phase 4 decisions (§8 1-3) settled with Suraj before 4.2: tab rest style,
+  hover dwell + double-tap Super (replaces `Super+grave`, see §8.2 for the live test),
+  HDMI-A-1 rest-only / click to expand. The temporary test bind was runtime-only and is gone;
+  binds match the pre-test set (the Super+arrow binds only changed internal Lua function IDs,
+  because binds.lua registers them with `pairs()`, whose order varies between reloads).
 - 2026-09-26 - Fixes found while previewing frame mode live, deployed; not yet committed.
   1. Config ignored settings.json at startup (since Phase 3 slice 1): the file was read, but
      JsonAdapter's own `({})` defaults overwrote it, so values applied only after the file

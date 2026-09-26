@@ -14,9 +14,12 @@ import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
-for command in ("Xvfb", "qs", "magick"):
+for command in ("Xvfb", "qs", "magick", "xdotool", "lua"):
     if not shutil.which(command):
         raise SystemExit(f"Missing test dependency: {command} (nothing installed)")
+
+print(subprocess.run(["lua", "scripts/tests/test_super_tap.lua"], cwd=ROOT, check=True,
+                     capture_output=True, text=True, timeout=30).stdout.strip())
 
 with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
     home = Path(tmp)
@@ -24,16 +27,30 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
     config_dir.mkdir(parents=True)
     runtime = home / "r"
     runtime.mkdir(mode=0o700)
-    for name in ("services", "theme", "components/frame"):
+    for name in ("services", "theme", "components"):
         shutil.copytree(ROOT / ".config/quickshell" / name, config_dir / name)
+    # The pill's chips load Desktop, Audio etc. As in check-desktop-phase3.py, no real
+    # controller, service or session command may run from the sandbox.
+    (home / "bin").mkdir()
+    for name, body in {"gamemoded": "printf 'gamemode is inactive\\n'", "pgrep": "exit 1",
+                       "pkill": "exit 1", "hyprctl": "exit 1", "systemctl": "exit 1",
+                       "hyprlock": "exit 1", "pactl": "exit 0", "curl": "exit 1",
+                       "ddcutil": "exit 1"}.items():
+        (home / "bin" / name).write_text("#!/bin/sh\n" + body + "\n")
+        (home / "bin" / name).chmod(0o700)
+    (config_dir / "scripts").mkdir()
+    (config_dir / "scripts/desktop-gamemode.py").write_text('print(\'{"gameMode":false,"dnd":false}\')\n')
     # Xvfb has no layer shell, so its attached properties cannot be created there.
     # Check them statically in the real files, then drop them from the private copy.
-    for name, namespace in (("Frame.qml", '"quickshell-frame"'), ("Reserve.qml", '"quickshell-reserve-" + edge')):
-        source = (ROOT / ".config/quickshell/components/frame" / name).read_text()
-        for line in ("WlrLayershell.layer: WlrLayer.Top", "WlrLayershell.namespace: " + namespace,
+    for name, namespace in (("frame/Frame.qml", '"quickshell-frame"'),
+                            ("frame/Reserve.qml", '"quickshell-reserve-" + edge'),
+                            ("pill/PillOverlay.qml", '"quickshell-pill"')):
+        source = (ROOT / ".config/quickshell/components" / name).read_text()
+        layer = "Overlay" if name.startswith("pill/") else "Top"
+        for line in ("WlrLayershell.layer: WlrLayer." + layer, "WlrLayershell.namespace: " + namespace,
                      "WlrLayershell.keyboardFocus: WlrKeyboardFocus.None"):
             assert line in source, f"{name}: missing {line}"
-        copy = config_dir / "components/frame" / name
+        copy = config_dir / "components" / name
         copy.write_text("\n".join(l for l in source.splitlines()
                                   if not l.strip().startswith("WlrLayershell.")) + "\n")
     fixture = config_dir / "shell.qml"
@@ -47,7 +64,8 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
                XDG_STATE_HOME=str(home / ".state"), XDG_RUNTIME_DIR=str(runtime),
                DBUS_SESSION_BUS_ADDRESS="unix:path=/nonexistent",
                DBUS_SYSTEM_BUS_ADDRESS="unix:path=/nonexistent",
-               QT_QPA_PLATFORM="xcb", QT_QUICK_BACKEND="software", QML_DISABLE_DISK_CACHE="1")
+               QT_QPA_PLATFORM="xcb", QT_QUICK_BACKEND="software", QML_DISABLE_DISK_CACHE="1",
+               PATH=str(home / "bin") + ":/usr/bin")
     for key in ("HYPRLAND_INSTANCE_SIGNATURE", "WAYLAND_DISPLAY", "DISPLAY", "XAUTHORITY",
                 "SESSION_MANAGER", "SWAYSOCK", "I3SOCK", "PIPEWIRE_REMOTE", "PIPEWIRE_RUNTIME_DIR",
                 "PULSE_SERVER"):
@@ -104,7 +122,7 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
                     assert reserve["maskEmpty"] and not reserve["focus"], reserve
                     assert reserve["anchors"] == {e: e != opposite[edge] for e in opposite}, reserve
 
-            empty = lambda v: v["layout"] == "classic" and v["frames"] == []
+            empty = lambda v: v["layout"] == "classic" and v["frames"] == [] and v["pills"] == []
             wait_state(lambda v: v["layout"] == "frame" and len(v["frames"]) == 2, "frame read at startup")
             configure({}, empty, "classic by default: no extra windows")
             state = configure({"appearance": {"layout": "frame"}},
@@ -168,17 +186,137 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
                 check_frame(frame, True, 10, top=False)
             assert ipc("classic", "false").returncode == 0
             wait_state(lambda v: all(f["bottom"] == 40 for f in v["frames"]), "full frame restored")
+            # ---- 4.2 pill: a real pointer (xdotool) on the private display drives hover ----
+            def pointer(x, y):
+                subprocess.run(["xdotool", "mousemove", str(x), str(y)], env=env, check=True, timeout=5)
+
+            def pill():
+                return wait_state(lambda v: len(v["pills"]) == 1, "one pill")["pills"][0]
+
+            def wait_pill(accept, what, timeout=3):
+                deadline = time.monotonic() + timeout
+                while time.monotonic() < deadline:
+                    value = pill()
+                    if accept(value):
+                        return value
+                    time.sleep(0.03)
+                raise AssertionError(f"pill never reached: {what}; last {value}")
+
+            pointer(400, 300)
+            configure({"appearance": {"layout": "frame"}},
+                      lambda v: len(v["pills"]) == 1 and v["pills"][0]["state"] == "rest", "pill at rest")
+            rest = wait_pill(lambda v: v["state"] == "rest" and v["w"] == 230 and v["h"] == 30, "settled rest")
+            win_top = 600 - rest["winH"]                      # bottom-anchored overlay window
+            assert (rest["w"], rest["h"], rest["winH"]) == (230, 30, 56), rest
+            assert rest["x"] == 285 and rest["y"] == rest["winH"] - 10 - 30, rest  # centred, on the frame edge
+            assert rest["visible"] and rest["hoverExpand"] and rest["animate"], rest
+            assert rest["collapseMs"] == 700, rest
+
+            # Pixels at rest (shape image = overlay window, 800x56): rounded top corners and
+            # concave shoulders joining the frame edge (baseY 46, shoulder radius 30-16 = 14).
+            assert ipc("pillCapture").returncode == 0
+            image = home / "pill.png"
+            deadline = time.monotonic() + 5
+            while not image.exists() and time.monotonic() < deadline:
+                time.sleep(0.05)
+            points = [(400, 30), (400, 10), (300, 20), (286, 17), (283, 45), (272, 33),
+                      (265, 50), (285, 50), (514, 17), (517, 45), (528, 33)]
+            fmt = " ".join(f"%[fx:p{{{x},{y}}}.a]" for x, y in points)
+            alpha = [round(float(v)) for v in subprocess.check_output(
+                ["magick", str(image), "-format", fmt, "info:"], text=True).split()]
+            assert alpha == [1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0], alpha
+
+            # Bottom-edge dwell: passing through the hot strip does nothing; resting opens.
+            pointer(60, 598); time.sleep(0.05); pointer(60, 300); time.sleep(0.4)
+            assert pill()["state"] == "rest", "a pass through the bottom edge must not expand"
+            pointer(60, 598)
+            hover = wait_pill(lambda v: v["state"] == "hover" and v["w"] == 696 and v["h"] == 46,
+                              "hover after the dwell")
+            assert hover["x"] == 52 and hover["y"] == hover["winH"] - 10 - 46, hover
+            pointer(400, 592); time.sleep(1.0)       # frame band under the pill (not the hot strip)
+            assert pill()["state"] == "hover", "the frame band under the pill must count as the pill"
+            pointer(400, win_top + 30); time.sleep(1.0)             # onto the pill: stays open
+            assert pill()["state"] == "hover", "must stay open while the pointer is on the pill"
+            pointer(400, 300)
+            wait_pill(lambda v: v["state"] == "rest" and v["w"] == 230, "collapse after leaving")
+
+            # IPC pin: stays open until the pointer has visited and left.
+            assert ipc("pill", "open").returncode == 0
+            wait_pill(lambda v: v["state"] == "hover" and v["pinned"], "pinned open")
+            time.sleep(0.6)
+            assert pill()["state"] == "hover", "an untouched pin must not collapse"
+            pointer(400, win_top + 30); time.sleep(0.1); pointer(400, 300)
+            wait_pill(lambda v: v["state"] == "rest" and not v["pinned"], "pin ends after a visit")
+            assert ipc("pill", "toggle").returncode == 0
+            wait_pill(lambda v: v["state"] == "hover", "toggle opens")
+            assert ipc("pill", "toggle").returncode == 0
+            wait_pill(lambda v: v["state"] == "rest", "toggle closes")
+
+            # Fullscreen: nothing mapped; a pin is the peek; leaving fullscreen ends it.
+            assert ipc("fullscreen", "true", "false").returncode == 0
+            wait_pill(lambda v: v["state"] == "hidden" and not v["visible"], "hidden on fullscreen")
+            assert ipc("pill", "open").returncode == 0
+            peek = wait_pill(lambda v: v["state"] == "hover" and v["visible"], "peek over fullscreen")
+            assert peek["collapseMs"] == 800, peek
+            # Pointer never goes near it (the usual case over a game): hides after 800 ms.
+            wait_pill(lambda v: v["state"] == "hidden" and not v["pinned"], "peek hides untouched")
+            assert ipc("pill", "open").returncode == 0
+            wait_pill(lambda v: v["state"] == "hover" and v["visible"], "peek again")
+            assert ipc("fullscreen", "false", "false").returncode == 0
+            wait_pill(lambda v: v["state"] == "rest" and not v["pinned"], "peek ends with fullscreen")
+
+            # Rest-only monitor (the HDMI-A-1 default in settings.json): no dwell; click opens.
+            configure({"appearance": {"layout": "frame"},
+                       "monitors": {"HDMI-A-1": {"pill": {"hoverExpand": False}}}},
+                      lambda v: True, "HDMI override")
+            assert ipc("pillOn", "HDMI-A-1").returncode == 0
+            wait_pill(lambda v: v["name"] == "HDMI-A-1" and not v["hoverExpand"], "rest-only pill")
+            pointer(60, 598); time.sleep(0.6)
+            assert pill()["state"] == "rest", "rest-only monitors must not expand on hover"
+            pointer(450, win_top + 31)
+            subprocess.run(["xdotool", "click", "1"], env=env, check=True, timeout=5)
+            wait_pill(lambda v: v["state"] == "hover", "click on the rest tab expands")
+            pointer(400, 300)
+            wait_pill(lambda v: v["state"] == "rest", "collapse after the click visit")
+            assert ipc("pillOn", "DP-2").returncode == 0
+
+            # Collapse delay setting: global, per monitor, invalid values fall back.
+            configure({"appearance": {"layout": "frame"}, "pill": {"collapseDelayMs": 1500}},
+                      lambda v: v["pills"] and v["pills"][0]["collapseMs"] == 1500, "global delay")
+            configure({"appearance": {"layout": "frame"}, "pill": {"collapseDelayMs": 1500},
+                       "monitors": {"DP-2": {"pill": {"collapseDelayMs": 0}}}},
+                      lambda v: v["pills"] and v["pills"][0]["collapseMs"] == 0, "per-monitor delay")
+            for bad in (-1, 5001, 1.5, "700", True):
+                configure({"appearance": {"layout": "frame"}, "pill": {"collapseDelayMs": bad}},
+                          lambda v: v["pills"] and v["pills"][0]["collapseMs"] == 700, f"invalid delay {bad!r}")
+
+            # Animations off: the morph is instant.
+            configure({"appearance": {"layout": "frame", "animations": False}},
+                      lambda v: len(v["pills"]) == 1 and not v["pills"][0]["animate"], "animations off")
+            assert ipc("pill", "open").returncode == 0
+            assert pill()["w"] == 696, "no morph when animations are off"
+            assert ipc("pill", "close").returncode == 0
+
             for invalid in ("invalid", True, 42, None):
                 configure({"appearance": {"layout": invalid}}, empty, "invalid layout is classic")
             configure({}, empty, "removed sections return to classic")
             log.flush()
-            errors = [line for line in (home / "shell.log").read_text().splitlines()
-                      if any(word in line for word in (" ERROR", "TypeError:", "ReferenceError:", "Binding loop"))]
+            lines = (home / "shell.log").read_text().splitlines()
+            # No PipeWire or D-Bus in the sandbox: these errors prove it stayed isolated.
+            isolated = ("quickshell.service.pipewire.loop: Failed to connect pipewire context",
+                        "quickshell.network: Network will not work. Could not find an available backend")
+            for expected in isolated:
+                assert any(expected in line for line in lines), "sandbox may have reached the session: " + expected
+            errors = [line for line in lines if not any(e in line for e in isolated) and any(
+                word in line for word in (" ERROR", "TypeError:", "ReferenceError:", "Binding loop"))]
             assert not errors, "\n".join(errors)
             print("PASS: settings file present at startup is applied immediately; unrelated edits keep frames")
             print("PASS: classic/frame switch, fixed reserves, empty masks, per-monitor fullscreen and hotplug")
             print("PASS: classic-bar preview (no top reserve, no pill space)")
             print("PASS: rest-style override/reset, invalid settings, frame pixels on private Xvfb")
+            print("PASS: pill rest geometry and shape pixels, edge dwell/pass-through, collapse, IPC pin/toggle,")
+            print("      frame band counts as the pill, fullscreen hide + peek (hides untouched after 800 ms),")
+            print("      rest-only click-to-expand, collapse-delay setting, animations off (real pointer on Xvfb)")
             print("PASS: Top layer, per-surface namespaces and no keyboard focus (static; Xvfb has no layer shell)")
             print("NOT TESTED: live Wayland exclusive zones, click-through, direct scanout or VRR")
         except Exception:

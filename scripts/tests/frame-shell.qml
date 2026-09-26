@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import "../../.config/quickshell/components/frame"
+import "../../.config/quickshell/components/pill"
 import "../../.config/quickshell/services"
 
 // Run only in the isolated HOME/display created by check-desktop-phase4.py.
@@ -27,6 +28,24 @@ ShellRoot {
             reserveTop: !root.classicBar
             pillShown: !root.classicBar
         }
+    }
+
+    property var pillNames: ["DP-2"]   // one at a time: pills on the same test screen overlap
+    Variants {
+        id: pills
+        model: root.frameLayout ? root.pillNames : []
+        PillOverlay {
+            required property string modelData
+            screen: Quickshell.screens[0]
+            monitorName: modelData
+            fullscreen: modelData === "DP-2" ? root.mainFullscreen : root.secondaryFullscreen
+        }
+    }
+    function pillState(p) {
+        return { name: p.monitorName, state: p.pillState, visible: p.visible, pinned: p.pinned,
+                 x: p.pillItem.x, y: p.pillItem.y, w: p.pillItem.width, h: p.pillItem.height,
+                 winH: p.height, winW: p.width, hoverExpand: p.prefs.hoverExpand, animate: p.animate,
+                 collapseMs: p.collapseDelay }
     }
 
     function frameState(frame) {
@@ -63,9 +82,20 @@ ShellRoot {
                 result.saveToFile(Quickshell.env("HOME") + "/frame.png")
             })
         }
+        function pill(action: string): void {
+            var p = pills.instances[0]
+            if (action === "open") p.open(); else if (action === "close") p.close(); else p.toggle()
+        }
+        function pillOn(name: string): void { root.pillNames = [name] }
+        function pillCapture(): void {
+            pills.instances[0].shape.grabToImage(function(result) {
+                result.saveToFile(Quickshell.env("HOME") + "/pill.png")
+            })
+        }
         function status(): string {
             return JSON.stringify({ layout: Config.appearance.layout, builds: root.frameBuilds,
-                frames: frames.instances.map(function(frame) { return root.frameState(frame) }) })
+                frames: frames.instances.map(function(frame) { return root.frameState(frame) }),
+                pills: pills.instances.map(function(p) { return root.pillState(p) }) })
         }
     }
 }

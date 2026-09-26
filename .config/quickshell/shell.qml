@@ -7,6 +7,7 @@ import Quickshell.Wayland
 import "theme"
 import "components"
 import "components/frame"
+import "components/pill"
 import "services"
 
 ShellRoot {
@@ -88,8 +89,8 @@ ShellRoot {
     Process { id: pReboot;  command: ["systemctl", "reboot"]                }
     Process { id: pOff;     command: ["systemctl", "poweroff"]              }
 
-    // Phase 4.1 preview: no extra windows in classic mode. Keep the working bar
-    // below until the pill takes over its controls and Caffeine surface in 4.2/4.3.
+    // Phase 4 preview: no extra windows in classic mode. The classic bar below stays
+    // until 4.3 moves its popups (and the Caffeine inhibitor) into the pill.
     // A bool only changes on a real switch; Config rebuilds its objects on every edit.
     readonly property bool frameLayout: Config.appearance.layout === "frame"
     Variants {
@@ -98,12 +99,49 @@ ShellRoot {
             required property ShellScreen modelData
             screen: modelData
             reserveTop: false   // the classic bar below already reserves the top edge
-            pillShown: false
+        }
+    }
+    Variants {
+        id: pills
+        model: shellRoot.frameLayout ? Quickshell.screens : []
+        PillOverlay {
+            required property ShellScreen modelData
+            screen: modelData
+            accent: shellRoot.accentFor(modelData.name)
+            // ponytail: until 4.3 re-hosts these views in the pill, open the classic panel
+            // on the same screen; remove with the classic bar in frame mode.
+            onSurfaceRequested: name => {
+                var bar = bars.instances.find(function(b) { return b.modelData === modelData })
+                if (bar) bar.panel.open(name)
+            }
+            onPowerRequested: shellRoot.sessionOpen = !shellRoot.sessionOpen
+        }
+    }
+
+    // IPC target `pill` (SPEC 4.2); acts on the focused monitor's pill. Double-tap Super
+    // is counted in binds.lua and calls peek().
+    function focusedPill() {
+        var name = Hypr.focusedMonitor ? Hypr.focusedMonitor.name : ""
+        return pills.instances.find(function(p) { return p.monitorName === name }) || null
+    }
+    IpcHandler {
+        target: "pill"
+        function peek(): void { var p = shellRoot.focusedPill(); if (p) p.toggle() }
+        // Surfaces (dashboard, sound, ...) arrive in 4.3/4.4; for now every name opens the bar row.
+        function open(name: string): void { var p = shellRoot.focusedPill(); if (p) p.open() }
+        function close(): void { var p = shellRoot.focusedPill(); if (p) p.close() }
+        function toggle(name: string): void { var p = shellRoot.focusedPill(); if (p) p.toggle() }
+        function status(): string {
+            return JSON.stringify(pills.instances.map(function(p) {
+                return { monitor: p.monitorName, state: p.pillState, pinned: p.pinned,
+                         fullscreen: p.fullscreen }
+            }))
         }
     }
 
     // ── Per-screen bar ──────────────────────────────────────────────────────
     Variants {
+        id: bars
         model: Quickshell.screens
 
         PanelWindow {
@@ -113,6 +151,7 @@ ShellRoot {
 
             property color screenAccent: shellRoot.accentFor(modelData.name)
             Behavior on screenAccent { ColorAnimation { duration: 500 } }
+            readonly property var panel: unifiedPanel   // opened by the pill's chips (4.2 bridge)
 
             anchors { top: true; left: true; right: true }
             // In frame mode the bar floats inside the frame with its usual gap. The side

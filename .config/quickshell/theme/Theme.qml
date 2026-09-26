@@ -74,6 +74,20 @@ QtObject {
     readonly property int frameRadius:       22
     readonly property int pillRestTabHeight: 30
     readonly property int pillRestHandleHeight: 6
+    readonly property int pillRestTabWidth:  230
+    readonly property int pillRestHandleWidth: 120
+    readonly property int pillHoverHeight:   46
+    readonly property int pillHoverMaxWidth: 1200
+    readonly property int pillRadiusSmall:   16
+    readonly property int shoulderRadius:    22
+
+    // Pill motion (SPEC 5.2). Zeroed when animations are off or Game Mode is on.
+    readonly property int glideDuration:  240
+    readonly property var morphCurve:     [0.16, 1, 0.3, 1, 1, 1]
+    readonly property int hoverDwell:     150
+    readonly property int collapseDelay:  700   // SPEC said 300; too eager in use (settings: pill.collapseDelayMs)
+    readonly property int peekLeaveDelay: 800
+    readonly property int doubleTapWindow: 300
 
     // OSD
     readonly property int osdWidth:      350
