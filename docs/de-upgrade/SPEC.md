@@ -764,6 +764,9 @@ HDMI-A-1 stays readable (no inactive dimming), and everything is restored on exi
 - Writing monitor layout from the shell (use nwg-displays).
 
 ## Change log
+- 2026-09-26 - wofi removed from the repo with Suraj's approval: `.config/wofi` (config,
+  style.css) and its entry in `scripts/bootstrap-arch.sh`. The live `~/.config/wofi` and the
+  installed wofi package are left alone (`sudo pacman -Rns wofi` if wanted).
 - 2026-09-26 - Phase 5.1 (launcher + clipboard), deployed and committed with Suraj's approval. Backup
   `phase5-launcher-20260926-212413` (`new-files.txt`; `files/hypr/binds.lua`).
   - `components/pill/surfaces/Launcher.qml`, the pill's `launcher` surface (640x470,
