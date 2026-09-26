@@ -12,9 +12,12 @@ Item {
     property var dismissFunc: null   // function(id) — Notifs.dismiss
 
     readonly property bool hasToasts: toastModel != null && toastModel.count > 0
+    // The stack plus its margins; 0 when empty (the frame drawer sizes itself from this).
+    implicitHeight: stack.height > 0 ? stack.height + 32 : 0
 
     // ── Toast stack (top-right, grows downward) ───────────────────────────
     Column {
+        id: stack
         anchors { right: parent.right; top: parent.top; margins: 16 }
         spacing: 8
 

@@ -200,7 +200,7 @@ All sizes are logical px at scale 1. Clamp widths to
 | `rest` (style `tab`, default) | 230×30 | default | workspace dots (active one elongated) + clock |
 | `rest` (style `handle`) | 120×6 | default when `pill.restStyle = "handle"` | none (thin line). Reserve drops to `frame + 6` |
 | `hover` | min(1200, clamp)×46 | pointer in the bottom 4 px strip for ≥150 ms (dwell), or double-tap Super | full bar row (§3.4) |
-| `dashboard` | 920×420 | click clock or media in the bar, `Super+D`, `qs ipc call pill open dashboard` | Dashboard / Media / Performance / Weather tabs |
+| `dashboard` | 920×420 | click the clock in the bar, `Super+D`, `qs ipc call pill open dashboard` (`open media`: Media tab) | Dashboard / Media / Performance / Weather tabs |
 | `launcher` | 640×470 | `Super+Space` (unchanged), `Super+V` (clipboard mode) | search + results (Phase 5) |
 | `sound` / `network` / `bluetooth` / `notifs` / `system` / `power` / `devices` / `settings` | per surface, ≤ 920×560 | click the matching bar item | re-hosted views (Phase 4/6) |
 | `hidden` | — | fullscreen on this monitor, and not peeking | nothing mapped |
@@ -218,9 +218,11 @@ Double-tapping Super toggles `peek` on the focused monitor. Peeking maps the pil
 
 ### 3.4 Bar row (hover state), left to right
 workspaces 1–5 (pill chips; active = accent fill; occupied chips show 2-letter app
-hints from toplevels) · active window title (elided) · spacer · now-playing (MPRIS) ·
+hints from toplevels) · active window title (elided) · **clock at the true centre** ·
 spacer · CPU% · RAM% · tray (`SystemTray`) · network/Bluetooth/volume icons · Caffeine
-and Game Mode chips (only when active) · update badge (Phase 6) · clock · power.
+and Game Mode chips (only when active) · update badge (Phase 6) · power.
+(Changed in 4.4 with Suraj: no now-playing text; the dashboard's Media tab and the media
+keys cover it, and the clock moved from the right end to the centre.)
 Scrolling on workspaces switches workspace. Scrolling on the volume icon changes volume.
 
 ### 3.5 Notifications and OSD
@@ -760,7 +762,37 @@ HDMI-A-1 stays readable (no inactive dimming), and everything is restored on exi
 - Writing monitor layout from the shell (use nwg-displays).
 
 ## Change log
-- 2026-09-26 - Phase 4.4 (dashboard), deployed with Suraj's approval; not yet committed.
+- 2026-09-26 - Phase 4.5 (edge drawers), deployed and committed with Suraj's approval. Backup
+  `phase4-drawers-20260926-205136` (`new-files.txt` lists the two files that were absent).
+  - `components/pill/EdgeTab.qml`: a drawer joined to the frame, drawn like the pill (one
+    path in `frameBg`, running into the frame edge, concave shoulders). Two forms: a tab out
+    of the right edge, and a drawer in the top-right corner joined to both edges.
+  - `components/pill/Drawers.qml`, hosted by `PillOverlay` (so both hide with it on
+    fullscreen, SPEC 3.1): toasts in a 392 px corner drawer (`notifDrawerWidth` 360 plus the
+    toast margins) that grows with the stack (morph timing) and closes with the last toast;
+    they are the classic `NotificationToasts` cards, so timeouts, dismiss, media art, the
+    4-toast cap and DND behave as before (it now reports its `implicitHeight`). The OSD is a
+    52x220 tab from the right edge, vertically centred, on the focused monitor only, hidden
+    2 s after the last change; it shows volume (and mute), mic mute (the `XF86AudioMicMute`
+    key; new, the classic OSD had volume only) and brightness (the System view slider).
+    Same change rules as the classic OSD: never on the first reading.
+  - Input: the toast drawer joins the pill's input mask (its close buttons work); the OSD
+    stays click-through. Motion follows `appearance.animations` / Game Mode like the pill.
+  - `shell.qml`: the classic OSD and toast windows are only created in classic mode.
+  - Deviation to note: in frame mode toasts do not show over a fullscreen window (the
+    overlay is unmapped there, SPEC 3.1); they still reach the history (Notifications
+    surface) and the badge. Classic showed them over fullscreen apps.
+  - Tests: phase4 adds toasts (corner position, 392 px, grows and settles, max 4, timeout,
+    dismiss closes the drawer, shape pixels: top and right-edge shoulders, rounded corner),
+    the OSD (52x220 at the right edge, centred, shape pixels, hides after 2 s, mic kind),
+    both hidden on fullscreen, and a static check that frame mode creates no classic
+    OSD/toast windows. Live: clean restart, no warnings, binds unchanged, a real
+    `notify-send` toast raised no errors; no `quickshell` classic windows in `hyprctl layers`.
+  - 4.4 review (before 4.5): SPEC 3.2/3.4 still described now-playing in the bar; updated.
+    Stale "now-playing" comments in `PillOverlay` and the phase4 harness corrected. The
+    4.4 commit body (`36a90e0`) still lists now-playing as a dashboard opener; it was
+    removed in the same commit (the SPEC entry below is right).
+- 2026-09-26 - Phase 4.4 (dashboard), committed `36a90e0` with Suraj's approval.
   `components/pill/surfaces/Dashboard.qml`, a 920x420 surface (clamped to the bar on small
   screens) with Dashboard / Media / Performance / Weather tabs. Opens from the clock (Dashboard
   tab), from now-playing (Media tab; the tier grows from whichever was clicked) and Super+D,

@@ -611,9 +611,9 @@ ShellRoot {
         }
     }
 
-    // ── Per-screen OSD overlay ─────────────────────────────────────────────
+    // ── Per-screen OSD overlay (classic; frame mode has the edge drawers) ──
     Variants {
-        model: Quickshell.screens
+        model: shellRoot.frameLayout ? [] : Quickshell.screens
 
         PanelWindow {
             required property ShellScreen modelData
@@ -636,9 +636,9 @@ ShellRoot {
         }
     }
 
-    // ── Per-screen notification toasts ─────────────────────────────────────
+    // ── Per-screen notification toasts (classic; frame: PillOverlay drawer) ─
     Variants {
-        model: Quickshell.screens
+        model: shellRoot.frameLayout ? [] : Quickshell.screens
 
         PanelWindow {
             required property ShellScreen modelData

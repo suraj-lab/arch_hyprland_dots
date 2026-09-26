@@ -52,9 +52,12 @@ ShellRoot {
                  rowItems: root.rowSpans(p), clock: root.clockSpan(p),
                  x: p.pillItem.x, y: p.pillItem.y, w: p.pillItem.width, h: p.pillItem.height,
                  winH: p.height, winW: p.width, hoverExpand: p.prefs.hoverExpand, animate: p.animate,
-                 collapseMs: p.collapseDelay }
+                 collapseMs: p.collapseDelay,
+                 toasts: Notifs.toastModel.count, toast: root.box(p.drawers.toastArea),
+                 osd: root.box(p.drawers.osdArea), osdKind: p.drawers.osdKind, osdShown: p.drawers.osdShown }
     }
 
+    function box(item) { return [item.x, item.y, item.width, item.height] }
     function find(item, name) {
         if (item.objectName === name) return item
         for (var i = 0; i < item.children.length; i++) {
@@ -127,6 +130,20 @@ ShellRoot {
             else p.toggle()
         }
         function pillOn(name: string): void { root.pillNames = [name] }
+        // Edge drawers (4.5): fake toasts straight into the model, the OSD by kind.
+        property int nextToast: 1000
+        function toast(count: int, timeoutMs: int): void {
+            for (var i = 0; i < count; i++)
+                Notifs.pushToast({ notifId: nextToast++, appName: "Test", summary: "Toast " + i,
+                                   body: "body", urgency: 1, toastTimeout: timeoutMs })
+        }
+        function toastDismiss(): void { Notifs.dismiss(Notifs.toastModel.get(0).notifId) }
+        function osd(kind: string): void { pills.instances[0].drawers.showOsd(kind) }
+        function drawerCapture(): void {
+            pills.instances[0].drawers.grabToImage(function(result) {
+                result.saveToFile(Quickshell.env("HOME") + "/drawers.png")
+            })
+        }
         function dashTab(name: string): void { pills.instances[0].dashboard.tab = name }
         function dashChoose(index: int): void {
             var d = pills.instances[0].dashboard; d.chosen = d.others[index]

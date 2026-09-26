@@ -84,6 +84,9 @@ QtObject {
     readonly property int surfaceWidth:      400   // re-hosted views keep their classic 380 px
     readonly property int dashboardWidth:    920   // SPEC 3.2: dashboard 920x420
     readonly property int surfacePadding:    10
+    readonly property int notifDrawerWidth:  360   // SPEC 5.2 edge drawers
+    readonly property int osdTabWidth:       52
+    readonly property int osdTabHeight:      220
 
     // Pill motion (SPEC 5.2). Zeroed when animations are off or Game Mode is on.
     readonly property int glideDuration:  240   // rest <-> hover

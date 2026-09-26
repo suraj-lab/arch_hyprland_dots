@@ -26,7 +26,7 @@ PanelWindow {
     // the pill since it opened, so leaving it may collapse it. A peek does not wait for a
     // visit: over a game the pointer rarely goes there, so it hides 800 ms after it's away.
     // surface: "" or the open view (sound / notifs / system / dashboard); it holds the
-    // pill open. "media" opens the dashboard on its Media tab (click on now-playing).
+    // pill open. "media" opens the dashboard on its Media tab (IPC).
     property bool pinned: false
     property bool hoverOpen: false
     property bool visited: false
@@ -121,6 +121,7 @@ PanelWindow {
         Region { item: base }
         Region { item: tier }
         Region { item: hotZone }
+        Region { item: drawers.toastArea }   // toasts take clicks; the OSD stays click-through
     }
 
     property alias pillItem: pill
@@ -182,8 +183,8 @@ PanelWindow {
     // gear), kept clear of the bar's rounded ends so the concave joins fit. The views keep
     // their classic content and width. All three stay loaded (as in the classic panel) so
     // switching is a morph, not a reload.
-    // The last opened surface and the element that opened it (clock or now-playing for
-    // the dashboard), kept while the tier shrinks so it closes where it opened.
+    // The last opened surface and the element that opened it, kept while the tier shrinks
+    // so it closes where it opened.
     property string lastSurface: "sound"
     property string anchorKey: "sound"
     readonly property real tierAnchor: bar.chipCenters[anchorKey]
@@ -250,6 +251,17 @@ PanelWindow {
                 onCloseRequested: root.closeSurface()
             }
         }
+    }
+
+    // Toast drawer (top-right corner) and OSD (right edge), SPEC 3.5.
+    property alias drawers: drawers
+    Drawers {
+        id: drawers
+        anchors.fill: parent
+        accent: root.accent
+        animate: root.animate
+        // No Hyprland (tests): show everywhere.
+        osdHere: !Hypr.focusedMonitor || Hypr.focusedMonitor.name === root.monitorName
     }
 
     // Bottom-edge hot strip: hover only, never eats clicks.

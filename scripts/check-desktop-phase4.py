@@ -57,6 +57,9 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
         copy = config_dir / "components" / name
         copy.write_text("\n".join(l for l in source.splitlines()
                                   if not l.strip().startswith("WlrLayershell.")) + "\n")
+    # Frame mode: no classic top bar, OSD or toast windows (the edge drawers replace them).
+    assert (ROOT / ".config/quickshell/shell.qml").read_text().count(
+        "model: shellRoot.frameLayout ? [] : Quickshell.screens") == 3, "classic-only windows in frame mode"
     fixture = config_dir / "shell.qml"
     fixture.write_text((ROOT / "scripts/tests/frame-shell.qml").read_text().replace(
         "../../.config/quickshell/", ""))
@@ -238,7 +241,7 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
             hover = wait_pill(lambda v: v["state"] == "hover" and v["w"] == 696 and v["h"] == 46,
                               "hover after the dwell")
             # Only the spacer may stretch (a nested layout, e.g. the tray, fills by default and
-            # used to push CPU/RAM into the centre, under the now-playing text).
+            # used to push CPU/RAM into the centre, under the centre text).
             stretched = [s for s in hover["rowItems"] if s[1] - s[0] > s[2] + 1]
             assert hover["rowItems"] and not stretched, hover["rowItems"]
             assert hover["x"] == 52 and hover["y"] == hover["winH"] - 10 - 46, hover
@@ -365,7 +368,7 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
                              "dashboard settled at 920x420 (clamped on a small screen)")
             assert dash["tierW"] == min(920, dash["hoverW"] - 2 * (16 + 22)) and dash["dashTab"] == "dashboard", dash
             assert dash["x"] + 38 <= dash["tierX"] and dash["tierX"] + dash["tierW"] <= dash["x"] + dash["w"] - 38, dash
-            assert ipc("pill", "media").returncode == 0       # now-playing click: Media tab, no close
+            assert ipc("pill", "media").returncode == 0       # IPC media: Media tab, no close
             wait_pill(lambda v: v["surface"] == "dashboard" and v["dashTab"] == "media", "media tab")
             assert ipc("pill", "media").returncode == 0       # same element again closes
             wait_pill(lambda v: v["surface"] == "" and v["tierH"] == 0, "media toggles closed")
@@ -375,6 +378,59 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
             wait_pill(lambda v: v["surface"] == "sound" and v["tierW"] == 400, "switch to sound")
             assert ipc("pill", "close").returncode == 0
             wait_pill(lambda v: v["state"] == "rest", "closed")
+
+            # ---- 4.5 edge drawers: toasts from the top-right corner, OSD from the right edge ----
+            def drawer_alpha(points):
+                (home / "drawers.png").unlink(missing_ok=True)
+                assert ipc("drawerCapture").returncode == 0
+                deadline = time.monotonic() + 5
+                while not (home / "drawers.png").exists() and time.monotonic() < deadline:
+                    time.sleep(0.05)
+                time.sleep(0.1)
+                fmt = " ".join(f"%[fx:p{{{px},{py}}}.a]" for px, py in points)
+                return [round(float(a)) for a in subprocess.check_output(
+                    ["magick", str(home / "drawers.png"), "-format", fmt, "info:"], text=True).split()]
+
+            def settled(key, accept, what):
+                last = None
+                deadline = time.monotonic() + 3
+                while time.monotonic() < deadline:
+                    v = pill()
+                    if accept(v) and last is not None and v[key] == last[key]:
+                        return v
+                    last = v
+                    time.sleep(0.1)
+                raise AssertionError(f"{what} never settled; last {last}")
+
+            idle = pill()
+            assert idle["toasts"] == 0 and idle["toast"][3] == 0 and idle["osd"][2] == 0, idle
+            assert ipc("toast", "2", "0").returncode == 0      # timeout 0: stays until dismissed
+            dr = settled("toast", lambda v: v["toasts"] == 2 and v["toast"][3] > 100, "toast drawer")
+            assert dr["toast"][:3] == [398, 10, 392], dr         # in the top-right corner, inside the frame
+            y1 = 10 + dr["toast"][3]
+            # Inside; beyond the top shoulder; top shoulder fillet vs hollow; rounded bottom-left
+            # corner vs inside it; right-edge shoulder fillet vs hollow; below the drawer.
+            assert drawer_alpha([(600, 30), (368, 15), (396, 12), (380, 28), (400, y1 - 2), (410, y1 - 10),
+                                 (788, y1 + 2), (775, y1 + 15), (500, y1 + 5)]) == [1, 0, 1, 0, 0, 1, 1, 0, 0]
+            assert pill()["state"] == "rest", "a toast must not expand the pill"
+            assert ipc("toast", "3", "400").returncode == 0      # at most 4 stacked; timed ones go
+            wait_pill(lambda v: v["toasts"] == 4, "four toasts at most")
+            wait_pill(lambda v: v["toasts"] == 1, "timed toasts dismissed")
+            assert ipc("toastDismiss").returncode == 0           # as the toast's close button does
+            wait_pill(lambda v: v["toasts"] == 0 and v["toast"][3] == 0, "drawer closes with the last toast")
+
+            assert ipc("osd", "volume").returncode == 0
+            od = settled("osd", lambda v: v["osd"][2] == 52, "OSD tab")
+            assert od["osd"] == [738, 190, 52, 220] and od["osdKind"] == "volume", od   # right edge, centred
+            # Inside; left of the tab; top shoulder fillet vs hollow; rounded top-left corner.
+            assert drawer_alpha([(760, 300), (730, 300), (788, 188), (775, 175), (739, 191)]) == [1, 0, 1, 0, 0]
+            wait_pill(lambda v: not v["osdShown"] and v["osd"][2] == 0, "OSD hides after 2 s", timeout=4)
+            assert ipc("osd", "mic").returncode == 0
+            wait_pill(lambda v: v["osdKind"] == "mic" and v["osd"][2] == 52, "mic OSD")
+            assert ipc("fullscreen", "true", "false").returncode == 0   # drawers hide with the pill
+            wait_pill(lambda v: not v["visible"], "hidden on fullscreen")
+            assert ipc("fullscreen", "false", "false").returncode == 0
+            wait_pill(lambda v: v["visible"] and v["state"] == "rest", "back from fullscreen")
 
             # Collapse delay setting: global, per monitor, invalid values fall back.
             configure({"appearance": {"layout": "frame"}, "pill": {"collapseDelayMs": 1500}},
@@ -454,7 +510,10 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
             print("      rest-only click-to-expand, collapse-delay setting, animations off (real pointer on Xvfb)")
             print("PASS: surfaces: open/switch/re-open toggle, Escape, stays open, badge clears on Notifications only,")
             print("      fullscreen closes them, tier over its chip, tier shape pixels (rounded corners, concave joins)")
-            print("PASS: dashboard: bar widens before the tier rises, 920x420 clamped, clock/now-playing tabs, toggle, switch")
+            print("PASS: dashboard: bar widens before the tier rises, 920x420 clamped, clock/media tabs, toggle, switch")
+            print("PASS: edge drawers: toasts grow from the top-right corner (392 px, max 4, timeout, dismiss")
+            print("      closes it, shape pixels), OSD 52x220 from the right edge (pixels, hides after 2 s, mic),")
+            print("      both hide on fullscreen; classic OSD/toast windows only in classic (static)")
             print("PASS: layers, per-surface namespaces, keyboard focus only for an open surface (static; Xvfb has no layer shell)")
             print("NOT TESTED: live Wayland exclusive zones, click-through, direct scanout or VRR")
         except Exception:
