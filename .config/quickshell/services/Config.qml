@@ -41,7 +41,8 @@ QtObject {
 
     readonly property var appearance: {
         var values = settingsData.appearance || {}
-        return { layout: values.layout === "frame" ? "frame" : "classic",
+        // Frame is the default; only an explicit "classic" brings back the top bar.
+        return { layout: values.layout === "classic" ? "classic" : "frame",
                  animations: values.animations !== false }
     }
 

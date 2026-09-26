@@ -65,7 +65,8 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
         "../../.config/quickshell/", ""))
     settings = config_dir / "settings.json"
     # Regression: settings present at startup used to be ignored until the file changed.
-    settings.write_text(json.dumps({"appearance": {"layout": "frame"}}))
+    # Classic, because frame is the default and would pass either way.
+    settings.write_text(json.dumps({"appearance": {"layout": "classic"}}))
     env = dict(os.environ, HOME=tmp, XDG_CONFIG_HOME=str(home / ".config"),
                XDG_CACHE_HOME=str(home / ".cache"), XDG_DATA_HOME=str(home / ".local/share"),
                XDG_STATE_HOME=str(home / ".state"), XDG_RUNTIME_DIR=str(runtime),
@@ -130,8 +131,9 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
                     assert reserve["anchors"] == {e: e != opposite[edge] for e in opposite}, reserve
 
             empty = lambda v: v["layout"] == "classic" and v["frames"] == [] and v["pills"] == []
-            wait_state(lambda v: v["layout"] == "frame" and len(v["frames"]) == 2, "frame read at startup")
-            configure({}, empty, "classic by default: no extra windows")
+            framed = lambda v: v["layout"] == "frame" and len(v["frames"]) >= 1 and len(v["pills"]) == 1
+            wait_state(empty, "classic read at startup: no frame windows")
+            configure({}, framed, "frame by default")
             state = configure({"appearance": {"layout": "frame"}},
                               lambda v: len(v["frames"]) == 2 and all(f["visible"] for f in v["frames"]),
                               "two frames in frame mode")
@@ -450,8 +452,9 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
             assert ipc("pill", "close").returncode == 0
 
             for invalid in ("invalid", True, 42, None):
-                configure({"appearance": {"layout": invalid}}, empty, "invalid layout is classic")
-            configure({}, empty, "removed sections return to classic")
+                configure({"appearance": {"layout": invalid}}, framed, "invalid layout is frame (the default)")
+            configure({}, framed, "removed sections return to frame")
+            configure({"appearance": {"layout": "classic"}}, empty, "classic only when asked for")
             log.flush()
             # ---- Media players: a second run on a private bus with fake Spotify + Firefox ----
             # (no service activation: scripts/tests/private-bus.conf; the main run has no bus)

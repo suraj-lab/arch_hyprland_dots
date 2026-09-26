@@ -559,6 +559,8 @@ use them during the migration.
 ### Phase 4 — Frame + pill (the visual change)
 Build this behind a switch: `Config.appearance.layout = "frame" | "classic"`, default
 `"classic"` until Phase 4 passes, then flip it. Keep `classic` working until Phase 8.
+(Flipped 2026-09-26 at Suraj's request, with the live fullscreen and Gaming Mode checks
+still to run; see the change log.)
 
 **4.1 Frame + reserves** (`components/frame/Frame.qml`, `Reserve.qml`)
 - Four reserve windows plus one click-through frame window per screen, as in §3.1. The
@@ -762,6 +764,19 @@ HDMI-A-1 stays readable (no inactive dimming), and everything is restored on exi
 - Writing monitor layout from the shell (use nwg-displays).
 
 ## Change log
+- 2026-09-26 - Frame is the default layout (Suraj). `Config.appearance.layout` is "classic"
+  only when set to exactly that; missing or invalid values now mean frame. Fresh installs
+  and the repo's `settings.json` (no `appearance` section) get the frame; Suraj's live
+  settings already said frame, so nothing changed on screen. Deployed, backup
+  `phase4-frame-default-20260926-210334`. Tests: phase4 now starts from an explicit classic
+  file (frame would pass either way, hiding the startup-read regression), then checks that
+  the default, invalid values and removed sections give frame, and that classic still
+  works when asked for.
+  Phase 4 acceptance still open, deferred by Suraj to run himself later:
+  - a fullscreen game or `mpv --fs`: `hyprctl layers` shows no Quickshell surface on that
+    monitor, and VRR/tearing still engage (MangoHud / `hyprctl monitors`);
+  - the Gaming Mode round-trip (§7.3);
+  - dock audio after a suspend (earlier open item).
 - 2026-09-26 - Phase 4.5 (edge drawers), deployed and committed with Suraj's approval. Backup
   `phase4-drawers-20260926-205136` (`new-files.txt` lists the two files that were absent).
   - `components/pill/EdgeTab.qml`: a drawer joined to the frame, drawn like the pill (one
