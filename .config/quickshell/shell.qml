@@ -90,11 +90,15 @@ ShellRoot {
 
     // Phase 4.1 preview: no extra windows in classic mode. Keep the working bar
     // below until the pill takes over its controls and Caffeine surface in 4.2/4.3.
+    // A bool only changes on a real switch; Config rebuilds its objects on every edit.
+    readonly property bool frameLayout: Config.appearance.layout === "frame"
     Variants {
-        model: Config.appearance.layout === "frame" ? Quickshell.screens : []
+        model: shellRoot.frameLayout ? Quickshell.screens : []
         Frame {
             required property ShellScreen modelData
             screen: modelData
+            reserveTop: false   // the classic bar below already reserves the top edge
+            pillShown: false
         }
     }
 
@@ -111,8 +115,10 @@ ShellRoot {
             Behavior on screenAccent { ColorAnimation { duration: 500 } }
 
             anchors { top: true; left: true; right: true }
+            // In frame mode the bar floats inside the frame with its usual gap. The side
+            // reserves already push it in; only the top (no reserve beside the bar) needs this.
             margins {
-                top:   Theme.barMarginTop
+                top:   Theme.barMarginTop + (shellRoot.frameLayout ? Theme.frameThickness : 0)
                 left:  Theme.barMarginSide
                 right: Theme.barMarginSide
             }

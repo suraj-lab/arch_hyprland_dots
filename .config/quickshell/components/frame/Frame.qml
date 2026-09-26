@@ -10,8 +10,12 @@ PanelWindow {
     id: root
     property string monitorName: screen ? screen.name : ""
     property bool fullscreen: Hypr.isFullscreen(monitorName)
-    readonly property int bottomReserve: Theme.frameThickness
-        + (Config.pillFor(monitorName).restStyle === "handle"
+    // Spec target is all true. shell.qml turns both off while the classic bar still owns
+    // the top edge and no pill exists yet (4.2), so the frame adds only its thickness.
+    property bool reserveTop: true
+    property bool pillShown: true
+    readonly property int bottomReserve: Theme.frameThickness + (!pillShown ? 0
+        : Config.pillFor(monitorName).restStyle === "handle"
             ? Theme.pillRestHandleHeight : Theme.pillRestTabHeight)
 
     property alias outline: outline
@@ -24,7 +28,7 @@ PanelWindow {
     WlrLayershell.namespace: "quickshell-frame"
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
-    Reserve { screen: root.screen; edge: "top"; visible: root.visible }
+    Reserve { screen: root.screen; edge: "top"; visible: root.visible && root.reserveTop }
     Reserve { screen: root.screen; edge: "left"; visible: root.visible }
     Reserve { screen: root.screen; edge: "right"; visible: root.visible }
     Reserve { screen: root.screen; edge: "bottom"; thickness: root.bottomReserve; visible: root.visible }

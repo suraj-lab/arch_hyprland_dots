@@ -753,6 +753,23 @@ HDMI-A-1 stays readable (no inactive dimming), and everything is restored on exi
 - Writing monitor layout from the shell (use nwg-displays).
 
 ## Change log
+- 2026-09-26 - Fixes found while previewing frame mode live, deployed; not yet committed.
+  1. Config ignored settings.json at startup (since Phase 3 slice 1): the file was read, but
+     JsonAdapter's own `({})` defaults overwrote it, so values applied only after the file
+     next changed. Unnoticed because Suraj's values equal the defaults. Config now parses the
+     file text directly and synchronously (no JsonAdapter): missing file = defaults, malformed
+     save keeps the last good values (now logged), deleted sections fall back to defaults.
+     Regression: phase4 check starts with a settings file present.
+  2. Side effect guarded: Config now rebuilds its objects on every edit, which re-triggered
+     DDC reads (and cleared errors) and could rebuild frame windows. Brightness reacts to a
+     string key of the bus map; shell.qml uses a `frameLayout` bool. Phase4 asserts that an
+     unrelated edit does not rebuild frames.
+  3. Frame preview beside the classic bar: no top reserve (the bar already reserves the
+     top) and no empty pill space at the bottom until 4.2 (bottom reserve = 10 px). The bar
+     moves down by the frame thickness; side reserves already inset it horizontally.
+  Live: reserved [l,t,r,b] = [10, 50, 10, 10] on both monitors; bar 22 px from the sides and
+  18 px from the top. Backups `phase4-frame-fix-20260926-093416`,
+  `config-startup-fix-20260926-094059`. No runtime warnings; keybinds unchanged.
 - 2026-09-26 - Phase 4.1 (frame + reserves), deployed (classic default) with Suraj's approval.
   Gaming Mode round-trip deferred to final acceptance at Suraj's request (still required).
   `Config.appearance.layout` = "classic" (default; any invalid value) | "frame". Classic

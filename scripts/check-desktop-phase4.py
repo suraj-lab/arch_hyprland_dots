@@ -40,6 +40,8 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
     fixture.write_text((ROOT / "scripts/tests/frame-shell.qml").read_text().replace(
         "../../.config/quickshell/", ""))
     settings = config_dir / "settings.json"
+    # Regression: settings present at startup used to be ignored until the file changed.
+    settings.write_text(json.dumps({"appearance": {"layout": "frame"}}))
     env = dict(os.environ, HOME=tmp, XDG_CONFIG_HOME=str(home / ".config"),
                XDG_CACHE_HOME=str(home / ".cache"), XDG_DATA_HOME=str(home / ".local/share"),
                XDG_STATE_HOME=str(home / ".state"), XDG_RUNTIME_DIR=str(runtime),
@@ -90,25 +92,32 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
                 replacement.replace(settings)
                 return wait_state(accept, what)
 
-            def check_frame(frame, visible, bottom):
+            def check_frame(frame, visible, bottom, top=True):
                 assert frame["visible"] == visible and frame["bottom"] == bottom, frame
                 assert frame["maskEmpty"] and frame["ignoreReserves"] and not frame["focus"], frame
                 reserves = {r["edge"]: r for r in frame["reserves"]}
                 assert set(reserves) == {"top", "bottom", "left", "right"}, reserves
                 opposite = {"top": "bottom", "bottom": "top", "left": "right", "right": "left"}
                 for edge, reserve in reserves.items():
-                    assert reserve["visible"] == visible, reserve
+                    assert reserve["visible"] == (visible and (top or edge != "top")), reserve
                     assert reserve["zone"] == (bottom if edge == "bottom" else 10), reserve
                     assert reserve["maskEmpty"] and not reserve["focus"], reserve
                     assert reserve["anchors"] == {e: e != opposite[edge] for e in opposite}, reserve
 
-            empty = lambda v: v == {"layout": "classic", "frames": []}
-            wait_state(empty, "classic by default: no extra windows")
+            empty = lambda v: v["layout"] == "classic" and v["frames"] == []
+            wait_state(lambda v: v["layout"] == "frame" and len(v["frames"]) == 2, "frame read at startup")
+            configure({}, empty, "classic by default: no extra windows")
             state = configure({"appearance": {"layout": "frame"}},
                               lambda v: len(v["frames"]) == 2 and all(f["visible"] for f in v["frames"]),
                               "two frames in frame mode")
             for frame in state["frames"]:
                 check_frame(frame, True, 40)
+            # Unrelated edits must not rebuild the frame windows.
+            builds = state["builds"]
+            configure({"appearance": {"layout": "frame"}, "idle": {"lockSec": 123}},
+                      lambda v: len(v["frames"]) == 2, "unrelated edit")
+            time.sleep(0.5)
+            assert wait_state(lambda v: True, "status")["builds"] == builds, "frames rebuilt by unrelated edit"
             # Actual rendering on the private display: opaque edges, transparent hole,
             # rounded inner corners. Never capture the user's desktop.
             time.sleep(0.2)
@@ -152,6 +161,13 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
                               lambda v: all(f["bottom"] == 40 for f in v["frames"]), "invalid rest-style fallback")
             for frame in state["frames"]:
                 check_frame(frame, True, 40)
+            # Preview beside the classic bar: no top reserve, bottom is frame thickness only.
+            assert ipc("classic", "true").returncode == 0
+            state = wait_state(lambda v: all(f["bottom"] == 10 for f in v["frames"]), "classic-bar preview")
+            for frame in state["frames"]:
+                check_frame(frame, True, 10, top=False)
+            assert ipc("classic", "false").returncode == 0
+            wait_state(lambda v: all(f["bottom"] == 40 for f in v["frames"]), "full frame restored")
             for invalid in ("invalid", True, 42, None):
                 configure({"appearance": {"layout": invalid}}, empty, "invalid layout is classic")
             configure({}, empty, "removed sections return to classic")
@@ -159,7 +175,9 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
             errors = [line for line in (home / "shell.log").read_text().splitlines()
                       if any(word in line for word in (" ERROR", "TypeError:", "ReferenceError:", "Binding loop"))]
             assert not errors, "\n".join(errors)
+            print("PASS: settings file present at startup is applied immediately; unrelated edits keep frames")
             print("PASS: classic/frame switch, fixed reserves, empty masks, per-monitor fullscreen and hotplug")
+            print("PASS: classic-bar preview (no top reserve, no pill space)")
             print("PASS: rest-style override/reset, invalid settings, frame pixels on private Xvfb")
             print("PASS: Top layer, per-surface namespaces and no keyboard focus (static; Xvfb has no layer shell)")
             print("NOT TESTED: live Wayland exclusive zones, click-through, direct scanout or VRR")

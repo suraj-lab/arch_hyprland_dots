@@ -21,7 +21,9 @@ Singleton {
     property string error: ""
     property int pendingValue: -1
     property bool readRequested: false
-    onBusMapChanged: if (detectionComplete) read()
+    // Config rebuilds its objects on every settings.json change; only re-read on a real change.
+    readonly property string busKey: JSON.stringify(busMap)
+    onBusKeyChanged: if (detectionComplete) read()
 
     // `ddcutil detect --brief` lists each display's bus and connector across lines.
     function parseDetect(text) {

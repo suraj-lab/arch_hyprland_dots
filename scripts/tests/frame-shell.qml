@@ -10,16 +10,22 @@ ShellRoot {
     id: root
     property bool mainFullscreen: false
     property bool secondaryFullscreen: false
+    property bool classicBar: false
 
     property var monitorNames: ["DP-2", "HDMI-A-1"]
+    readonly property bool frameLayout: Config.appearance.layout === "frame"   // same guard as shell.qml
+    property int frameBuilds: 0
     Variants {
         id: frames
-        model: Config.appearance.layout === "frame" ? root.monitorNames : []
+        model: root.frameLayout ? root.monitorNames : []
         Frame {
             required property string modelData
+            Component.onCompleted: root.frameBuilds++
             screen: Quickshell.screens[0]
             monitorName: modelData
             fullscreen: modelData === "DP-2" ? root.mainFullscreen : root.secondaryFullscreen
+            reserveTop: !root.classicBar
+            pillShown: !root.classicBar
         }
     }
 
@@ -48,6 +54,7 @@ ShellRoot {
             root.mainFullscreen = main
             root.secondaryFullscreen = secondary
         }
+        function classic(enabled: bool): void { root.classicBar = enabled }
         function secondary(enabled: bool): void {
             root.monitorNames = enabled ? ["DP-2", "HDMI-A-1"] : ["DP-2"]
         }
@@ -57,7 +64,7 @@ ShellRoot {
             })
         }
         function status(): string {
-            return JSON.stringify({ layout: Config.appearance.layout,
+            return JSON.stringify({ layout: Config.appearance.layout, builds: root.frameBuilds,
                 frames: frames.instances.map(function(frame) { return root.frameState(frame) }) })
         }
     }
