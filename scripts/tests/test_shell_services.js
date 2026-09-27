@@ -322,3 +322,28 @@ assert.ok(Math.max(...rows) - Math.min(...rows) <= 2, rows);
 assert.deepEqual(Array.from(live).map(c => Array.from(c).map(g => g.name)),
     [['Screenshot', 'Workspaces'], ['Apps', 'Windows'], ['Media', 'Shell', 'Session']]);   // original order kept
 console.log('PASS: Cheatsheet modmask decoding, key labels, grouping, filter, balanced columns');
+
+// Updates (SPEC 6.4): per-tool exit codes, item names, absent tools, the update command.
+const upd = load('services/Updates.qml', ['parse', 'updateCommand']);
+const plain = o => JSON.parse(JSON.stringify(o));
+const all = upd.parse('@pacman\nbash 5.3.15-2 -> 5.3.20-2\ngspell 1.14.4-1.1 -> 1.14.5-1.1\n@pacman-exit 0\n'
+    + '@flatpak\ncom.usebottles.bottles\norg.freedesktop.Platform.Compat.i386\n\n@flatpak-exit 0\n'
+    + '@aur\nani-cli 5.0-1 -> 5.1-1\nlianli-linux-git 0.8.9.r0.g515ee32-1 -> latest-commit\n@aur-exit 0\n');
+assert.deepEqual(plain(all), {
+    pacman: {count: 2, items: ['bash', 'gspell'], ok: true, present: true},
+    flatpak: {count: 2, items: ['com.usebottles.bottles', 'org.freedesktop.Platform.Compat.i386'], ok: true, present: true},
+    aur: {count: 2, items: ['ani-cli', 'lianli-linux-git'], ok: true, present: true}});
+// Nothing to do: checkupdates exits 2, paru -Qua exits 1 with no output.
+assert.deepEqual(plain(upd.parse('@pacman\n@pacman-exit 2\n@flatpak\n@flatpak-exit 0\n@aur\n@aur-exit 1\n')), {
+    pacman: {count: 0, items: [], ok: true, present: true}, flatpak: {count: 0, items: [], ok: true, present: true},
+    aur: {count: 0, items: [], ok: true, present: true}});
+// Failures (offline: checkupdates 1; timeout 124) are unknown, not zero; tools absent (127).
+assert.deepEqual(plain(upd.parse('@pacman\n@pacman-exit 1\n@flatpak\n@flatpak-exit 127\n@aur\npartial -> x\n@aur-exit 124\n')), {
+    pacman: {count: -1, items: [], ok: false, present: true}, flatpak: {count: -1, items: [], ok: false, present: false},
+    aur: {count: -1, items: [], ok: false, present: true}});
+assert.deepEqual(plain(upd.parse('')), {});                        // no output at all: nothing changes
+assert.equal(upd.updateCommand(true, 0),
+    "paru; qs ipc call updates check >/dev/null 2>&1; printf '\\nDone. Press Enter to close. '; read _");
+assert.ok(upd.updateCommand(true, 3).startsWith('paru; flatpak update; qs ipc call updates check'));
+assert.ok(upd.updateCommand(false, 0).startsWith('sudo pacman -Syu; qs ipc call updates check'));
+console.log('PASS: Updates parsing (exit codes per tool, absent tools, failures stay unknown) and update command');

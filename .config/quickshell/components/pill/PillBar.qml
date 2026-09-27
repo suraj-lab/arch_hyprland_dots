@@ -25,7 +25,8 @@ Item {
         media: root.width / 2,
         launcher: root.width / 2,
         clipboard: root.width / 2,
-        cheatsheet: root.width / 2
+        cheatsheet: root.width / 2,
+        updates: row.x + updChip.x + updChip.width / 2
     })
     signal powerRequested()
 
@@ -106,6 +107,14 @@ Item {
             onChipClicked: root.surfaceRequested("notifs")
         }
         ControlCenter { id: ccChip; barAccent: root.accent; onChipClicked: root.surfaceRequested("system") }
+        BarText {   // update badge (SPEC 6.4): only when something is waiting
+            id: updChip
+            objectName: "updateBadge"
+            visible: Updates.total > 0
+            color: root.accent
+            text: "\uf0ed " + Updates.total
+            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.surfaceRequested("updates") }
+        }
         PowerMenu { onClicked: root.powerRequested() }
     }
 }

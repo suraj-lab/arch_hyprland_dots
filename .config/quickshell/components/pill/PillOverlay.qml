@@ -33,7 +33,7 @@ PanelWindow {
     property bool hoverOpen: false
     property bool visited: false
     property string surface: ""
-    readonly property var surfaces: ["sound", "notifs", "system", "dashboard", "media", "launcher", "clipboard", "cheatsheet"]
+    readonly property var surfaces: ["sound", "notifs", "system", "dashboard", "media", "launcher", "clipboard", "cheatsheet", "updates"]
     readonly property bool edgeHovered: hotZone.containsMouse
     readonly property bool pillHovered: pillHover.hovered || baseHover.hovered || tierHover.hovered
     readonly property bool peeking: fullscreen && pinned
@@ -114,7 +114,7 @@ PanelWindow {
     readonly property var activeView: surface === "sound" ? soundView
         : surface === "notifs" ? notifsView : surface === "system" ? systemView
         : surface === "dashboard" ? dashView : surface === "launcher" ? launcherView
-        : surface === "cheatsheet" ? cheatsheetView : null
+        : surface === "cheatsheet" ? cheatsheetView : surface === "updates" ? updatesView : null
     // The tier rises only once the bar is fully wide (opening from the rest tab), so it
     // never slides with a growing bar; closing mirrors this (see `expanded`).
     readonly property int tierTarget: activeView && pill.width >= hoverWidth
@@ -141,6 +141,7 @@ PanelWindow {
     property alias dashboard: dashView
     property alias launcher: launcherView
     property alias cheatsheet: cheatsheetView
+    property alias updates: updatesView
     property alias tierItem: tier
     property alias shape: shape
     PillShape {
@@ -269,6 +270,13 @@ PanelWindow {
                 accent: root.accent
                 active: root.surface === "cheatsheet"
                 visible: root.surface === "cheatsheet"
+                onCloseRequested: root.closeSurface()
+            }
+            UpdatesPanel {
+                id: updatesView
+                anchors { left: parent.left; right: parent.right; top: parent.top }
+                accent: root.accent
+                visible: root.surface === "updates"
                 onCloseRequested: root.closeSurface()
             }
             SystemView {

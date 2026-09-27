@@ -60,7 +60,7 @@ ShellRoot {
                  launcher: { mode: p.launcher.mode, query: p.launcher.query, count: p.launcher.count,
                              current: p.launcher.current, armed: p.launcher.armed,
                              first: p.launcher.rows.length ? (p.launcher.rows[0].text || p.launcher.rows[0].title) : "" },
-                 lastAction: root.lastAction,
+                 lastAction: root.lastAction, updateBadge: root.badge(p),
                  sheet: { query: p.cheatsheet.query,
                           groups: p.cheatsheet.groups.map(function(g) { return g.name }),
                           shown: p.cheatsheet.shown.map(function(g) { return g.name }),
@@ -68,6 +68,7 @@ ShellRoot {
                           other: p.cheatsheet.groups.filter(function(g) { return g.name === "Other" }).length } }
     }
 
+    function badge(p) { var t = find(p.pillItem, "updateBadge"); return t && t.visible ? t.text : "" }
     function box(item) { return [item.x, item.y, item.width, item.height] }
     function find(item, name) {
         if (item.objectName === name) return item

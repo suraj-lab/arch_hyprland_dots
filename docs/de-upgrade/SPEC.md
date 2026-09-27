@@ -764,6 +764,32 @@ HDMI-A-1 stays readable (no inactive dimming), and everything is restored on exi
 - Writing monitor layout from the shell (use nwg-displays).
 
 ## Change log
+- 2026-09-26 - Phase 6.4 (update notifier), deployed and committed with Suraj's approval (after a real
+  upgrade through the Update button, the recheck cleared the official and Flatpak counts). Backup
+  `phase6-updates-20260926-234859` (`new-files.txt`).
+  - `services/Updates.qml` singleton: one read-only check 90 s after start, hourly, and on
+    demand (`qs ipc call updates check`; `updates status`): `checkupdates`, `flatpak
+    remote-ls --updates --columns=application`, `paru -Qua` when paru exists, each under a
+    120 s timeout. Exit codes per tool (checkupdates 2 = none, paru -Qua 1 with no output =
+    none); a failed source (offline, timeout) is "unknown", not zero, and keeps its last
+    good count. Verified live: checkupdates used its own database (`pacman -Qu` on the
+    real one still said 0 afterwards).
+  - Bar: an update badge (cloud icon + total) before the power button, only when something
+    is waiting; it opens the small `updates` surface: total, when it last checked, counts
+    and the first package names per source, "Check now" and "Update".
+  - Update opens a floating ghostty running `paru` (or `sudo pacman -Syu` without paru),
+    then `flatpak update` only when Flatpak has updates (the SPEC named only paru; paru does
+    not update Flatpaks), then `qs ipc call updates check` so the badge clears. Nothing
+    upgrades except that button.
+  - First live check: 12 official, 18 AUR, 13 Flatpak. The AUR count includes -git
+    packages paru reports as "latest-commit" (its devel check), and Flatpak counts runtimes.
+  - Found by the new integration test: a JavaScript automatic-semicolon trap (a line
+    starting with `[` after `var r = root.parse(text)` became an index expression); fixed,
+    and no other code has that shape.
+  - Tests: unit tests for parsing (each tool's exit codes, absent tools, failures unknown,
+    empty output) and the update command; phase4 stubs the three tools (logging every call)
+    and checks counts and names, the badge, the surface, and that only the three read-only
+    commands ever ran.
 - 2026-09-26 - Phase 5.2 (keybind cheatsheet), deployed and committed with Suraj's approval. Backup
   `phase5-cheatsheet-20260926-222209` (`new-files.txt`; `files/hypr/binds.lua` and
   `binds.lua.pre-labels`).

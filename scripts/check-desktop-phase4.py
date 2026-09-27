@@ -35,6 +35,12 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
     (home / "bin").mkdir()
     for name, body in {"gamemoded": "printf 'gamemode is inactive\\n'", "pgrep": "exit 1",
                        "pkill": "exit 1", "systemctl": "exit 1",
+                       # Updates (6.4): fake sources; every call is logged to prove they are read-only.
+                       "checkupdates": 'echo "checkupdates $*" >> "$HOME/update-calls"; '
+                                       'printf "bash 5.3.15-2 -> 5.3.20-2\\ngspell 1.14.4 -> 1.14.5\\n"',
+                       "flatpak": 'echo "flatpak $*" >> "$HOME/update-calls"; [ "$1" = remote-ls ] && echo com.example.App',
+                       "paru": 'echo "paru $*" >> "$HOME/update-calls"; '
+                               'if [ "$1" = -Qua ]; then echo "ani-cli 5.0-1 -> 5.1-1"; exit 0; fi; exit 1',
                        # Cheatsheet (5.2) reads `hyprctl binds -j`; nothing else may reach Hyprland.
                        "hyprctl": 'if [ "$*" = "binds -j" ]; then cat "$HOME/binds.json"; else exit 1; fi',
                        "hyprlock": "exit 1", "pactl": "exit 0", "curl": "exit 1",
@@ -569,6 +575,30 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
             assert ipc("pill", "cheatsheet").returncode == 0      # Super+/ again closes
             wait_pill(lambda v: v["surface"] == "" and v["tierH"] == 0, "Super+/ toggles")
 
+            # ---- 6.4 updates: read-only checks, badge, surface; nothing upgrades on its own ----
+            def updates(method):
+                return subprocess.run(["qs", "ipc", "--path", str(fixture), "call", "updates", method], env=env,
+                                      capture_output=True, text=True, timeout=5)
+            assert updates("check").returncode == 0
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline:
+                st = json.loads(updates("status").stdout)
+                if not st["checking"] and st["total"] == 4:
+                    break
+                time.sleep(0.1)
+            assert st["total"] == 4 and st["lastChecked"] > 0, st
+            assert (st["pacman"]["items"], st["flatpak"]["items"], st["aur"]["items"]) == (
+                ["bash", "gspell"], ["com.example.App"], ["ani-cli"]), st
+            assert ipc("pill", "open").returncode == 0
+            wait_pill(lambda v: v["updateBadge"] == "\uf0ed 4", "update badge in the bar")
+            assert ipc("pill", "updates").returncode == 0      # click on the badge
+            up = wait_pill(lambda v: v["surface"] == "updates" and v["tierH"] == v["tierTarget"] > 0, "updates surface")
+            assert up["tierW"] == 400, up
+            assert ipc("pill", "close").returncode == 0
+            wait_pill(lambda v: v["state"] == "rest", "closed")
+            calls = set((home / "update-calls").read_text().splitlines())
+            assert calls == {"checkupdates ", "flatpak remote-ls --updates --columns=application", "paru -Qua"}, calls
+
             # Collapse delay setting: global, per monitor, invalid values fall back.
             configure({"appearance": {"layout": "frame"}, "pill": {"collapseDelayMs": 1500}},
                       lambda v: v["pills"] and v["pills"][0]["collapseMs"] == 1500, "global delay")
@@ -657,6 +687,8 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
             print("      image thumbnail, Delete, filter, copy), Super+V switch/toggle, Escape")
             print("PASS: cheatsheet (5.2): hyprctl binds -j grouped by prefix, 920x520 clamped, filter by")
             print("      keyboard, Escape, reopens unfiltered, Super+/ toggles")
+            print("PASS: updates (6.4): checkupdates + flatpak + paru -Qua counted, badge in the bar, surface;")
+            print("      only those three read-only commands ever ran")
             print("PASS: layers, per-surface namespaces, keyboard focus only for an open surface (static; Xvfb has no layer shell)")
             print("NOT TESTED: live Wayland exclusive zones, click-through, direct scanout or VRR")
         except Exception:
