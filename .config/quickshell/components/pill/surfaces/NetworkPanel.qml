@@ -136,6 +136,7 @@ Item {
         }
 
         Flickable {
+            id: listFlick
             Layout.fillWidth: true
             Layout.preferredHeight: Math.min(contentHeight, 6 * 46)
             visible: Net.networks.length > 0
@@ -144,7 +145,7 @@ Item {
             boundsBehavior: Flickable.StopAtBounds
             ColumnLayout {
                 id: list
-                width: parent.width
+                width: listFlick.width
                 spacing: 2
                 Repeater {
                     model: Net.networks

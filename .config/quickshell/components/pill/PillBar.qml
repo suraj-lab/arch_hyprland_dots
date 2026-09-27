@@ -26,6 +26,7 @@ Item {
         launcher: root.width / 2,
         clipboard: root.width / 2,
         cheatsheet: root.width / 2,
+        settings: root.width / 2,
         updates: row.x + updChip.x + updChip.width / 2,
         network: row.x + wifiChip.x + wifiChip.width / 2,
         devices: row.x + devChip.x + devChip.width / 2,

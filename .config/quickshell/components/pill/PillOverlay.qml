@@ -33,7 +33,7 @@ PanelWindow {
     property bool hoverOpen: false
     property bool visited: false
     property string surface: ""
-    readonly property var surfaces: ["sound", "notifs", "system", "dashboard", "media", "launcher", "clipboard", "cheatsheet", "updates", "network", "bluetooth", "devices"]
+    readonly property var surfaces: ["sound", "notifs", "system", "dashboard", "media", "launcher", "clipboard", "cheatsheet", "updates", "network", "bluetooth", "devices", "settings"]
     readonly property bool edgeHovered: hotZone.containsMouse
     readonly property bool pillHovered: pillHover.hovered || baseHover.hovered || tierHover.hovered
     readonly property bool peeking: fullscreen && pinned
@@ -116,7 +116,8 @@ PanelWindow {
         : surface === "dashboard" ? dashView : surface === "launcher" ? launcherView
         : surface === "cheatsheet" ? cheatsheetView : surface === "updates" ? updatesView
         : surface === "network" ? networkView : surface === "bluetooth" ? bluetoothView
-        : surface === "devices" ? devicesView : null
+        : surface === "devices" ? devicesView
+        : surface === "settings" ? settingsView : null
     // The tier rises only once the bar is fully wide (opening from the rest tab), so it
     // never slides with a growing bar; closing mirrors this (see `expanded`).
     readonly property int tierTarget: activeView && pill.width >= hoverWidth
@@ -137,6 +138,7 @@ PanelWindow {
         Region { item: base }
         Region { item: tier }
         Region { item: hotZone }
+        Region { item: restHit }
         Region { item: drawers.toastArea }   // toasts take clicks; the OSD stays click-through
     }
 
@@ -148,6 +150,7 @@ PanelWindow {
     property alias network: networkView
     property alias bluetooth: bluetoothView
     property alias devices: devicesView
+    property alias settings: settingsView
     property alias tierItem: tier
     property alias shape: shape
     PillShape {
@@ -180,14 +183,6 @@ PanelWindow {
 
         HoverHandler { id: pillHover }
 
-        // Click the rest tab to expand (the only way on rest-only monitors, besides Super).
-        MouseArea {
-            anchors.fill: parent
-            enabled: root.pillState === "rest"
-            cursorShape: Qt.PointingHandCursor
-            onClicked: root.open()
-        }
-
         PillBar {
             id: bar
             anchors.fill: parent
@@ -214,7 +209,8 @@ PanelWindow {
     FocusScope {
         id: tier
         objectName: "tier"
-        width: Math.min(root.lastSurface === "dashboard" || root.lastSurface === "cheatsheet" ? Theme.dashboardWidth
+        width: Math.min(root.lastSurface === "dashboard" || root.lastSurface === "cheatsheet"
+                        || root.lastSurface === "settings" ? Theme.dashboardWidth
                         : root.lastSurface === "launcher" ? Theme.launcherSurfaceWidth : Theme.surfaceWidth,
                         root.hoverWidth - 2 * root.tierInset)
         height: root.tierTarget
@@ -308,6 +304,16 @@ PanelWindow {
                 visible: root.surface === "devices"
                 onCloseRequested: root.closeSurface()
             }
+            SettingsPanel {
+                id: settingsView
+                anchors { left: parent.left; right: parent.right; top: parent.top }
+                accent: root.accent
+                active: root.surface === "settings"
+                visible: root.surface === "settings"
+                onCloseRequested: root.closeSurface()
+                onActionRequested: id => root.runAction(id)
+                onSurfaceRequested: name => root.openSurface(name, false)
+            }
             SystemView {
                 id: systemView
                 surfaceLinks: true
@@ -334,6 +340,21 @@ PanelWindow {
         animate: root.animate
         // No Hyprland (tests): show everywhere.
         osdHere: !Hypr.focusedMonitor || Hypr.focusedMonitor.name === root.monitorName
+    }
+
+    // Click the rest shape to expand (the only way on rest-only monitors, besides Super).
+    // The target is the shape plus a margin, down to the screen edge: the 6 px handle alone
+    // (floating above the frame band) was nearly impossible to hit. Zero-sized otherwise.
+    Item {
+        id: restHit
+        objectName: "restHit"
+        readonly property bool on: root.pillState === "rest"
+        x: pill.x - 24
+        y: pill.y - 10
+        width: on ? pill.width + 48 : 0
+        height: on ? root.height - y : 0
+        // A click here is a visit: leaving collapses it again, as after clicking the tab itself.
+        MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: { root.open(); root.visited = true } }
     }
 
     // Bottom-edge hot strip: hover only, never eats clicks.

@@ -92,7 +92,7 @@ ShellRoot {
                  wifiTile: root.center(p, "wifiTile"), btTile: root.center(p, "btTile"),
                  volChip: root.center(p, "volChip", p.pillItem),
                  caffeineChip: root.center(p, "caffeineChip", p.pillItem),
-                 wifiSpinning: root.spinning(p, "wifiRescan"),
+                 wifiSpinning: root.spinning(p, "wifiRescan"), handle: p.handle,
                  devChip: root.center(p, "devicesChip", p.pillItem),
                  openBtn: root.center(p, "open:/dev/sdb1"), ejectBtn: root.center(p, "eject:/dev/sdb"),
                  sheet: { query: p.cheatsheet.query,
@@ -230,6 +230,14 @@ ShellRoot {
             return JSON.stringify({ open: w.visible, submitted: fakeFlow.submitted, cancels: fakeFlow.cancels,
                 field: field.text, fieldFocus: field.focus, error: err.visible ? err.text : "",
                 selected: fakeFlow.selectedIdentity.string, wheel: c ? [Math.round(c.x), Math.round(c.y)] : null })
+        }
+        // Centre of a nested named item in the open tier, "lockSec/choice:5 min"; null if hidden.
+        function where(path: string): string {
+            var item = pills.instances[0].tierItem
+            path.split("/").forEach(function(name) { item = item ? root.find(item, name) : null })
+            if (!item || !item.visible || item.width === 0) return "null"
+            var c = item.mapToItem(null, item.width / 2, item.height / 2)
+            return JSON.stringify([Math.round(c.x), Math.round(c.y)])
         }
         function status(): string {
             return JSON.stringify({ layout: Config.appearance.layout, builds: root.frameBuilds,

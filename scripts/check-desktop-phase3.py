@@ -115,7 +115,7 @@ else:
             time.sleep(0.1)
         raise AssertionError(f"No {tag} line with {what}\n{''.join(log)}")
 
-    def expect(lock=600, dpms=900, suspend=0, location="London"):
+    def expect(lock=600, dpms=900, suspend=0, location="London", caffeine=False):
         idle = dict(lockSec=lock, dpmsSec=dpms, suspendSec=suspend)
         desktop = dict(idle, dnd=False, backendDnd=False, gameMode=False)
         seen = set()
@@ -129,7 +129,7 @@ else:
                 continue
             if "CONFIG " in line:
                 c = json.loads(line.split("CONFIG ", 1)[1])
-                if c == dict(idle=idle, weather=dict(location=location)):
+                if c == dict(idle=dict(idle, caffeine=caffeine), weather=dict(location=location)):
                     seen.add("CONFIG")
             if "DESKTOP " in line and json.loads(line.split("DESKTOP ", 1)[1]) == desktop:
                 seen.add("DESKTOP")
@@ -170,6 +170,8 @@ else:
         expect(1200, 1500, 1800)
         config.write_text('{"idle":{"lockSec":0}}')
         expect(0)
+        config.write_text('{"idle":{"lockSec":0,"caffeine":true}}')   # remembered Caffeine (6.5a)
+        expect(0, caffeine=True)
         config.write_text('{"idle":{"lockSec":-1,"dpmsSec":"20","suspendSec":1.5}}')
         expect()
         config.write_text('{"idle":{"lockSec":700},"weather":{"location":"  New York "}}')
@@ -187,7 +189,7 @@ else:
         replacement.write_text('{}')
         replacement.replace(config)  # atomic editor saves must also reload; sections reset
         expect()
-        config.write_text('{"idle":{"lockSec":true,"dpmsSec":2147483648},"weather":{"location":42}}')
+        config.write_text('{"idle":{"lockSec":true,"dpmsSec":2147483648,"caffeine":1},"weather":{"location":42}}')
         expect()
         config.write_text('{"weather":{"location":"' + "x" * 101 + '"}}')
         expect()

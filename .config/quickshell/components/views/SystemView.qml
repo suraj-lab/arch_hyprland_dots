@@ -456,6 +456,29 @@ Item {
             }
         }
 
+        // Frame mode: the Settings surface (SPEC 6.5) holds the rest.
+        Rectangle {
+            objectName: "allSettings"
+            visible: root.surfaceLinks
+            Layout.fillWidth: true
+            Layout.leftMargin: 12; Layout.rightMargin: 12
+            implicitHeight: 32; radius: 10
+            color: settingsLinkMouse.containsMouse ? Theme.surfaceHover : Theme.surface
+            Text {
+                anchors { left: parent.left; leftMargin: 12; verticalCenter: parent.verticalCenter }
+                text: "\uf1de   All settings"
+                color: settingsLinkMouse.containsMouse ? root.barAccent : Theme.textDim
+                font { family: Theme.fontFamily; pixelSize: Theme.fontSm; bold: true }
+            }
+            Text {
+                anchors { right: parent.right; rightMargin: 12; verticalCenter: parent.verticalCenter }
+                text: "\uf054"
+                color: Theme.textFaint
+                font { family: Theme.fontFamily; pixelSize: 10 }
+            }
+            MouseArea { id: settingsLinkMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.surfaceRequested("settings") }
+        }
+
         // ── Idle (visible when not in network drill-in) ─────────────────
         Rectangle {
             Layout.fillWidth: true; height: 1; color: Theme.borderLight

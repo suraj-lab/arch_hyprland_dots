@@ -348,6 +348,25 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
             wait_pill(lambda v: v["state"] == "hover", "click on the rest tab expands")
             pointer(400, 300)
             wait_pill(lambda v: v["state"] == "rest", "collapse after the click visit")
+            # Handle rest style (6 px): the click target includes a margin and the screen edge
+            # under it, but not the rest of the bottom edge.
+            configure({"appearance": {"layout": "frame"}, "pill": {"restStyle": "handle"},
+                       "monitors": {"HDMI-A-1": {"pill": {"hoverExpand": False}}}},
+                      lambda v: v["pills"] and v["pills"][0]["handle"], "rest-only handle")
+            wait_pill(lambda v: v["state"] == "rest" and v["h"] == 6, "handle at rest")
+            for x, y, what in ((400, 599, "the screen edge under the handle"), (460, win_top + 32, "just above the handle")):
+                pointer(x, y); time.sleep(0.2)
+                subprocess.run(["xdotool", "click", "1"], env=env, check=True, timeout=5)
+                wait_pill(lambda v: v["state"] == "hover", f"click on {what} expands")
+                pointer(400, 300)
+                wait_pill(lambda v: v["state"] == "rest", "collapse after the click visit")
+            pointer(120, 599); time.sleep(0.2)
+            subprocess.run(["xdotool", "click", "1"], env=env, check=True, timeout=5)
+            time.sleep(0.4)
+            assert pill()["state"] == "rest", "a click elsewhere on the bottom edge must not expand"
+            configure({"appearance": {"layout": "frame"},
+                       "monitors": {"HDMI-A-1": {"pill": {"hoverExpand": False}}}},
+                      lambda v: v["pills"] and not v["pills"][0]["handle"], "back to the tab")
             assert ipc("pillOn", "DP-2").returncode == 0
 
             # ---- 4.3 surfaces: the classic views rise from the bar row ----
@@ -696,7 +715,11 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
             subprocess.run(["xdotool", "click", "1"], env=env, check=True, timeout=5)
             wait_polkit(lambda v: v["selected"] == "wheel", "identity switched")
             pwin = focus_at(400, 300)
-            type_text(pwin, "typed"); keys(pwin, "Escape")
+            type_text(pwin, "typed")
+            # Real input (XTEST), not `key --window` (XSendEvent): the prompt unmaps while
+            # handling the press, and a synthetic event's release is then lost, leaving a
+            # phantom Escape for the next focused field (the cheatsheet filter, 6.5a).
+            subprocess.run(["xdotool", "key", "Escape"], env=env, check=True, timeout=5)
             v = wait_polkit(lambda v: not v["open"], "Escape cancels")
             assert v["cancels"] == 1 and v["submitted"] == [] and v["field"] == "", v
 
@@ -720,6 +743,63 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
             subprocess.run(["xdotool", "click", "1"], env=env, check=True, timeout=5)
             wait_file(home / "udisks-calls", b"unmount -b /dev/sdb1\npower-off -b /dev/sdb\n")
             wait_pill(lambda v: v["devChip"] is None and v["ejectBtn"] is None, "stick gone: chip and card go")
+            assert ipc("pill", "close").returncode == 0
+            wait_pill(lambda v: v["state"] == "rest", "closed")
+
+            # ---- 6.5a settings: real clicks write settings.json through Config.set ----
+            def click_at(path, what):
+                deadline = time.monotonic() + 3
+                while time.monotonic() < deadline:
+                    xy = json.loads(ipc("where", path).stdout or "null")
+                    if xy:
+                        break
+                    time.sleep(0.05)
+                assert xy, f"{what}: {path} not shown"
+                pointer(*xy); time.sleep(0.15)
+                subprocess.run(["xdotool", "click", "1"], env=env, check=True, timeout=5)
+
+            def wait_settings(accept, what, timeout=3):
+                deadline = time.monotonic() + timeout
+                while time.monotonic() < deadline:
+                    data = json.loads(settings.read_text())
+                    if accept(data):
+                        return data
+                    time.sleep(0.05)
+                raise AssertionError(f"{what}: {settings.read_text()}")
+
+            configure({"appearance": {"layout": "frame"}, "custom": {"keep": [1, 2]}},
+                      lambda v: v["pills"] and v["pills"][0]["animate"], "settings baseline")
+            assert ipc("pill", "system").returncode == 0     # frame mode: System links to Settings
+            wait_pill(lambda v: v["surface"] == "system" and v["tierH"] == v["tierTarget"] > 100, "system")
+            click_at("allSettings", "System's All settings link")
+            sv = wait_pill(lambda v: v["surface"] == "settings" and v["tierH"] == v["tierTarget"] > 0, "settings surface")
+            assert sv["tierW"] == min(920, sv["hoverW"] - 76) and sv["tierH"] == min(560, sv["winH"] - 116), sv
+            click_at("restStyle/choice:Handle", "rest style")
+            wait_settings(lambda d: d.get("pill", {}).get("restStyle") == "handle", "pill.restStyle written")
+            wait_pill(lambda v: v["handle"], "pill follows the new rest style")
+            click_at("animations", "animations switch")
+            data = wait_settings(lambda d: d["appearance"].get("animations") is False, "animations written")
+            wait_pill(lambda v: not v["animate"], "animations off")
+            click_at("section:power", "Power & idle")
+            click_at("lockSec/choice:5 min", "lock timeout")
+            data = wait_settings(lambda d: d.get("idle", {}).get("lockSec") == 300, "idle.lockSec written")
+            click_at("suspendSec/choice:1 h", "suspend timeout")
+            data = wait_settings(lambda d: d["idle"].get("suspendSec") == 3600, "idle.suspendSec written")
+            click_at("section:night", "Night light")
+            click_at("temperature/choice:3500 K", "temperature")
+            wait_settings(lambda d: d.get("nightLight", {}).get("temperature") == 3500, "temperature written")
+            click_at("from/plus", "from +30 min")
+            data = wait_settings(lambda d: d["nightLight"].get("from") == "20:00", "nightLight.from written")
+            assert data["custom"] == {"keep": [1, 2]} and data["appearance"]["layout"] == "frame", data   # rest kept
+            settings.write_text('{"appearance": {"layout": "frame"},')        # a half-saved hand edit
+            time.sleep(0.5)
+            click_at("temperature/choice:4500 K", "temperature on a malformed file")
+            time.sleep(0.5)
+            assert settings.read_text() == '{"appearance": {"layout": "frame"},', "Config.set overwrote a malformed file"
+            click_at("section:about", "About")
+            click_at("section:keybinds", "Keybinds")
+            click_at("openCheatsheet", "Open cheatsheet")
+            wait_pill(lambda v: v["surface"] == "cheatsheet", "Settings' Keybinds opens the cheatsheet")
             assert ipc("pill", "close").returncode == 0
             wait_pill(lambda v: v["state"] == "rest", "closed")
 
@@ -799,7 +879,8 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
             print("PASS: rest-style override/reset, invalid settings, frame pixels on private Xvfb")
             print("PASS: pill rest geometry and shape pixels, edge dwell/pass-through, collapse, IPC pin/toggle,")
             print("      frame band counts as the pill, fullscreen hide + peek (hides untouched after 800 ms),")
-            print("      rest-only click-to-expand, collapse-delay setting, animations off (real pointer on Xvfb)")
+            print("      rest-only click-to-expand (tab, and handle: margin + screen edge, not the whole edge),")
+            print("      collapse-delay setting, animations off (real pointer on Xvfb)")
             print("PASS: surfaces: open/switch/re-open toggle, Escape, stays open, badge clears on Notifications only,")
             print("      fullscreen closes them, tier over its chip, tier shape pixels (rounded corners, concave joins)")
             print("PASS: dashboard: bar widens before the tier rises, 920x420 clamped, clock/media tabs, toggle, switch")
@@ -821,6 +902,9 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
             print("      Enter submits and clears, failure shown and retried, identity choice, Escape cancels")
             print("PASS: devices (6.3, fake lsblk/udisksctl): USB chip only while a stick is in, surface from")
             print("      it, Open goes to thunar, Eject unmounts then powers off; chip goes with the stick")
+            print("PASS: settings (6.5a): opened from System's link, 920x560 clamped; real clicks on rest")
+            print("      style, animations, lock/suspend timeouts, temperature and the from stepper write")
+            print("      settings.json (unknown keys kept) and take effect; a malformed file is never overwritten")
             print("PASS: layers, per-surface namespaces, keyboard focus only for an open surface (static; Xvfb has no layer shell)")
             print("NOT TESTED: live Wayland exclusive zones, click-through, direct scanout or VRR")
         except Exception:

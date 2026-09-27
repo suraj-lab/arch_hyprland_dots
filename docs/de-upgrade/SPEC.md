@@ -764,6 +764,55 @@ HDMI-A-1 stays readable (no inactive dimming), and everything is restored on exi
 - Writing monitor layout from the shell (use nwg-displays).
 
 ## Change log
+- 2026-09-27 - Phase 6.5a (Settings surface: appearance, power & idle, night light, keybinds,
+  about), deployed and committed with Suraj's approval (live: settings survive a restart,
+  handle rest style opens on the rest-only monitor, Caffeine remembered). Backup `phase6-settings-20260927-214601`
+  (`files/`, `files/hypr/`, the live `settings.json`, `new-files.txt`).
+  - `settings` pill surface, 920x560 clamped: sections on the left, controls on the right.
+    Opened from the System view's "All settings" row (frame mode), the launcher's
+    `> Settings` action, or `qs ipc call pill open settings`.
+  - `Config.set(path, value)`: re-parses settings.json, changes one key, writes the whole
+    object back (2-space JSON; unknown keys kept; undefined deletes). It refuses while the
+    file does not parse, so a half-saved hand edit is never overwritten.
+  - Appearance: wallpaper picker (closes the surface, then opens it), rest style
+    (`pill.restStyle`, global; per-monitor overrides still win), animations
+    (`appearance.animations`), accent swatch. Power & idle: `idle.lockSec`, `dpmsSec`,
+    `suspendSec` as choices (a hand-set value outside them is shown too; suspend Off is
+    the toggle), Caffeine. Keybinds: opens the cheatsheet. About: OS, kernel, Hyprland,
+    Quickshell.
+  - Night light: hyprsunset 0.4 has no config-path option and its own profiles would
+    fight any other schedule, so the schedule moved into the shell: `nightLight
+    {temperature, from, to}` in settings.json (defaults 4000 K, 19:30 -> 09:00, the old
+    profiles), applied through `hyprctl hyprsunset temperature N | identity` every minute,
+    on settings changes and 0.7 s after hyprsunset starts. hyprsunset.conf keeps no
+    profiles; autostart and the toggle start `hyprsunset --identity`. Deployed with a
+    hyprsunset restart; the shell set 4000 K at 21:46 straight away.
+  - Found while testing: a Flickable's content width follows its children (use the
+    Flickable's width, also in the network/bluetooth lists), and a nested ColumnLayout
+    fills by default and caps its width at its children's (the section list and the
+    setting titles now say so explicitly). A phase4 harness artefact also surfaced:
+    `xdotool key --window Escape` to the polkit prompt, which unmaps while handling it,
+    left a phantom Escape that closed the next focused field; the test now sends real
+    input (XTEST), which does not.
+  - Tests: Config.set (one key, unknown keys kept, malformed refused, missing file,
+    deletion), night light window (overnight, same-day, from == to) and exact hyprsunset
+    commands, settings helpers; phase4 real clicks: System's link opens Settings, rest
+    style, animations, lock/suspend, temperature and the from stepper each land in
+    settings.json and take effect, unknown keys kept, a malformed file is never
+    overwritten, Keybinds opens the cheatsheet.
+  - From Suraj's live test: everything was remembered across a restart except Caffeine,
+    which was session state (the deploy scripts had been re-enabling it). It is now
+    `idle.caffeine` in settings.json: read at startup, written on every toggle (chip,
+    System, Settings, launcher); if the file cannot be written it still toggles for the
+    session.
+  - From Suraj: with the handle rest style, the rest-only second monitor (HDMI-A-1,
+    hoverExpand false) could not be opened: the click target was the rest shape itself,
+    and the handle is 120x6 px floating above the frame band. The target is now the rest
+    shape plus 24 px each side and 10 px above, down to the screen edge (so the pointer
+    parked on the bottom edge under it works), in the input mask only at rest; a click
+    there counts as a visit, so the pill collapses again after the pointer leaves. The
+    rest of the bottom edge still passes clicks through. phase4 checks both clicks and
+    the pass-through; phase3 checks idle.caffeine (true read, non-boolean rejected).
 - 2026-09-27 - Phase 6.3 (devices surface), deployed and committed with Suraj's approval (live USB
   stick test: toast, chip, Open in thunar, Eject). Backup
   `phase6-devices-20260927-201408` (`new-files.txt`, `files/hypr/autostart.lua`).

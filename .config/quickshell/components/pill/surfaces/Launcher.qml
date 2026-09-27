@@ -116,6 +116,7 @@ Item {
         { id: "wallpaper", icon: "\uf03e", title: "Wallpaper", subtitle: "Open the picker" },
         { id: "overview", icon: "\uf009", title: "Overview", subtitle: "Workspaces" },
         { id: "cheatsheet", icon: "\uf11c", title: "Keybind cheatsheet", subtitle: "Super + /" },
+        { id: "settings", icon: "\uf1de", title: "Settings", subtitle: "Appearance, power, night light" },
         { id: "screenshot", icon: "\uf030", title: "Screenshot", subtitle: "Select an area" },
         { id: "lock", icon: "\uf023", title: "Lock", subtitle: "hyprlock" },
         { id: "suspend", icon: "\uf236", title: "Suspend", subtitle: "Sleep" },

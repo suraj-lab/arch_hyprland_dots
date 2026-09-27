@@ -11,7 +11,8 @@ import Quickshell.Wayland
 //     inhibitors, Caffeine, and Desktop Game Mode.
 //   • Caffeine (manual idle inhibit; the IdleInhibitor itself lives on the
 //     bar window in shell.qml because it needs a surface).
-//   • Night Light (hyprsunset schedule daemon on/off).
+//   • Night Light: hyprsunset on/off; the schedule (Config.nightLight) is run here
+//     through hyprsunset's IPC (`hyprctl hyprsunset ...`).
 //   • Desktop Game Mode: auto-on while gamemoded is active — DND on, blur/
 //     animations off, no inactive-window dimming — restored when it ends.
 //
@@ -26,7 +27,8 @@ Item {
     readonly property int lockTimeout:    Config.idle.lockSec
     readonly property int dpmsTimeout:    Config.idle.dpmsSec
     readonly property int suspendTimeout: Config.idle.suspendSec
-    property string nightLightCmd: "hyprsunset"   // schedule in ~/.config/hypr/hyprsunset.conf
+    // Starts neutral; applyNightLight() sets the colour for the time of day right after.
+    property string nightLightCmd: "hyprsunset --identity"
 
     // ── Wiring to ShellRoot's DND state ───────────────────────────────────
     property bool dndEnabled: false
@@ -47,7 +49,9 @@ Item {
                                        : gameMode ? "Paused · game mode"
                                        : "Active"
 
-    function toggleCaffeine()   { caffeine = !caffeine }
+    // Remembered in settings.json; a file that cannot be written still toggles for the session.
+    function toggleCaffeine() { caffeine = !caffeine; Config.set("idle.caffeine", caffeine) }
+    Component.onCompleted: caffeine = Config.idle.caffeine
     function toggleNightLight() {
         if (nightReadProc.running || nightOffProc.running) return
         if (nightLight) { nightOffProc.running = true; return }
@@ -128,6 +132,27 @@ Item {
             root.syncGameMode()
         }
     }
+
+    // ── Night light schedule (SPEC 6.5) ───────────────────────────────────
+    // Minutes since midnight; from > to spans midnight (19:30 -> 09:00), from == to never.
+    function isNight(minute, from, to) {
+        return from === to ? false : from < to ? minute >= from && minute < to : minute >= from || minute < to
+    }
+    function minutes(hhmm) { var p = hhmm.split(":"); return Number(p[0]) * 60 + Number(p[1]) }
+    function nightLightCommand(now, settings) {
+        var night = isNight(now.getHours() * 60 + now.getMinutes(), minutes(settings.from), minutes(settings.to))
+        return night ? ["hyprctl", "hyprsunset", "temperature", String(settings.temperature)]
+                     : ["hyprctl", "hyprsunset", "identity"]
+    }
+    function applyNightLight() {
+        if (nightLight) Quickshell.execDetached(nightLightCommand(new Date(), Config.nightLight))
+    }
+    // Once a minute, on settings changes, and (hyprsunset needs a moment for its IPC
+    // socket) shortly after it starts.
+    Timer { interval: 60000; running: root.nightLight; repeat: true; onTriggered: root.applyNightLight() }
+    Timer { id: nightStart; interval: 700; onTriggered: root.applyNightLight() }
+    onNightLightChanged: if (nightLight) nightStart.restart()
+    Connections { target: Config; function onNightLightChanged() { root.applyNightLight() } }
 
     // Reflect external starts/stops as well as our own toggles.
     Process {

@@ -437,3 +437,53 @@ assert.equal(dv.pendingOpen, '/dev/sde2');
 drives[2].volumes[0].mountpoint = '/run/media/suraj/Portable'; dv.openPending();
 assert.deepEqual([plain(opened.pop()), dv.pendingOpen], [['thunar', '/run/media/suraj/Portable'], '']);
 console.log('PASS: Devices lsblk filter (removable only, never system-mounted), eject/mount/open commands');
+
+// Settings (SPEC 6.5a): Config.set keeps the rest of the file and refuses a malformed one;
+// the night light schedule; the settings surface helpers.
+const cfg = load('services/Config.qml', ['parse', 'set', 'clock']);
+let disk = '{\n  "idle": {"lockSec": 600},\n  "custom": {"mine": [1, 2]}\n}\n';
+Object.assign(cfg, {fileMissing: false, lastGood: {}, console: {warn: () => {}},
+                    settingsFile: {text: () => disk, setText: t => { disk = t; }}});
+assert.equal(cfg.set('idle.lockSec', 300), true);
+assert.deepEqual(JSON.parse(disk), {idle: {lockSec: 300}, custom: {mine: [1, 2]}});     // unknown keys kept
+assert.equal(cfg.set('pill.restStyle', 'handle'), true);                                 // missing section created
+assert.equal(JSON.parse(disk).pill.restStyle, 'handle');
+cfg.set('pill.restStyle', undefined);                                                    // undefined deletes
+assert.deepEqual(JSON.parse(disk).pill, {});
+assert.ok(disk.endsWith('}\n') && disk.includes('\n  "idle"'));                          // readable, 2-space
+disk = '{"idle": {"lockSec": 600},';                                                     // half-saved hand edit
+assert.equal(cfg.set('idle.lockSec', 900), false);
+assert.equal(disk, '{"idle": {"lockSec": 600},');                                        // not overwritten
+Object.assign(cfg, {fileMissing: true}); disk = '';
+assert.equal(cfg.set('appearance.animations', false), true);                             // no file yet: created
+assert.deepEqual(JSON.parse(disk), {appearance: {animations: false}});
+assert.deepEqual(['19:30', '09:00', '9:00', '24:00', '07:60', 1930].map(v => cfg.clock(v, 'X')),
+                 ['19:30', '09:00', 'X', 'X', 'X', 'X']);
+const desk = load('services/Desktop.qml', ['isNight', 'minutes', 'nightLightCommand']);
+const at = (h, m) => ({getHours: () => h, getMinutes: () => m});
+const night = {temperature: 3500, from: '19:30', to: '09:00'};
+assert.deepEqual([[19, 29], [19, 30], [23, 59], [0, 0], [8, 59], [9, 0], [12, 0]].map(([h, m]) =>
+    desk.nightLightCommand(at(h, m), night).slice(2).join(' ')),
+    ['identity', 'temperature 3500', 'temperature 3500', 'temperature 3500', 'temperature 3500', 'identity', 'identity']);
+assert.equal(desk.isNight(120, 60, 180), true);                                          // same-day window
+assert.equal(desk.isNight(200, 60, 180), false);
+assert.equal(desk.isNight(600, 600, 600), false);                                        // from == to: never
+assert.deepEqual(plain(desk.nightLightCommand(at(22, 0), night)), ['hyprctl', 'hyprsunset', 'temperature', '3500']);
+const st = load('components/pill/surfaces/SettingsPanel.qml', ['duration', 'timeoutOptions', 'shiftClock', 'parseAbout']);
+assert.deepEqual([0, 45, 300, 600, 700, 3600, 7200].map(st.duration), ['Off', '45 s', '5 min', '10 min', '11.7 min', '1 h', '2 h']);
+assert.deepEqual(plain(st.timeoutOptions([0, 300, 900], 900)).map(o => o.value), [0, 300, 900]);
+assert.deepEqual(plain(st.timeoutOptions([0, 300, 900], 700)).map(o => o.label), ['Off', '5 min', '11.7 min', '15 min']);
+assert.deepEqual(['19:30', '23:45', '00:10', '09:00'].map(t => st.shiftClock(t, 30)), ['20:00', '00:15', '00:40', '09:30']);
+assert.equal(st.shiftClock('00:10', -30), '23:40');                                      // wraps back past midnight
+assert.deepEqual(plain(st.parseAbout('{"version":"0.56.2","tag":"v0.56.2"}\nQuickshell 0.3.1 (revision , distributed by Arch Linux)\n7.2.8-1-cachyos\nArch Linux\n')),
+    {hyprland: '0.56.2', quickshell: '0.3.1', kernel: '7.2.8-1-cachyos', os: 'Arch Linux'});
+assert.deepEqual(plain(st.parseAbout('')), {hyprland: '?', quickshell: '?', kernel: '?', os: '?'});
+console.log('PASS: Config.set (one key, unknown keys kept, malformed file refused), night light schedule, settings helpers');
+
+// Caffeine is remembered: each toggle writes idle.caffeine (and still toggles if the write fails).
+const caf = load('services/Desktop.qml', ['toggleCaffeine']);
+const writes = [];
+Object.assign(caf, {caffeine: false, Config: {set: (k, v) => { writes.push([k, v]); return writes.length !== 2; }}});
+caf.toggleCaffeine(); caf.toggleCaffeine(); caf.toggleCaffeine();
+assert.deepEqual([caf.caffeine, writes], [true, [['idle.caffeine', true], ['idle.caffeine', false], ['idle.caffeine', true]]]);
+console.log('PASS: Caffeine toggles are written to settings.json (idle.caffeine)');

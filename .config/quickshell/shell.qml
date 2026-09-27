@@ -115,6 +115,7 @@ ShellRoot {
         case "wallpaper": wallpickerIpc.toggle(); break
         case "overview": overviewIpc.toggle(); break
         case "cheatsheet": { const p = focusedPill(); if (p) p.openSurface("cheatsheet", false); break }
+        case "settings": { const p = focusedPill(); if (p) p.openSurface("settings", false); break }
         case "screenshot": screenshotIpc.area(); break
         case "lock": pLock.running = true; break
         case "suspend": pSuspend.running = true; break
