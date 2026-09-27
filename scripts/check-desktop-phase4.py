@@ -41,6 +41,12 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
                        "flatpak": 'echo "flatpak $*" >> "$HOME/update-calls"; [ "$1" = remote-ls ] && echo com.example.App',
                        "paru": 'echo "paru $*" >> "$HOME/update-calls"; '
                                'if [ "$1" = -Qua ]; then echo "ani-cli 5.0-1 -> 5.1-1"; exit 0; fi; exit 1',
+                       # Devices (6.3): lsblk reads $HOME/lsblk.json; udisksctl logs calls, `monitor`
+                       # idles, `power-off` empties the list (the stick is gone); thunar logs.
+                       "lsblk": 'cat "$HOME/lsblk.json"',
+                       "udisksctl": '[ "$1" = monitor ] && { while kill -0 $PPID 2>/dev/null; do sleep 0.5; done; exit 0; }; echo "$*" >> "$HOME/udisks-calls"; '
+                                    '[ "$1" = power-off ] && echo \'{"blockdevices":[]}\' > "$HOME/lsblk.json"; exit 0',
+                       "thunar": 'echo "$*" >> "$HOME/thunar-calls"',
                        # Cheatsheet (5.2) reads `hyprctl binds -j`; nothing else may reach Hyprland.
                        "hyprctl": 'if [ "$*" = "binds -j" ]; then cat "$HOME/binds.json"; else exit 1; fi',
                        "hyprlock": "exit 1", "pactl": "exit 0", "curl": "exit 1",
@@ -58,6 +64,13 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
                                    'esac'}.items():
         (home / "bin" / name).write_text("#!/bin/sh\n" + body + "\n")
         (home / "bin" / name).chmod(0o700)
+    # Devices (6.3): one USB stick, its partition mounted where udisks mounts things.
+    (home / "lsblk.json").write_text(json.dumps({"blockdevices": [{
+        "name": "sdb", "path": "/dev/sdb", "type": "disk", "hotplug": True, "rm": True, "size": "28.9G",
+        "label": None, "fstype": None, "mountpoints": [None], "vendor": "SanDisk", "model": "Ultra Fit",
+        "tran": "usb", "children": [{
+            "name": "sdb1", "path": "/dev/sdb1", "type": "part", "hotplug": True, "rm": True, "size": "28.9G",
+            "label": "STICK", "fstype": "exfat", "mountpoints": ["/run/media/suraj/STICK"]}]}]}))
     # Launcher (5.1): a findable app whose launch leaves a mark, and a clipboard image.
     apps = home / ".local/share/applications"
     apps.mkdir(parents=True)
@@ -634,7 +647,8 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
             # Bar chips: the hover highlight's padding takes clicks too, and a click on the glyph
             # opens the surface once (a double fire would toggle it straight back closed).
             assert ipc("pill", "open").returncode == 0
-            bar = wait_pill(lambda v: v["state"] == "hover" and v["volChip"], "bar row")
+            bar = wait_pill(lambda v: v["state"] == "hover" and v["w"] >= v["hoverW"] and v["volChip"],
+                            "bar row (fully wide, so chip positions are final)")
             assert bar["caffeineChip"], "Caffeine is always in the expanded bar, even while off"
             cx, cy, cw = bar["volChip"]
             for x, what in ((cx, "glyph"), (cx - cw // 2 - 2, "highlight padding")):
@@ -685,6 +699,29 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
             type_text(pwin, "typed"); keys(pwin, "Escape")
             v = wait_polkit(lambda v: not v["open"], "Escape cancels")
             assert v["cancels"] == 1 and v["submitted"] == [] and v["field"] == "", v
+
+            # ---- 6.3 devices: fake lsblk/udisksctl/thunar; real clicks on chip, Open, Eject ----
+            assert ipc("pill", "open").returncode == 0
+            v = wait_pill(lambda v: v["state"] == "hover" and v["w"] >= v["hoverW"] and v["devChip"],
+                          "USB chip while a stick is in (bar fully wide)")
+            pointer(*v["devChip"][:2]); time.sleep(0.2)
+            subprocess.run(["xdotool", "click", "1"], env=env, check=True, timeout=5)
+            v = wait_pill(lambda v: v["surface"] == "devices" and v["tierH"] == v["tierTarget"] > 0
+                          and v["openBtn"] and v["ejectBtn"], "devices surface from the chip")
+            assert v["tierW"] == 400, v
+            pointer(*v["openBtn"][:2]); time.sleep(0.2)                 # mounted: straight to thunar
+            subprocess.run(["xdotool", "click", "1"], env=env, check=True, timeout=5)
+            wait_file(home / "thunar-calls", b"/run/media/suraj/STICK\n")
+            wait_pill(lambda v: v["surface"] == "", "Open closes the surface")
+            assert ipc("pill", "devices").returncode == 0
+            v = wait_pill(lambda v: v["surface"] == "devices" and v["tierH"] == v["tierTarget"] > 0
+                          and v["ejectBtn"], "devices surface again")
+            pointer(*v["ejectBtn"][:2]); time.sleep(0.2)                # unmount, then power off
+            subprocess.run(["xdotool", "click", "1"], env=env, check=True, timeout=5)
+            wait_file(home / "udisks-calls", b"unmount -b /dev/sdb1\npower-off -b /dev/sdb\n")
+            wait_pill(lambda v: v["devChip"] is None and v["ejectBtn"] is None, "stick gone: chip and card go")
+            assert ipc("pill", "close").returncode == 0
+            wait_pill(lambda v: v["state"] == "rest", "closed")
 
             # Collapse delay setting: global, per monitor, invalid values fall back.
             configure({"appearance": {"layout": "frame"}, "pill": {"collapseDelayMs": 1500}},
@@ -782,6 +819,8 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
             print("      padding takes clicks too (real pointer); Caffeine always in the bar")
             print("PASS: polkit prompt (6.1, fake AuthFlow): overlay with exclusive keyboard, field focused,")
             print("      Enter submits and clears, failure shown and retried, identity choice, Escape cancels")
+            print("PASS: devices (6.3, fake lsblk/udisksctl): USB chip only while a stick is in, surface from")
+            print("      it, Open goes to thunar, Eject unmounts then powers off; chip goes with the stick")
             print("PASS: layers, per-surface namespaces, keyboard focus only for an open surface (static; Xvfb has no layer shell)")
             print("NOT TESTED: live Wayland exclusive zones, click-through, direct scanout or VRR")
         except Exception:

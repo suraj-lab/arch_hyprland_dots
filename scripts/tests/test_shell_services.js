@@ -391,3 +391,49 @@ assert.equal(upd.updateCommand(true, 0),
 assert.ok(upd.updateCommand(true, 3).startsWith('paru; flatpak update; qs ipc call updates check'));
 assert.ok(upd.updateCommand(false, 0).startsWith('sudo pacman -Syu; qs ipc call updates check'));
 console.log('PASS: Updates parsing (exit codes per tool, absent tools, failures stay unknown) and update command');
+
+// Devices (SPEC 6.3): lsblk -J filtered to removable drives; commands for eject/mount/open.
+const dv = load('services/Devices.qml', ['parse', 'open', 'openPending', 'mount', 'unmount', 'eject', 'run']);
+const blk = (o) => Object.assign({type: 'part', hotplug: false, rm: false, label: null, fstype: null, mountpoints: [null],
+                                  vendor: null, model: null, tran: null, children: undefined}, o);
+const lsblk = JSON.stringify({blockdevices: [
+    blk({name: 'nvme0n1', path: '/dev/nvme0n1', type: 'disk', size: '931.5G', tran: 'nvme', children: [
+        blk({name: 'nvme0n1p2', path: '/dev/nvme0n1p2', fstype: 'btrfs', mountpoints: ['/home', '/']})]}),
+    blk({name: 'sdb', path: '/dev/sdb', type: 'disk', hotplug: true, rm: true, size: '28.9G', vendor: 'SanDisk ',
+         model: 'Ultra Fit       ', tran: 'usb', children: [
+        blk({name: 'sdb1', path: '/dev/sdb1', label: 'STICK', fstype: 'exfat', size: '28.9G',
+             mountpoints: ['/run/media/suraj/STICK']})]}),
+    blk({name: 'mmcblk0', path: '/dev/mmcblk0', type: 'disk', rm: true, size: '59.5G', fstype: 'vfat', tran: 'mmc'}),
+    blk({name: 'sdc', path: '/dev/sdc', type: 'disk', hotplug: true, size: '1.8T', tran: 'sata', children: [
+        blk({name: 'sdc1', path: '/dev/sdc1', fstype: 'ext4', label: 'data', mountpoints: ['/mnt/data']})]}),
+    blk({name: 'sdd', path: '/dev/sdd', type: 'disk', hotplug: true, size: '8G', tran: 'usb', children: [
+        blk({name: 'sdd1', path: '/dev/sdd1', fstype: 'swap', mountpoints: ['[SWAP]']})]}),
+    blk({name: 'sde', path: '/dev/sde', type: 'disk', hotplug: true, size: '500G', model: 'Portable', tran: 'usb', children: [
+        blk({name: 'sde1', path: '/dev/sde1', size: '16M'}),
+        blk({name: 'sde2', path: '/dev/sde2', fstype: 'ntfs', size: '499G'})]}),
+    blk({name: 'zram0', path: '/dev/zram0', type: 'disk', fstype: 'swap', mountpoints: ['[SWAP]']}),
+]});
+const drives = plain(dv.parse(lsblk));
+assert.deepEqual(drives.map(d => d.path), ['/dev/sdb', '/dev/mmcblk0', '/dev/sde']);  // no internal/system/swap-only
+assert.deepEqual(drives[0], {path: '/dev/sdb', name: 'SanDisk Ultra Fit', size: '28.9G', tran: 'usb',
+    volumes: [{path: '/dev/sdb1', name: 'STICK', size: '28.9G', fstype: 'exfat', mountpoint: '/run/media/suraj/STICK'}]});
+assert.deepEqual(drives[1].volumes.map(v => [v.path, v.name, v.mountpoint]), [['/dev/mmcblk0', 'mmcblk0', '']]);  // no partitions
+assert.equal(drives[1].name, 'SD card');                                        // no vendor/model: by transport
+assert.deepEqual(drives[2].volumes.map(v => v.path), ['/dev/sde2']);             // unformatted partition skipped
+assert.deepEqual(plain(dv.parse('not json')), []);
+const ran = [], opened = [];
+Object.assign(dv, {root: dv, drives, pendingOpen: '', act: {running: false}, error: '', busy: '',
+                   Quickshell: {execDetached: c => opened.push(c)}});
+dv.run = (path, command) => ran.push([path, command]);
+dv.eject(drives[0]);
+assert.deepEqual(plain(ran.pop()), ['/dev/sdb', ['sh', '-c',
+    'd=$1; shift; for p; do udisksctl unmount -b "$p" || exit 1; done; udisksctl power-off -b "$d"',
+    'sh', '/dev/sdb', '/dev/sdb1']]);                                            // mounted volumes only, as arguments
+dv.open(drives[0].volumes[0]);                                                   // mounted: straight to thunar
+assert.deepEqual(plain(opened.pop()), ['thunar', '/run/media/suraj/STICK']);
+dv.open(drives[2].volumes[0]);                                                   // not mounted: mount, open after
+assert.deepEqual(plain(ran.pop()), ['/dev/sde2', ['udisksctl', 'mount', '-b', '/dev/sde2']]);
+assert.equal(dv.pendingOpen, '/dev/sde2');
+drives[2].volumes[0].mountpoint = '/run/media/suraj/Portable'; dv.openPending();
+assert.deepEqual([plain(opened.pop()), dv.pendingOpen], [['thunar', '/run/media/suraj/Portable'], '']);
+console.log('PASS: Devices lsblk filter (removable only, never system-mounted), eject/mount/open commands');

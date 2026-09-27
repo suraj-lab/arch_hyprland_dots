@@ -764,6 +764,29 @@ HDMI-A-1 stays readable (no inactive dimming), and everything is restored on exi
 - Writing monitor layout from the shell (use nwg-displays).
 
 ## Change log
+- 2026-09-27 - Phase 6.3 (devices surface), deployed and committed with Suraj's approval (live USB
+  stick test: toast, chip, Open in thunar, Eject). Backup
+  `phase6-devices-20260927-201408` (`new-files.txt`, `files/hypr/autostart.lua`).
+  - `services/Devices.qml`: `lsblk -J` (NAME, PATH, LABEL, SIZE, FSTYPE, MOUNTPOINTS,
+    HOTPLUG, RM, TYPE, VENDOR, MODEL, TRAN), refreshed 300 ms after `udisksctl monitor`
+    output (restarted after 5 s if it exits). Only disks with hotplug or rm, and never a
+    disk with anything mounted outside /run/media, so a system disk cannot show up with an
+    Eject button (every internal disk here reports hotplug=0, rm=0). Volumes are the
+    formatted, non-swap partitions (or the whole disk when unpartitioned).
+  - Actions through udisksctl: Open (mounts first if needed, then `thunar <mountpoint>`,
+    detached), Mount / Unmount, Eject (unmount each mounted volume, then `power-off`).
+    Errors show udisksctl's reason ("target is busy"). Polkit asks via the shell's agent
+    only if a rule needs it.
+  - Bar: a USB chip (count when more than one) only while a removable drive is present;
+    it opens the `devices` surface, a card per drive with Eject and its volumes.
+  - autostart.lua: `udiskie --no-tray --notify` (automount + the "device added" toast
+    through the shell's notification server), as the SPEC says.
+  - Tests: parser unit tests (internal, USB stick, unpartitioned SD card, hotplug disk
+    mounted at /mnt excluded, swap-only, unformatted partition) and the exact
+    eject/mount/open commands; phase4 with fake lsblk/udisksctl/thunar: chip only while a
+    stick is in, real clicks on the chip, Open (thunar gets the mount point) and Eject
+    (unmount then power-off, then chip and card go). Also fixed a harness race: chip
+    positions are now read once the bar is fully wide.
 - 2026-09-27 - Phase 6.1 (polkit agent), deployed and committed with Suraj's approval. Backup
   `phase6-polkit-20260927-193804` (`UNDO.txt`, `new-files.txt`, `files/`).
   - `PolkitAgent` in shell.qml (both layouts) feeds `components/PolkitDialog.qml`: a dimmed

@@ -28,6 +28,7 @@ Item {
         cheatsheet: root.width / 2,
         updates: row.x + updChip.x + updChip.width / 2,
         network: row.x + wifiChip.x + wifiChip.width / 2,
+        devices: row.x + devChip.x + devChip.width / 2,
         // The Bluetooth chip only shows while it is on; otherwise grow from the System chip.
         bluetooth: row.x + (btChip.visible ? btChip.x + btChip.width / 2 : ccChip.x + ccChip.width / 2)
     })
@@ -137,6 +138,14 @@ Item {
         BarText { visible: root.width >= 900; color: Theme.pink; text: "\ue266 " + (Sysmon.cpu < 0 ? "--" : Sysmon.cpu) + "%" }
         BarText { visible: root.width >= 900; color: Theme.warning; text: "\uf2db " + (Sysmon.mem < 0 ? "--" : Sysmon.mem) + "%" }
         TrayArea { menuEdge: Edges.Top; Layout.fillWidth: false }   // a nested layout fills by default
+        BarChip {   // removable drives (SPEC 6.3): only while one is connected
+            id: devChip
+            objectName: "devicesChip"
+            visible: Devices.count > 0
+            tint: root.accent
+            text: "\uf287" + (Devices.count > 1 ? " " + Devices.count : "")
+            onClicked: root.surfaceRequested("devices")
+        }
         BarChip {
             id: wifiChip
             tint: Net.wifiEnabled && Net.ssid ? root.accent : Theme.textDimmer

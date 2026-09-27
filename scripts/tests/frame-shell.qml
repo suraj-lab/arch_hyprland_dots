@@ -93,6 +93,8 @@ ShellRoot {
                  volChip: root.center(p, "volChip", p.pillItem),
                  caffeineChip: root.center(p, "caffeineChip", p.pillItem),
                  wifiSpinning: root.spinning(p, "wifiRescan"),
+                 devChip: root.center(p, "devicesChip", p.pillItem),
+                 openBtn: root.center(p, "open:/dev/sdb1"), ejectBtn: root.center(p, "eject:/dev/sdb"),
                  sheet: { query: p.cheatsheet.query,
                           groups: p.cheatsheet.groups.map(function(g) { return g.name }),
                           shown: p.cheatsheet.shown.map(function(g) { return g.name }),

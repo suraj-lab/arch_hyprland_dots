@@ -33,7 +33,7 @@ PanelWindow {
     property bool hoverOpen: false
     property bool visited: false
     property string surface: ""
-    readonly property var surfaces: ["sound", "notifs", "system", "dashboard", "media", "launcher", "clipboard", "cheatsheet", "updates", "network", "bluetooth"]
+    readonly property var surfaces: ["sound", "notifs", "system", "dashboard", "media", "launcher", "clipboard", "cheatsheet", "updates", "network", "bluetooth", "devices"]
     readonly property bool edgeHovered: hotZone.containsMouse
     readonly property bool pillHovered: pillHover.hovered || baseHover.hovered || tierHover.hovered
     readonly property bool peeking: fullscreen && pinned
@@ -115,7 +115,8 @@ PanelWindow {
         : surface === "notifs" ? notifsView : surface === "system" ? systemView
         : surface === "dashboard" ? dashView : surface === "launcher" ? launcherView
         : surface === "cheatsheet" ? cheatsheetView : surface === "updates" ? updatesView
-        : surface === "network" ? networkView : surface === "bluetooth" ? bluetoothView : null
+        : surface === "network" ? networkView : surface === "bluetooth" ? bluetoothView
+        : surface === "devices" ? devicesView : null
     // The tier rises only once the bar is fully wide (opening from the rest tab), so it
     // never slides with a growing bar; closing mirrors this (see `expanded`).
     readonly property int tierTarget: activeView && pill.width >= hoverWidth
@@ -146,6 +147,7 @@ PanelWindow {
     property alias updates: updatesView
     property alias network: networkView
     property alias bluetooth: bluetoothView
+    property alias devices: devicesView
     property alias tierItem: tier
     property alias shape: shape
     PillShape {
@@ -296,6 +298,14 @@ PanelWindow {
                 anchors { left: parent.left; right: parent.right; top: parent.top }
                 active: root.surface === "bluetooth"
                 visible: root.surface === "bluetooth"
+                onCloseRequested: root.closeSurface()
+            }
+            DevicesPanel {
+                id: devicesView
+                anchors { left: parent.left; right: parent.right; top: parent.top }
+                accent: root.accent
+                active: root.surface === "devices"
+                visible: root.surface === "devices"
                 onCloseRequested: root.closeSurface()
             }
             SystemView {
