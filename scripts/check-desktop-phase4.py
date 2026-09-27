@@ -100,7 +100,7 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
     # Regression: settings present at startup used to be ignored until the file changed.
     # Classic, because frame is the default and would pass either way.
     settings.write_text(json.dumps({"appearance": {"layout": "classic"}}))
-    env = dict(os.environ, HOME=tmp, XDG_CONFIG_HOME=str(home / ".config"),
+    env = dict(os.environ, LC_ALL="C.UTF-8", HOME=tmp, XDG_CONFIG_HOME=str(home / ".config"),
                XDG_CACHE_HOME=str(home / ".cache"), XDG_DATA_HOME=str(home / ".local/share"),
                XDG_STATE_HOME=str(home / ".state"), XDG_RUNTIME_DIR=str(runtime),
                DBUS_SESSION_BUS_ADDRESS="unix:path=/nonexistent",

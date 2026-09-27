@@ -74,7 +74,7 @@ else:
     (config.parent / "scripts").mkdir()
     (config.parent / "scripts/desktop-gamemode.py").write_text(
         'print(\'{"gameMode":false,"dnd":false}\')\n')
-    env = dict(os.environ, HOME=tmp, PATH=str(home / "bin") + ":/usr/bin",
+    env = dict(os.environ, LC_ALL="C.UTF-8", HOME=tmp, PATH=str(home / "bin") + ":/usr/bin",
                XDG_CONFIG_HOME=str(home / ".config"),
                XDG_CACHE_HOME=str(home / ".cache"), XDG_STATE_HOME=str(home / ".state"),
                XDG_DATA_HOME=str(home / ".local/share"), XDG_RUNTIME_DIR=str(home / "r"),
