@@ -90,6 +90,16 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
         copy = config_dir / "components" / name
         copy.write_text("\n".join(l for l in source.splitlines()
                                   if not l.strip().startswith("WlrLayershell.")) + "\n")
+    # 6.1 polkit prompt: an overlay taking the keyboard exclusively (checked here, stripped below).
+    source = (ROOT / ".config/quickshell/components/PolkitDialog.qml").read_text()
+    for line in ("WlrLayershell.layer: WlrLayer.Overlay", 'WlrLayershell.namespace: "quickshell-polkit"',
+                 "WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive"):
+        assert line in source, f"PolkitDialog.qml: missing {line}"
+    (config_dir / "components/PolkitDialog.qml").write_text(
+        "\n".join(l for l in source.splitlines() if not l.strip().startswith("WlrLayershell.")) + "\n")
+    shell_src = (ROOT / ".config/quickshell/shell.qml").read_text()
+    assert shell_src.count("PolkitAgent {") == 1 and "PolkitDialog { flow: polkitAgent.flow" in shell_src, \
+        "shell.qml: exactly one polkit agent, feeding the dialog"
     # Frame mode: no classic top bar, OSD, toast or launcher windows (the pill replaces them).
     assert (ROOT / ".config/quickshell/shell.qml").read_text().count(
         "model: shellRoot.frameLayout ? [] : Quickshell.screens") == 4, "classic-only windows in frame mode"
@@ -468,13 +478,16 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
             wait_pill(lambda v: v["visible"] and v["state"] == "rest", "back from fullscreen")
 
             # ---- 5.1 launcher: apps, "=" calculator, ">" actions, clipboard; keyboard only ----
-            def focus_surface():
-                pointer(400, pill()["tierY"] + 30); time.sleep(0.2)   # over the search field
+            def focus_at(x, y):   # keys go to the window under the pointer (no WM on Xvfb)
+                pointer(x, y); time.sleep(0.2)
                 top = subprocess.run(["xdotool", "getmouselocation", "--shell"], env=env, capture_output=True,
                                      text=True, timeout=5).stdout
                 win = dict(line.split("=", 1) for line in top.split())["WINDOW"]
                 subprocess.run(["xdotool", "windowfocus", "--sync", win], env=env, timeout=5)
                 return win
+
+            def focus_surface():
+                return focus_at(400, pill()["tierY"] + 30)   # over the search field
 
             def keys(win, *names):
                 subprocess.run(["xdotool", "key", "--window", win, *names], env=env, check=True, timeout=5)
@@ -635,6 +648,44 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
             assert ipc("pill", "close").returncode == 0
             wait_pill(lambda v: v["state"] == "rest", "closed")
 
+            # ---- 6.1 polkit prompt, driven by a fake AuthFlow; real keyboard and pointer ----
+            def polkit_state():
+                return json.loads(ipc("polkitState").stdout)
+
+            def wait_polkit(accept, what, timeout=3):
+                deadline = time.monotonic() + timeout
+                while time.monotonic() < deadline:
+                    v = polkit_state()
+                    if accept(v):
+                        return v
+                    time.sleep(0.05)
+                raise AssertionError(f"{what}: {polkit_state()}")
+
+            assert polkit_state()["open"] is False
+            assert ipc("polkit", "start").returncode == 0
+            wait_polkit(lambda v: v["open"] and v["fieldFocus"], "prompt opens with the field focused")
+            pwin = focus_at(400, 300)                      # the dimmed full-screen window
+            type_text(pwin, "hunter2"); keys(pwin, "Return")
+            v = wait_polkit(lambda v: v["submitted"] == ["hunter2"], "Enter submits the password")
+            assert v["field"] == "" and v["error"] == "", v   # the password leaves the field at once
+            assert ipc("polkit", "fail").returncode == 0     # wrong password: polkit asks again
+            v = wait_polkit(lambda v: v["error"] != "", "failure shown")
+            assert v["error"] == "Authentication failed, try again." and v["open"], v
+            type_text(pwin, "correct"); keys(pwin, "Return")
+            wait_polkit(lambda v: v["submitted"] == ["hunter2", "correct"], "retry submits again")
+            assert ipc("polkit", "done").returncode == 0
+            wait_polkit(lambda v: not v["open"], "closes when the request completes")
+            # Two identities: a click on the other one selects it; Escape cancels.
+            assert ipc("polkit", "startTwo").returncode == 0
+            v = wait_polkit(lambda v: v["open"] and v["wheel"], "identity choice")
+            pointer(*v["wheel"]); time.sleep(0.2)
+            subprocess.run(["xdotool", "click", "1"], env=env, check=True, timeout=5)
+            wait_polkit(lambda v: v["selected"] == "wheel", "identity switched")
+            pwin = focus_at(400, 300)
+            type_text(pwin, "typed"); keys(pwin, "Escape")
+            v = wait_polkit(lambda v: not v["open"], "Escape cancels")
+            assert v["cancels"] == 1 and v["submitted"] == [] and v["field"] == "", v
+
             # Collapse delay setting: global, per monitor, invalid values fall back.
             configure({"appearance": {"layout": "frame"}, "pill": {"collapseDelayMs": 1500}},
                       lambda v: v["pills"] and v["pills"][0]["collapseMs"] == 1500, "global delay")
@@ -729,6 +780,8 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
             print("      view's Wi-Fi and Bluetooth tiles open them in frame mode; refresh spins, then stops")
             print("PASS: bar chips: a click on the glyph opens its surface once; the hover highlight's")
             print("      padding takes clicks too (real pointer); Caffeine always in the bar")
+            print("PASS: polkit prompt (6.1, fake AuthFlow): overlay with exclusive keyboard, field focused,")
+            print("      Enter submits and clears, failure shown and retried, identity choice, Escape cancels")
             print("PASS: layers, per-surface namespaces, keyboard focus only for an open surface (static; Xvfb has no layer shell)")
             print("NOT TESTED: live Wayland exclusive zones, click-through, direct scanout or VRR")
         except Exception:

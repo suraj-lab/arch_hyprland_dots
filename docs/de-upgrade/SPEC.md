@@ -764,6 +764,31 @@ HDMI-A-1 stays readable (no inactive dimming), and everything is restored on exi
 - Writing monitor layout from the shell (use nwg-displays).
 
 ## Change log
+- 2026-09-27 - Phase 6.1 (polkit agent), deployed and committed with Suraj's approval. Backup
+  `phase6-polkit-20260927-193804` (`UNDO.txt`, `new-files.txt`, `files/`).
+  - `PolkitAgent` in shell.qml (both layouts) feeds `components/PolkitDialog.qml`: a dimmed
+    full-screen overlay (layer Overlay, namespace `quickshell-polkit`, exclusive keyboard) on
+    the monitor focused when the request starts, with a centred card: lock icon, action id,
+    message, the identity ("As Suraj", or a choice when polkit offers several; switching
+    restarts the conversation), the password field (echo as polkit asks), the failure or
+    polkit's own message, Cancel / Authenticate. Enter submits, Escape cancels. It is its
+    own window, so it works whether or not the pill is shown.
+  - The password leaves the field on submit, cancel and when the request ends. The field is
+    disabled while polkit checks; focus returns to it whenever polkit asks again.
+  - Quickshell registers the agent once, at startup, with no retry; a warning is logged if
+    it is not registered 5 s later (another agent holding the session).
+  - Live: `pkexec true` (wrong password shows the error and retries, then succeeds; Escape
+    cancels) and `systemctl restart systemd-timesyncd` all used the new prompt (polkitd and
+    pam in the system journal agree). virt-manager shows no prompt by design: Suraj is in
+    the `libvirt` group and libvirt's `50-libvirt.rules` grants `org.libvirt.unix.manage`
+    without a password. GParted is not installed.
+  - `polkit-kde-agent` removed from autostart.lua (separate commit) once this worked; the
+    package stays in desktop-core.txt as a fallback until Phase 8. Only one agent now
+    registers per session (before, both started at login and raced).
+  - Tests: phase4 drives the dialog with a fake AuthFlow on Xvfb (real keyboard and
+    pointer): field focused on open, Enter submits and clears, failure shown and retried,
+    identity switch by click, Escape cancels; statically: layer, namespace, exclusive
+    keyboard, exactly one agent in shell.qml feeding the dialog.
 - 2026-09-27 - Phase 6.2 (Wi-Fi and Bluetooth surfaces), deployed and committed with Suraj's
   approval. Wi-Fi verified live (inline password connect works). PENDING live test (Suraj,
   later): pair a new Bluetooth device from the surface. Backup

@@ -3,6 +3,7 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
+import Quickshell.Services.Polkit
 import Quickshell.Wayland
 import "theme"
 import "components"
@@ -72,6 +73,20 @@ ShellRoot {
 
     // ── Session overlay state + processes ──────────────────────────────────
     property bool sessionOpen: false
+
+    // ── Polkit agent (SPEC 6.1): the password prompt for pkexec, systemctl, GParted... ──
+    // Polkit allows one agent per session and this registers once, at startup: if another
+    // agent (polkit-kde-agent) already holds the session, this one stays unregistered.
+    PolkitAgent {
+        id: polkitAgent
+        onIsRegisteredChanged: console.info("polkit agent registered:", isRegistered)
+    }
+    Timer {
+        interval: 5000; running: true
+        onTriggered: if (!polkitAgent.isRegistered)
+            console.warn("polkit agent not registered (another agent running?); prompts go to it instead")
+    }
+    PolkitDialog { flow: polkitAgent.flow; accent: shellRoot.accentFor(Hypr.focusedMonitor ? Hypr.focusedMonitor.name : "") }
 
     // ── Screen time tracking (runs continuously) ──────────────────────────
     ScreenTimeTracker { id: stTracker }

@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
+import "../../.config/quickshell/components"
 import "../../.config/quickshell/components/frame"
 import "../../.config/quickshell/components/pill"
 import "../../.config/quickshell/services"
@@ -14,6 +15,33 @@ ShellRoot {
     property bool classicBar: false
 
     property var monitorNames: ["DP-2", "HDMI-A-1"]
+
+    // 6.1: a fake polkit AuthFlow (no polkitd here) with the real one's properties/methods.
+    component FakeIdentity: QtObject {
+        property string string; property string displayName; property bool isGroup: false   // (no `id`: reserved in QML)
+    }
+    FakeIdentity { id: idSuraj; string: "suraj"; displayName: "Suraj" }
+    FakeIdentity { id: idWheel; string: "wheel"; displayName: "wheel"; isGroup: true }
+    QtObject {
+        id: fakeFlow
+        property string message: "Authentication is needed to run `/usr/bin/true' as the super user"
+        property string actionId: "org.freedesktop.policykit.exec"
+        property var identities: [idSuraj]
+        property var selectedIdentity: idSuraj
+        property bool isResponseRequired: true
+        property string inputPrompt: "Password: "
+        property bool responseVisible: false
+        property string supplementaryMessage: ""
+        property bool supplementaryIsError: false
+        property bool isCompleted: false
+        property bool failed: false
+        property var submitted: []
+        property int cancels: 0
+        function submit(value) { submitted = submitted.concat([value]); isResponseRequired = false }
+        function cancelAuthenticationRequest() { cancels++; isCompleted = true }
+    }
+    property var polkitFlow: null
+    PolkitDialog { id: polkitDialog; flow: root.polkitFlow }
     readonly property bool frameLayout: Config.appearance.layout === "frame"   // same guard as shell.qml
     property int frameBuilds: 0
     Variants {
@@ -176,6 +204,30 @@ ShellRoot {
             pills.instances[0].shape.grabToImage(function(result) {
                 result.saveToFile(Quickshell.env("HOME") + "/pill.png")
             })
+        }
+        // 6.1 polkit: start (one or two identities), a failed attempt, or the request ending.
+        function polkit(action: string): void {
+            var f = fakeFlow
+            if (action === "start" || action === "startTwo") {
+                root.polkitFlow = null
+                f.identities = action === "startTwo" ? [idSuraj, idWheel] : [idSuraj]
+                f.selectedIdentity = idSuraj
+                f.isResponseRequired = true; f.failed = false; f.isCompleted = false
+                f.supplementaryMessage = ""; f.submitted = []; f.cancels = 0
+                root.polkitFlow = f
+            } else if (action === "fail") { f.failed = true; f.isResponseRequired = true }
+            else if (action === "done") f.isCompleted = true
+        }
+        // fieldFocus is in-window focus: activeFocus also needs the window activated, which
+        // takes a window manager (live, the prompt's exclusive keyboard focus does it).
+        function polkitState(): string {
+            var w = polkitDialog.window
+            var field = root.find(w.contentItem, "polkitField"), err = root.find(w.contentItem, "polkitError")
+            var chip = root.find(w.contentItem, "identity:wheel")
+            var c = chip && chip.visible ? chip.mapToItem(null, chip.width / 2, chip.height / 2) : null
+            return JSON.stringify({ open: w.visible, submitted: fakeFlow.submitted, cancels: fakeFlow.cancels,
+                field: field.text, fieldFocus: field.focus, error: err.visible ? err.text : "",
+                selected: fakeFlow.selectedIdentity.string, wheel: c ? [Math.round(c.x), Math.round(c.y)] : null })
         }
         function status(): string {
             return JSON.stringify({ layout: Config.appearance.layout, builds: root.frameBuilds,
