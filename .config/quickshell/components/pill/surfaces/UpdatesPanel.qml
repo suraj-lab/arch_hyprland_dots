@@ -28,27 +28,6 @@ Item {
             : "checked " + Math.round(min / 60) + " h ago"
     }
 
-    component Button: Rectangle {
-        property string label
-        property bool primary: false
-        signal clicked()
-        Layout.fillWidth: true
-        Layout.preferredHeight: 34
-        radius: 10
-        opacity: enabled ? 1 : 0.4
-        color: primary ? Qt.rgba(root.accent.r, root.accent.g, root.accent.b, mouse.containsMouse ? 0.25 : 0.15)
-                       : mouse.containsMouse ? Theme.surfaceHover : Theme.surface
-        border.width: 1
-        border.color: primary ? Qt.rgba(root.accent.r, root.accent.g, root.accent.b, 0.4) : Theme.borderMuted
-        Text {
-            anchors.centerIn: parent
-            text: parent.label
-            color: parent.primary ? root.accent : Theme.text
-            font { family: Theme.fontFamily; pixelSize: Theme.fontNormal; bold: true }
-        }
-        MouseArea { id: mouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: parent.clicked() }
-    }
-
     ColumnLayout {
         id: column
         anchors { left: parent.left; right: parent.right; top: parent.top }
@@ -117,12 +96,14 @@ Item {
         RowLayout {
             Layout.fillWidth: true
             spacing: 10
-            Button {
+            SurfaceButton {
+                accent: root.accent
                 label: Updates.checking ? "Checking\u2026" : "Check now"
                 enabled: !Updates.checking
                 onClicked: Updates.check()
             }
-            Button {
+            SurfaceButton {
+                accent: root.accent
                 objectName: "updateButton"
                 label: "Update"
                 primary: true

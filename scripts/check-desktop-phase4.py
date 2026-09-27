@@ -599,6 +599,42 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
             calls = set((home / "update-calls").read_text().splitlines())
             assert calls == {"checkupdates ", "flatpak remote-ls --updates --columns=application", "paru -Qua"}, calls
 
+            # ---- 6.2 network and bluetooth surfaces (no NetworkManager or BlueZ here, so their
+            # empty states); in frame mode the System view's Wi-Fi/Bluetooth tiles open them ----
+            for name in ("network", "bluetooth"):
+                assert ipc("pill", name).returncode == 0
+                sv = wait_pill(lambda v: v["surface"] == name and v["tierH"] == v["tierTarget"] > 0, name + " surface")
+                assert sv["tierW"] == 400, sv
+                if name == "network":   # opening rescans: the refresh icon spins, then stops
+                    assert sv["wifiSpinning"] is True, sv
+                    wait_pill(lambda v: v["wifiSpinning"] is False, "refresh icon stops after the scan", timeout=5)
+            for tile, name in (("wifiTile", "network"), ("btTile", "bluetooth")):
+                assert ipc("pill", "system").returncode == 0
+                sv = wait_pill(lambda v: v["surface"] == "system" and v["tierH"] == v["tierTarget"] > 100
+                               and v[tile], "system surface")
+                pointer(*sv[tile][:2]); time.sleep(0.2)
+                subprocess.run(["xdotool", "click", "1"], env=env, check=True, timeout=5)
+                wait_pill(lambda v: v["surface"] == name, f"System {tile} opens {name}")
+            assert ipc("pill", "close").returncode == 0
+            wait_pill(lambda v: v["state"] == "rest", "closed")
+
+            # Bar chips: the hover highlight's padding takes clicks too, and a click on the glyph
+            # opens the surface once (a double fire would toggle it straight back closed).
+            assert ipc("pill", "open").returncode == 0
+            bar = wait_pill(lambda v: v["state"] == "hover" and v["volChip"], "bar row")
+            assert bar["caffeineChip"], "Caffeine is always in the expanded bar, even while off"
+            cx, cy, cw = bar["volChip"]
+            for x, what in ((cx, "glyph"), (cx - cw // 2 - 2, "highlight padding")):
+                pointer(x, cy); time.sleep(0.2)
+                subprocess.run(["xdotool", "click", "1"], env=env, check=True, timeout=5)
+                wait_pill(lambda v: v["surface"] == "sound", f"volume chip {what} opens Sound")
+                time.sleep(0.4)
+                assert pill()["surface"] == "sound", f"volume chip {what}: fired twice (toggled closed)"
+                assert ipc("pill", "closeSurface").returncode == 0
+                wait_pill(lambda v: v["surface"] == "" and v["tierH"] == 0, "sound closed")
+            assert ipc("pill", "close").returncode == 0
+            wait_pill(lambda v: v["state"] == "rest", "closed")
+
             # Collapse delay setting: global, per monitor, invalid values fall back.
             configure({"appearance": {"layout": "frame"}, "pill": {"collapseDelayMs": 1500}},
                       lambda v: v["pills"] and v["pills"][0]["collapseMs"] == 1500, "global delay")
@@ -689,6 +725,10 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
             print("      keyboard, Escape, reopens unfiltered, Super+/ toggles")
             print("PASS: updates (6.4): checkupdates + flatpak + paru -Qua counted, badge in the bar, surface;")
             print("      only those three read-only commands ever ran")
+            print("PASS: network/bluetooth (6.2): both surfaces open at 400 px; real clicks on the System")
+            print("      view's Wi-Fi and Bluetooth tiles open them in frame mode; refresh spins, then stops")
+            print("PASS: bar chips: a click on the glyph opens its surface once; the hover highlight's")
+            print("      padding takes clicks too (real pointer); Caffeine always in the bar")
             print("PASS: layers, per-surface namespaces, keyboard focus only for an open surface (static; Xvfb has no layer shell)")
             print("NOT TESTED: live Wayland exclusive zones, click-through, direct scanout or VRR")
         except Exception:

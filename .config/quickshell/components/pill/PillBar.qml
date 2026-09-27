@@ -26,7 +26,10 @@ Item {
         launcher: root.width / 2,
         clipboard: root.width / 2,
         cheatsheet: root.width / 2,
-        updates: row.x + updChip.x + updChip.width / 2
+        updates: row.x + updChip.x + updChip.width / 2,
+        network: row.x + wifiChip.x + wifiChip.width / 2,
+        // The Bluetooth chip only shows while it is on; otherwise grow from the System chip.
+        bluetooth: row.x + (btChip.visible ? btChip.x + btChip.width / 2 : ccChip.x + ccChip.width / 2)
     })
     signal powerRequested()
 
@@ -36,6 +39,46 @@ Item {
     component BarText: Text {
         color: Theme.text; font.family: Theme.fontFamily; font.pixelSize: Theme.fontBar
         verticalAlignment: Text.AlignVCenter; elide: Text.ElideRight
+    }
+    // Hover background for the chip it sits in (drawn behind the chip's own content), 24 px
+    // high and 4 px wider each side; a tap on that padding does what the chip does.
+    component ChipHighlight: Rectangle {
+        id: hl
+        signal tapped()
+        anchors.centerIn: parent
+        width: Math.max(24, parent.width + 8)
+        height: Math.max(24, parent.height)
+        z: -1
+        radius: 8
+        color: hlHover.hovered ? Theme.surfaceHover : "transparent"
+        Behavior on color { ColorAnimation { duration: Theme.animFast } }
+        HoverHandler { id: hlHover; cursorShape: Qt.PointingHandCursor }
+        TapHandler { onTapped: hl.tapped() }
+    }
+    // Clickable text chip: 24 px minimum target, hover background, accent and scale like the
+    // other chips.
+    component BarChip: Item {
+        id: chip
+        property alias text: label.text
+        property color tint: Theme.text
+        signal clicked()
+        implicitWidth: Math.max(24, label.implicitWidth + 8)
+        implicitHeight: 24
+        scale: chipMouse.containsMouse ? 1.08 : 1.0
+        Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutBack } }
+        Rectangle {
+            anchors.fill: parent
+            radius: 8
+            color: chipMouse.containsMouse ? Theme.surfaceHover : "transparent"
+            Behavior on color { ColorAnimation { duration: Theme.animFast } }
+        }
+        BarText {
+            id: label
+            anchors.centerIn: parent
+            color: chipMouse.containsMouse ? root.accent : chip.tint
+            Behavior on color { ColorAnimation { duration: Theme.animMedium } }
+        }
+        MouseArea { id: chipMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: chip.clicked() }
     }
 
     // Rest: fades out over the first 40% of the morph.
@@ -59,6 +102,7 @@ Item {
         opacity: row.opacity
         visible: opacity > 0
         text: root.time; font.bold: true
+        ChipHighlight { onTapped: root.surfaceRequested("dashboard") }
         MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.surfaceRequested("dashboard") }
     }
 
@@ -87,34 +131,59 @@ Item {
             text: Hyprland.activeToplevel ? Hyprland.activeToplevel.title : ""
         }
         Item { Layout.fillWidth: true }
-        BarText { color: Theme.pink; text: "\ue266 " + (Sysmon.cpu < 0 ? "--" : Sysmon.cpu) + "%" }
-        BarText { color: Theme.warning; text: "\uf2db " + (Sysmon.mem < 0 ? "--" : Sysmon.mem) + "%" }
+        // CPU/RAM give way on narrow bars so the right-hand chips never reach the centred clock.
+        // ponytail: fixed threshold (the chips need ~330 px of the half bar); the phase4 clock
+        // check on an 800 px screen catches it if the chip row grows.
+        BarText { visible: root.width >= 900; color: Theme.pink; text: "\ue266 " + (Sysmon.cpu < 0 ? "--" : Sysmon.cpu) + "%" }
+        BarText { visible: root.width >= 900; color: Theme.warning; text: "\uf2db " + (Sysmon.mem < 0 ? "--" : Sysmon.mem) + "%" }
         TrayArea { menuEdge: Edges.Top; Layout.fillWidth: false }   // a nested layout fills by default
-        BarText {
-            color: Net.wifiEnabled && Net.ssid ? root.accent : Theme.textDimmer
+        BarChip {
+            id: wifiChip
+            tint: Net.wifiEnabled && Net.ssid ? root.accent : Theme.textDimmer
             text: "\uf1eb"
+            onClicked: root.surfaceRequested("network")
         }
-        BarText { visible: Bt.enabled; color: Theme.purple; text: "\uf294" }
-        Volume { id: volChip; barAccent: root.accent; onChipClicked: root.surfaceRequested("sound") }
-        Microphone { barAccent: root.accent }
-        Caffeine { visible: Desktop.caffeine; barAccent: root.accent; active: true; onClicked: Desktop.toggleCaffeine() }
-        GameMode { visible: Desktop.gameMode; barAccent: root.accent; active: true; onClicked: Desktop.toggleGameMode() }
+        BarChip {
+            id: btChip
+            visible: Bt.enabled
+            tint: Theme.purple
+            text: "\uf294"
+            onClicked: root.surfaceRequested("bluetooth")
+        }
+        Volume {
+            id: volChip; objectName: "volChip"; barAccent: root.accent; onChipClicked: root.surfaceRequested("sound")
+            ChipHighlight { onTapped: root.surfaceRequested("sound") }
+        }
+        Microphone { barAccent: root.accent; ChipHighlight {} }   // its click (mute) is internal
+        Caffeine {
+            objectName: "caffeineChip"   // always in the bar; dim while off
+            barAccent: root.accent; active: true; on: Desktop.caffeine; onClicked: Desktop.toggleCaffeine()
+            ChipHighlight { onTapped: Desktop.toggleCaffeine() }
+        }
+        GameMode {
+            visible: Desktop.gameMode; barAccent: root.accent; active: true; onClicked: Desktop.toggleGameMode()
+            ChipHighlight { onTapped: Desktop.toggleGameMode() }
+        }
         NotificationCenter {
             id: notifChip
             barAccent: root.accent
             externalUnreadCount: Notifs.unreadCount
             dndEnabled: Notifs.dndEnabled
             onChipClicked: root.surfaceRequested("notifs")
+            ChipHighlight { onTapped: root.surfaceRequested("notifs") }
         }
-        ControlCenter { id: ccChip; barAccent: root.accent; onChipClicked: root.surfaceRequested("system") }
-        BarText {   // update badge (SPEC 6.4): only when something is waiting
+        ControlCenter {
+            id: ccChip; barAccent: root.accent; onChipClicked: root.surfaceRequested("system")
+            ChipHighlight { onTapped: root.surfaceRequested("system") }
+        }
+        BarChip {   // update badge (SPEC 6.4): only when something is waiting
             id: updChip
             objectName: "updateBadge"
             visible: Updates.total > 0
-            color: root.accent
+            tint: root.accent
             text: "\uf0ed " + Updates.total
-            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.surfaceRequested("updates") }
+            onClicked: root.surfaceRequested("updates")
         }
-        PowerMenu { onClicked: root.powerRequested() }
+        PowerMenu { onClicked: root.powerRequested(); ChipHighlight { onTapped: root.powerRequested() } }
     }
 }

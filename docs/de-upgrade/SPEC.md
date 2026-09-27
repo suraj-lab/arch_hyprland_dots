@@ -764,6 +764,65 @@ HDMI-A-1 stays readable (no inactive dimming), and everything is restored on exi
 - Writing monitor layout from the shell (use nwg-displays).
 
 ## Change log
+- 2026-09-27 - Phase 6.2 (Wi-Fi and Bluetooth surfaces), deployed and committed with Suraj's
+  approval. Wi-Fi verified live (inline password connect works). PENDING live test (Suraj,
+  later): pair a new Bluetooth device from the surface. Backup
+  `phase6-netbt-20260927-132453` (`new-files.txt`).
+  - `network` surface (bar Wi-Fi icon; in frame mode also the System view's Wi-Fi tile):
+    power switch, rescan (every 20 s while open), list (connected first, then signal),
+    and a card for the selected network: inline password (8-63 characters or 64 hex;
+    Enter connects, eye shows it), Connect / Disconnect / Forget, failure reason (wrong
+    password, timeout, network lost). The list is rebuilt on every signal change while
+    scanning, so the password field is in the card, never in a row.
+  - `Net.connectPsk` uses `WifiNetwork.connectWithPsk`; if a new profile fails, it is
+    forgotten so the next try asks again (a saved network that fails keeps its profile).
+    Enterprise (802.1X) networks show a pointer to nmtui.
+  - Hidden networks: `Quickshell.Networking` cannot see them, so `nmcli --ask --wait 45
+    device wifi connect <ssid> hidden yes`, argv only (no shell), and the password is
+    written to stdin, never argv (other processes can read argv from /proc). Stdin closes
+    after that one answer, so a second prompt (wrong password) fails at once; checked with
+    a real Process.
+  - `bluetooth` surface (bar Bluetooth icon; the System view's Bluetooth tile in frame
+    mode, which no longer toggles power directly: the switch is in the surface): power,
+    scan (30 s, again every 25 s while open), devices (connected, paired, then by name;
+    unnamed unpaired devices hidden), battery % when reported; Pair and connect (pair,
+    then trust, then connect), Connect, Disconnect, Forget.
+  - No BlueZ pairing agent (none runs, and Quickshell 0.3.1 has no agent API): devices
+    that need a PIN or passkey confirmed cannot pair here; use `bluetoothctl`.
+  - Classic mode unchanged: its System view keeps the network drill-in (and the terminal
+    fallback for new secured networks) and the Bluetooth power tile.
+  - `SurfaceButton.qml`: the updates surface's button, now shared by the three surfaces.
+  - Hover feedback (Suraj: some icons were hard to click and had no highlight): the bar's
+    Wi-Fi, Bluetooth and update chips are `BarChip`s (24 px minimum target, rounded hover
+    background, accent, 1.08 scale); every other bar chip (clock, volume, mic, Caffeine,
+    Game Mode, notifications, System, power) gets the same background via `ChipHighlight`
+    in PillBar, whose padding also takes the click (mic: highlight only, its mute click is
+    internal). The shared chip components are untouched, so the classic bar is unchanged.
+    In the surfaces: `SurfaceIcon` (28 px, rescan and show-password) and `SurfaceSwitch`
+    (hover ring), and "Hidden network" is a full-width row. The refresh icons spin (Suraj: "not just
+    static"): Bluetooth for its real 30 s discovery; Wi-Fi for 3 s after each requested scan
+    (NetworkManager keeps scanning while the surface is open, so there is no end to follow).
+  - Caffeine always in the expanded bar (Suraj): the chip stays, dimmed while off, click
+    toggles (`Caffeine.qml` gains `on`, default true, so classic still shows it only while
+    active). The System view already had its Caffeine tile; 6.5 Settings lists it too.
+    CPU/RAM readouts now hide on bars under 900 px, so the right-hand chips never reach
+    the centred clock (the phase4 800 px screen caught the overlap); real bars are 1200 px.
+  - Keyboard trouble and "freeze" after the Caffeine deploy (boot -1, 2026-09-27): not the
+    shell. The Moonlander (usb 7-6.1.1.3, on the CalDigit TS4 dock's hub 7-6.1.1) reset at
+    15:07:11 and never answered again (descriptor read -110); the dock's rear audio vanished
+    at the same instant (PipeWire front:6p). It survived the reboot: at 15:12 the Moonlander,
+    the dock's rear audio (7-6.1.1.4) and 7-6.1.5 still failed (-110/-71) until 15:18, so
+    the dock's hub itself was wedged (a reboot does not power-cycle the dock). The earlier
+    shell restarts that day (same ddcutil probe) had no USB errors; autosuspend is off for
+    the devices and no power daemon runs. The burst of `qs` processes in the journal was the
+    phase4 harness polling its private test shell (it now sets LC_ALL=C.UTF-8 like phase0,
+    so it no longer logs locale warnings). Backups under `phase6-netbt-20260927-132453/`
+    (`pre-hover/`, `pre-chip-highlight/`, `pre-caffeine/`) kept in case it recurs.
+  - Tests: unit tests for passphrase rules, new vs saved profiles, an invalid password
+    never reaching NetworkManager, hidden SSID password only on stdin, Bluetooth order,
+    battery, unnamed devices, pair before connect. phase4: both surfaces open at 400 px,
+    and real clicks on the System tiles open them. Live: both render with real networks
+    and devices, clean log.
 - 2026-09-26 - Phase 6.4 (update notifier), deployed and committed with Suraj's approval (after a real
   upgrade through the Update button, the recheck cleared the official and Flatpak counts). Backup
   `phase6-updates-20260926-234859` (`new-files.txt`).

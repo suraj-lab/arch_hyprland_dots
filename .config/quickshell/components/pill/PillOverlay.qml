@@ -33,7 +33,7 @@ PanelWindow {
     property bool hoverOpen: false
     property bool visited: false
     property string surface: ""
-    readonly property var surfaces: ["sound", "notifs", "system", "dashboard", "media", "launcher", "clipboard", "cheatsheet", "updates"]
+    readonly property var surfaces: ["sound", "notifs", "system", "dashboard", "media", "launcher", "clipboard", "cheatsheet", "updates", "network", "bluetooth"]
     readonly property bool edgeHovered: hotZone.containsMouse
     readonly property bool pillHovered: pillHover.hovered || baseHover.hovered || tierHover.hovered
     readonly property bool peeking: fullscreen && pinned
@@ -114,7 +114,8 @@ PanelWindow {
     readonly property var activeView: surface === "sound" ? soundView
         : surface === "notifs" ? notifsView : surface === "system" ? systemView
         : surface === "dashboard" ? dashView : surface === "launcher" ? launcherView
-        : surface === "cheatsheet" ? cheatsheetView : surface === "updates" ? updatesView : null
+        : surface === "cheatsheet" ? cheatsheetView : surface === "updates" ? updatesView
+        : surface === "network" ? networkView : surface === "bluetooth" ? bluetoothView : null
     // The tier rises only once the bar is fully wide (opening from the rest tab), so it
     // never slides with a growing bar; closing mirrors this (see `expanded`).
     readonly property int tierTarget: activeView && pill.width >= hoverWidth
@@ -127,7 +128,8 @@ PanelWindow {
     color: "transparent"
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "quickshell-pill"
-    // The launcher and cheatsheet are typed into straight away; the others only need Escape.
+    // The launcher and cheatsheet are typed into straight away; the others only need Escape
+    // (the network surface's password field takes focus on click).
     WlrLayershell.keyboardFocus: surface === "launcher" || surface === "cheatsheet" ? WlrKeyboardFocus.Exclusive : surface !== "" ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
     mask: Region {
         item: pill
@@ -142,6 +144,8 @@ PanelWindow {
     property alias launcher: launcherView
     property alias cheatsheet: cheatsheetView
     property alias updates: updatesView
+    property alias network: networkView
+    property alias bluetooth: bluetoothView
     property alias tierItem: tier
     property alias shape: shape
     PillShape {
@@ -279,8 +283,25 @@ PanelWindow {
                 visible: root.surface === "updates"
                 onCloseRequested: root.closeSurface()
             }
+            NetworkPanel {
+                id: networkView
+                anchors { left: parent.left; right: parent.right; top: parent.top }
+                accent: root.accent
+                active: root.surface === "network"
+                visible: root.surface === "network"
+                onCloseRequested: root.closeSurface()
+            }
+            BluetoothPanel {
+                id: bluetoothView
+                anchors { left: parent.left; right: parent.right; top: parent.top }
+                active: root.surface === "bluetooth"
+                visible: root.surface === "bluetooth"
+                onCloseRequested: root.closeSurface()
+            }
             SystemView {
                 id: systemView
+                surfaceLinks: true
+                onSurfaceRequested: name => root.openSurface(name, false)
                 anchors { left: parent.left; right: parent.right; top: parent.top }
                 barAccent: root.accent
                 viewActive: root.surface === "system"

@@ -61,6 +61,10 @@ ShellRoot {
                              current: p.launcher.current, armed: p.launcher.armed,
                              first: p.launcher.rows.length ? (p.launcher.rows[0].text || p.launcher.rows[0].title) : "" },
                  lastAction: root.lastAction, updateBadge: root.badge(p),
+                 wifiTile: root.center(p, "wifiTile"), btTile: root.center(p, "btTile"),
+                 volChip: root.center(p, "volChip", p.pillItem),
+                 caffeineChip: root.center(p, "caffeineChip", p.pillItem),
+                 wifiSpinning: root.spinning(p, "wifiRescan"),
                  sheet: { query: p.cheatsheet.query,
                           groups: p.cheatsheet.groups.map(function(g) { return g.name }),
                           shown: p.cheatsheet.shown.map(function(g) { return g.name }),
@@ -69,6 +73,14 @@ ShellRoot {
     }
 
     function badge(p) { var t = find(p.pillItem, "updateBadge"); return t && t.visible ? t.text : "" }
+    // Window (= screen) coordinates of a named item's centre, for real clicks; null if hidden.
+    function center(p, name, within) {
+        var t = find(within || p.tierItem, name)
+        if (!t || !t.visible || t.width === 0) return null
+        var c = t.mapToItem(null, t.width / 2, t.height / 2)
+        return [Math.round(c.x), Math.round(c.y), Math.round(t.width)]
+    }
+    function spinning(p, name) { var t = find(p.tierItem, name); return t ? t.spinning : null }
     function box(item) { return [item.x, item.y, item.width, item.height] }
     function find(item, name) {
         if (item.objectName === name) return item

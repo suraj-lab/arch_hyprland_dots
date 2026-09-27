@@ -62,6 +62,10 @@ Item {
         return sec >= 60 ? Math.round(sec / 60) + " min" : sec + " s"
     }
     property var screenTimeTracker: null   // ScreenTimeTracker instance from shell.qml
+    // Frame mode: the Wi-Fi and Bluetooth tiles open their surfaces (SPEC 6.2) instead of the
+    // classic network drill-in and Bluetooth power toggle.
+    property bool surfaceLinks: false
+    signal surfaceRequested(string name)
     signal dndToggled()
     signal closeRequested()
 
@@ -203,6 +207,7 @@ Item {
             // Wifi
             Rectangle {
                 id: wifiTile
+                objectName: "wifiTile"
                 Layout.fillWidth: true; height: 52; radius: 12
                 color: root.wifiEnabled ? Qt.rgba(root.barAccent.r,root.barAccent.g,root.barAccent.b,0.1) : Theme.surface
                 border.color: root.wifiEnabled ? Qt.rgba(root.barAccent.r,root.barAccent.g,root.barAccent.b,0.3) : Theme.borderMuted; border.width: 1
@@ -214,7 +219,11 @@ Item {
                 }
                 MouseArea {
                     anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
-                    onClicked: { wifiPress.start(); root.networkViewOpen = true; root.scanNetworks() }
+                    onClicked: {
+                        wifiPress.start()
+                        if (root.surfaceLinks) { root.surfaceRequested("network"); return }
+                        root.networkViewOpen = true; root.scanNetworks()
+                    }
                 }
                 ColumnLayout {
                     anchors.centerIn: parent; spacing: 3
@@ -226,6 +235,7 @@ Item {
             // Bluetooth
             Rectangle {
                 id: btTile
+                objectName: "btTile"
                 Layout.fillWidth: true; height: 52; radius: 12
                 color: root.bluetoothEnabled ? Qt.rgba(0.78,0.47,0.87,0.1) : Theme.surface
                 border.color: root.bluetoothEnabled ? Qt.rgba(0.78,0.47,0.87,0.3) : Theme.borderMuted; border.width: 1
@@ -235,7 +245,7 @@ Item {
                     NumberAnimation { target: btTile; property: "scale"; to: 0.93; duration: 80 }
                     NumberAnimation { target: btTile; property: "scale"; to: 1.0; duration: 200; easing.type: Easing.OutBack }
                 }
-                MouseArea { anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { btPress.start(); toggleBluetooth() } }
+                MouseArea { anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { btPress.start(); if (root.surfaceLinks) root.surfaceRequested("bluetooth"); else toggleBluetooth() } }
                 ColumnLayout {
                     anchors.centerIn: parent; spacing: 3
                     Text { text: "\uf294"; color: root.bluetoothEnabled ? Theme.purple : Theme.textDimmer; font.pixelSize: 16; font.family: Theme.fontFamily; Layout.alignment: Qt.AlignHCenter; Behavior on color { ColorAnimation { duration: Theme.animMedium } } }

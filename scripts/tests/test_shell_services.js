@@ -118,21 +118,23 @@ osd.check(); assert.equal(shown, 2);                                  // no chan
 console.log('PASS: OSD appears only on real volume/mute changes');
 
 // Net: the real functions with fake NetworkManager networks.
-const Sec = {Open: 0, Wpa2Psk: 1, toString: v => (v === 0 ? 'Open' : 'WPA2')};
+const Sec = {Open: 0, Wpa2Psk: 1, Wpa2Eap: 2, WpaEap: 3, Wpa3SuiteB192: 4, toString: v => (v === 0 ? 'Open' : 'WPA2')};
 const wnet = (name, extra = {}) => Object.assign({name, connected: false, known: false, signalStrength: 0.5,
-    security: Sec.Wpa2Psk, connects: 0, connect() { this.connects++; }}, extra);
+    security: Sec.Wpa2Psk, stateChanging: false, connects: 0, psks: [], connect() { this.connects++; },
+    connectWithPsk(k) { this.psks.push(k); }}, extra);
 const home = wnet('home', {connected: true, known: true, signalStrength: 0.72});
 const strong = wnet('cafe', {signalStrength: 0.9, security: Sec.Open});
 const saved = wnet('office', {known: true, signalStrength: 0.4});
 const hostile = wnet("x'; touch /tmp/pwned; echo '", {signalStrength: 0.3});
 const hidden = wnet('', {signalStrength: 0.99});
 const dispatched2 = [];
-const net = load('services/Net.qml', ['entry', 'sortNetworks', 'connect'],
+const net = load('services/Net.qml', ['entry', 'find', 'sortNetworks', 'connect', 'validPsk', 'track', 'connectKnown',
+    'connectPsk', 'connectHidden'],
     {WifiSecurityType: Sec, Hypr: {dispatch: lua => dispatched2.push(lua)}});
 Object.assign(net, {root: net, wifiDevice: {networks: {values: [saved, hostile, strong, home, hidden]}}});
 const list = JSON.parse(JSON.stringify(net.sortNetworks(net.wifiDevice.networks.values)));
 assert.deepEqual(list.map(n => n.ssid), ['home', 'cafe', 'office', hostile.name]);  // connected first, no hidden
-assert.deepEqual(list[0], {inUse: true, ssid: 'home', signal: 72, known: true, security: 'WPA2'});
+assert.deepEqual(list[0], {inUse: true, ssid: 'home', signal: 72, known: true, busy: false, enterprise: false, security: 'WPA2'});
 assert.equal(list[1].security, '');                                   // open: no label, like nmcli '--'
 net.connect('office'); net.connect('cafe'); net.connect('missing');
 assert.deepEqual([saved.connects, strong.connects, dispatched2.length], [1, 1, 0]);  // known/open: native
@@ -146,10 +148,52 @@ const argv = execFileSync('sh', ['-c', arg.replace('ghostty -e ', 'printf "%s\\n
 assert.deepEqual(argv.trimEnd().split('\n'), ['nmcli', 'dev', 'wifi', 'connect', hostile.name, '--ask']);
 console.log('PASS: Net list order/labels, native connect for known/open, untrusted SSID stays one argument');
 
-const bt = load('services/Bt.qml', ['toggle']);
+// 6.2 inline connect: passphrase rules, new vs saved profiles, hidden networks via nmcli stdin.
+assert.equal(net.entry(wnet('corp', {security: Sec.Wpa2Eap})).enterprise, true);
+for (const [psk, ok] of [['1234567', false], ['12345678', true], ['x'.repeat(63), true], ['x'.repeat(64), false],
+                         ['aB'.repeat(32), true], ['', false]]) assert.equal(net.validPsk(psk), ok, psk);
+Object.assign(net, {pending: '', pendingNew: false, error: {}});
+net.connectPsk(hostile.name, 'short');                                // invalid: never reaches NetworkManager
+assert.deepEqual([hostile.psks, net.pending], [[], '']);
+net.connectPsk(hostile.name, 'correct horse');
+assert.deepEqual([hostile.psks, net.pending, net.pendingNew], [['correct horse'], hostile.name, true]);
+net.connectKnown('office');                                           // saved: plain connect, never forgotten
+assert.deepEqual([saved.connects, net.pending, net.pendingNew], [2, 'office', false]);
+const nm = {running: false};
+Object.assign(net, {hidden: nm});
+net.connectHidden(hostile.name, 'short');                             // invalid password: nothing runs
+assert.equal(nm.running, false);
+net.connectHidden(hostile.name, 'hunter2hunter2');
+assert.deepEqual([...nm.command], ['nmcli', '--ask', '--wait', '45', 'device', 'wifi', 'connect', hostile.name, 'hidden', 'yes']);
+assert.equal(nm.psk, 'hunter2hunter2');                               // goes to stdin, not argv
+assert.ok(!nm.command.includes('hunter2hunter2') && nm.running);
+nm.command = null; net.connectHidden('other', '');                   // already running: ignored
+assert.equal(nm.command, null);
+nm.running = false; net.connectHidden('open-hidden', '');            // open hidden network: no password
+assert.deepEqual([nm.command[7], nm.psk], ['open-hidden', '']);
+console.log('PASS: Net inline connect (passphrase rules, new/saved profiles), hidden SSID password only on stdin');
+
+const State = {Disconnected: 0, Connected: 1, Disconnecting: 2, Connecting: 3};
+const bt = load('services/Bt.qml', ['toggle', 'entry', 'sortDevices', 'find', 'connect'], {BluetoothDeviceState: State});
 bt.adapter = {enabled: true}; bt.toggle(); assert.equal(bt.adapter.enabled, false);
 bt.adapter = null; bt.toggle();                                       // no adapter: no throw
-console.log('PASS: Bt power toggle');
+const dev = (name, address, extra = {}) => Object.assign({name, deviceName: name, address, icon: 'audio-headset',
+    connected: false, paired: false, trusted: false, pairing: false, state: State.Disconnected, batteryAvailable: false,
+    battery: 0, calls: [], pair() { this.calls.push('pair'); }, connect() { this.calls.push('connect'); }}, extra);
+const phones = dev('WH-1000XM4', '00:11:22:33:44:55', {paired: true, connected: true, batteryAvailable: true, battery: 0.8});
+const mouse = dev('MX Master', 'AA:BB:CC:DD:EE:01', {paired: true, icon: 'input-mouse'});
+const pad = dev('Xbox Controller', 'AA:BB:CC:DD:EE:02', {icon: 'input-gaming'});
+const beacon = dev('4C-1A-2B-3C-4D-5E', '4C:1A:2B:3C:4D:5E');          // BlueZ names unnamed devices by address
+const anon = dev('', '11:22:33:44:55:66', {deviceName: ''});
+const devs = bt.sortDevices([beacon, pad, mouse, anon, phones].map(bt.entry));
+assert.deepEqual(devs.map(d => d.name), ['WH-1000XM4', 'MX Master', 'Xbox Controller']);  // connected, paired, rest
+assert.deepEqual([devs[0].battery, devs[1].battery], [80, -1]);
+assert.equal(bt.entry(dev('x', 'y', {state: State.Connecting})).busy, true);
+bt.adapter = {devices: {values: [phones, mouse, pad]}}; bt.pending = '';
+bt.connect('AA:BB:CC:DD:EE:01'); assert.deepEqual([mouse.calls, bt.pending], [['connect'], '']);   // paired: connect
+bt.connect('AA:BB:CC:DD:EE:02'); assert.deepEqual([pad.calls, bt.pending], [['pair'], 'AA:BB:CC:DD:EE:02']);
+bt.connect('missing');                                                // gone since the list was drawn: no throw
+console.log('PASS: Bt power toggle, device list (order, battery, unnamed hidden), pair before connect');
 
 // Brightness: parse the real `ddcutil detect --brief` output into connector → bus.
 const io = {running: false, command: [], writing: false};
