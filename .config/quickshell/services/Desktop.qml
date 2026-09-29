@@ -41,8 +41,11 @@ Item {
     property string gameModeOverride: "auto"    // "auto" | "on" | "off"
     property bool gameMode: false             // last acknowledged backend state
     property string gameModeError: ""
-    readonly property bool desiredGameMode: gameModeOverride === "on"
-                                            || (gameModeOverride !== "off" && gamemodedActive)
+    // "on" wins; "off" wins; otherwise follow the auto toggle (Config.gaming) and gamemoded.
+    function wantGameMode(override, auto, active) {
+        return override === "on" || (override !== "off" && auto && active)
+    }
+    readonly property bool desiredGameMode: wantGameMode(gameModeOverride, Config.gaming.autoGameMode, gamemodedActive)
     readonly property bool idleEnabled: !caffeine && !gameMode
 
     readonly property string idleStatus: caffeine ? "Paused · caffeine"

@@ -99,7 +99,9 @@ ShellRoot {
                           groups: p.cheatsheet.groups.map(function(g) { return g.name }),
                           shown: p.cheatsheet.shown.map(function(g) { return g.name }),
                           items: p.cheatsheet.shown.reduce(function(n, g) { return n + g.items.length }, 0),
-                          other: p.cheatsheet.groups.filter(function(g) { return g.name === "Other" }).length } }
+                          other: p.cheatsheet.groups.filter(function(g) { return g.name === "Other" }).length },
+                 monitors: p.settings.monitors.map(function(m) { return m.name + " " + m.mode }),
+                 defaults: p.settings.defaultAppTypes.map(function(t) { return t.key + "=" + p.settings.currentDefault(t.key) }) }
     }
 
     function badge(p) { var t = find(p.pillItem, "updateBadge"); return t && t.visible ? t.text : "" }

@@ -12,14 +12,16 @@ const state = {
     gameModeError: '', dndEnabled: false, _gameChecked: false, _gamemodedKnown: true,
     gameModeProc: {running: false}, gameResult: {text: ''}, gameError: {text: ''},
     Quickshell: {shellDir: '/test'}, Qt: {callLater: fn => pending.push(fn)},
+    Config: {gaming: {autoGameMode: true}},   // the auto toggle defaults on
     console: {warn() {}},
     dndRequested(value) { state.dndEnabled = value; },
 };
-// Use the binding expression from the component as well.
+// Use the binding expression from the component as well (it now calls wantGameMode).
 const desired = source.match(/readonly property bool desiredGameMode: ([\s\S]*?)\n    readonly property/)[1];
-Object.defineProperty(state, 'desiredGameMode', {get: () => vm.runInContext(desired, context)});
 state.root = state;
 const context = vm.createContext(state);
+vm.runInContext(source.match(/    function wantGameMode\([^)]*\) \{[\s\S]*?^    \}/m)[0], context);
+Object.defineProperty(state, 'desiredGameMode', {get: () => vm.runInContext(desired, context)});
 for (const name of ['toggleGameMode', 'syncGameMode']) {
     const body = source.match(new RegExp(`    function ${name}\\(\\) \\{([\\s\\S]*?)^    \\}`, 'm'))[1];
     vm.runInContext(`function ${name}() {${body}}`, context);

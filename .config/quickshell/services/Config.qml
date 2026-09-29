@@ -61,6 +61,13 @@ QtObject {
                  animations: values.animations !== false }
     }
 
+    // Gaming (SPEC 6.5): "Game Mode follows games" is the Desktop Game Mode auto toggle.
+    // Only an explicit false disables it (the previous always-on behaviour is the default).
+    readonly property var gaming: {
+        var values = settingsData.gaming || {}
+        return { autoGameMode: values.autoGameMode !== false }
+    }
+
     // Pill preferences; monitors.<name>.pill overrides the global pill section.
     // hoverExpand false = rest-only, click (or double-tap Super) to expand.
     function pillFor(monitorName) {

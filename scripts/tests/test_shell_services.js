@@ -487,3 +487,45 @@ Object.assign(caf, {caffeine: false, Config: {set: (k, v) => { writes.push([k, v
 caf.toggleCaffeine(); caf.toggleCaffeine(); caf.toggleCaffeine();
 assert.deepEqual([caf.caffeine, writes], [true, [['idle.caffeine', true], ['idle.caffeine', false], ['idle.caffeine', true]]]);
 console.log('PASS: Caffeine toggles are written to settings.json (idle.caffeine)');
+
+// Settings 6.5b: monitors, default apps (xdg-mime) and gaming status parsers.
+const st2 = load('components/pill/surfaces/SettingsPanel.qml',
+    ['parseMonitors', 'parseDefaults', 'candidates', 'parseGaming']);
+const monitors = st2.parseMonitors(JSON.stringify([
+    {name: 'DP-2', description: 'Dell Inc. AW3423DWF 70742S3', width: 3440, height: 1440,
+     refreshRate: 164.89999, x: 1920, y: -400, scale: 1, vrr: false, focused: true},
+    {name: 'HDMI-A-1', description: 'ViewSonic Corporation VX2476 Series UPA213310203', width: 1920,
+     height: 1080, refreshRate: 74.973, x: 0, y: 0, scale: 1, vrr: false, focused: false}]));
+assert.deepEqual(plain(monitors), [
+    {name: 'HDMI-A-1', description: 'ViewSonic Corporation VX2476 Series UPA213310203', mode: '1920x1080 @ 75 Hz',
+     scale: 1, position: '0, 0', vrr: false, focused: false},
+    {name: 'DP-2', description: 'Dell Inc. AW3423DWF 70742S3', mode: '3440x1440 @ 165 Hz',
+     scale: 1, position: '1920, -400', vrr: false, focused: true}]);   // sorted by x; 164.89999 -> 165 Hz
+assert.deepEqual(plain(st2.parseMonitors('not json')), []);
+assert.deepEqual(plain(st2.parseMonitors('{}')), []);                     // an object, not an array
+assert.deepEqual(plain(st2.parseMonitors('[{"width": 1920}]')), []);     // no name: skipped
+assert.deepEqual(plain(st2.parseDefaults(
+    'D=x-scheme-handler/https=firefox.desktop\nD=inode/directory=thunar.desktop\nD=image/png=\n'
+    + '[MIME Cache]\nx-scheme-handler/https=firefox.desktop;\n')),
+    {'x-scheme-handler/https': 'firefox.desktop', 'inode/directory': 'thunar.desktop', 'image/png': ''});
+assert.deepEqual(Array.from(st2.candidates(
+    '[MIME Cache]\nx-scheme-handler/https=firefox.desktop;zyxtest.desktop;\n'
+    + 'x-scheme-handler/https=firefox.desktop;thunar.desktop;\n'
+    + 'inode/directory=thunar.desktop;\n', 'x-scheme-handler/https')),
+    ['firefox.desktop', 'zyxtest.desktop', 'thunar.desktop']);            // deduped, order kept
+assert.deepEqual(Array.from(st2.candidates('inode/directory=thunar.desktop;\n', 'image/png')), []);
+assert.deepEqual(plain(st2.parseGaming('helper=yes\ndaemon=/usr/bin/gamemoded\n')),
+    {helper: true, daemon: '/usr/bin/gamemoded'});
+assert.deepEqual(plain(st2.parseGaming('helper=no\ndaemon=missing\n')), {helper: false, daemon: ''});
+console.log('PASS: settings 6.5b monitors (sorted, Hz rounded, invalid JSON), xdg-mime defaults/candidates, gaming status');
+
+// "Game Mode follows games" (Config.gaming.autoGameMode): the pure toggle behind desiredGameMode.
+const gm = load('services/Desktop.qml', ['wantGameMode']);
+assert.equal(gm.wantGameMode('on', false, false), true);
+assert.equal(gm.wantGameMode('on', false, true), true);
+assert.equal(gm.wantGameMode('off', true, true), false);
+assert.equal(gm.wantGameMode('off', true, false), false);
+assert.equal(gm.wantGameMode('auto', false, true), false);                // auto toggle off
+assert.equal(gm.wantGameMode('auto', true, true), true);
+assert.equal(gm.wantGameMode('auto', true, false), false);                // no game running
+console.log('PASS: Game Mode auto toggle (wantGameMode truth table: override wins, auto gated by the setting)');

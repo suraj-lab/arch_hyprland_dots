@@ -47,8 +47,20 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
                        "udisksctl": '[ "$1" = monitor ] && { while kill -0 $PPID 2>/dev/null; do sleep 0.5; done; exit 0; }; echo "$*" >> "$HOME/udisks-calls"; '
                                     '[ "$1" = power-off ] && echo \'{"blockdevices":[]}\' > "$HOME/lsblk.json"; exit 0',
                        "thunar": 'echo "$*" >> "$HOME/thunar-calls"',
-                       # Cheatsheet (5.2) reads `hyprctl binds -j`; nothing else may reach Hyprland.
-                       "hyprctl": 'if [ "$*" = "binds -j" ]; then cat "$HOME/binds.json"; else exit 1; fi',
+                       # Cheatsheet (5.2) reads `hyprctl binds -j`; settings (6.5b) reads `hyprctl monitors -j`.
+                       "hyprctl": 'if [ "$*" = "binds -j" ]; then cat "$HOME/binds.json"; '
+                                  'elif [ "$*" = "monitors -j" ]; then cat "$HOME/monitors.json"; else exit 1; fi',
+                       # Settings (6.5b) default apps: query answers from $HOME/mime-defaults;
+                       # `default` logs the whole argv and updates the first type's answer.
+                       "xdg-mime": 'if [ "$1" = query ]; then '
+                                   'g=$(grep "^$3=" "$HOME/mime-defaults" 2>/dev/null | head -1); '
+                                   '[ -n "$g" ] && printf "%s\\n" "${g#*=}"; '
+                                   'elif [ "$1" = default ]; then '
+                                   't=$3; printf "%s\\n" "$*" >> "$HOME/xdg-mime-calls"; '
+                                   'grep -v "^$t=" "$HOME/mime-defaults" > "$HOME/mime-defaults.tmp" 2>/dev/null; '
+                                   'mv "$HOME/mime-defaults.tmp" "$HOME/mime-defaults"; '
+                                   'printf "%s=%s\\n" "$t" "$2" >> "$HOME/mime-defaults"; '
+                                   'else exit 1; fi',
                        "hyprlock": "exit 1", "pactl": "exit 0", "curl": "exit 1",
                        "ddcutil": "exit 1",
                        # Launcher (5.1): fake calculator, clipboard history and wl-copy.
@@ -85,6 +97,24 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
         bind(64, "slash", "Shell: Keybind cheatsheet"), bind(0, "XF86AudioMute", "Media: Mute audio")]))
     (config_dir / "scripts").mkdir()
     (config_dir / "scripts/desktop-gamemode.py").write_text('print(\'{"gameMode":false,"dnd":false}\')\n')
+    # Settings (6.5b): the two real monitors (sorted by x in the surface), the live default
+    # apps, and a local mimeinfo.cache with an extra resolvable browser candidate.
+    (home / "monitors.json").write_text(json.dumps([
+        {"name": "DP-2", "description": "Dell Inc. AW3423DWF 70742S3", "width": 3440, "height": 1440,
+         "refreshRate": 164.89999, "x": 1920, "y": -400, "scale": 1, "vrr": False, "focused": True},
+        {"name": "HDMI-A-1", "description": "ViewSonic Corporation VX2476 Series UPA213310203", "width": 1920,
+         "height": 1080, "refreshRate": 74.973, "x": 0, "y": 0, "scale": 1, "vrr": False, "focused": False}]))
+    (home / "mime-defaults").write_text(
+        "x-scheme-handler/https=firefox.desktop\n"
+        "inode/directory=thunar.desktop\n"
+        "text/plain=codium.desktop\n"
+        "image/png=viewnior.desktop\n")
+    (apps / "mimeinfo.cache").write_text(
+        "[MIME Cache]\n"
+        "x-scheme-handler/https=firefox.desktop;zyxtest.desktop;\n"
+        "inode/directory=thunar.desktop;\n"
+        "text/plain=codium.desktop;\n"
+        "image/png=viewnior.desktop;\n")
     # Xvfb has no layer shell, so its attached properties cannot be created there.
     # Check them statically in the real files, then drop them from the private copy.
     for name, namespace in (("frame/Frame.qml", '"quickshell-frame"'),
@@ -809,6 +839,49 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
             assert ipc("pill", "close").returncode == 0
             wait_pill(lambda v: v["state"] == "rest", "closed")
 
+            # ---- 6.5b settings: displays, sound, network/bluetooth links, default apps, gaming ----
+            configure({"appearance": {"layout": "frame"}, "custom": {"keep": [1, 2]}},
+                      lambda v: v["pills"] and v["pills"][0]["animate"], "6.5b baseline")
+            assert ipc("pill", "settings").returncode == 0
+            wait_pill(lambda v: v["surface"] == "settings" and v["tierH"] == v["tierTarget"] > 0, "settings surface")
+            # Displays: both monitors parsed from the fake `hyprctl monitors -j`, sorted by x.
+            click_at("section:displays", "Displays")
+            wait_state(lambda v: v["pills"][0]["monitors"] ==
+                       ["HDMI-A-1 1920x1080 @ 75 Hz", "DP-2 3440x1440 @ 165 Hz"], "both monitors listed, sorted")
+            # Sound: no PipeWire in the sandbox, so the empty state; the link opens the sound surface.
+            click_at("section:sound", "Sound")
+            click_at("openSound", "Volume and apps link")
+            wait_pill(lambda v: v["surface"] == "sound", "settings' sound link opens the sound surface")
+            assert ipc("pill", "settings").returncode == 0
+            wait_pill(lambda v: v["surface"] == "settings" and v["tierH"] == v["tierTarget"], "back to settings, settled")
+            # Network & Bluetooth links open their surfaces.
+            click_at("section:connections", "Network & Bluetooth")
+            click_at("openNetwork", "Wi-Fi Open")
+            wait_pill(lambda v: v["surface"] == "network", "network surface")
+            assert ipc("pill", "settings").returncode == 0
+            wait_pill(lambda v: v["surface"] == "settings" and v["tierH"] == v["tierTarget"], "back to settings, settled")
+            click_at("section:connections", "Network & Bluetooth")
+            click_at("openBluetooth", "Bluetooth Open")
+            wait_pill(lambda v: v["surface"] == "bluetooth", "bluetooth surface")
+            assert ipc("pill", "settings").returncode == 0
+            wait_pill(lambda v: v["surface"] == "settings" and v["tierH"] == v["tierTarget"], "back to settings, settled")
+            # Default apps: pick a candidate and confirm the exact xdg-mime command + the new row.
+            click_at("section:defaults", "Default apps")
+            click_at("default:browser", "browser chooser")
+            click_at("candidate:zyxtest.desktop", "Zyxtest Launcher candidate")
+            wait_file(home / "xdg-mime-calls",
+                      b"default zyxtest.desktop x-scheme-handler/https x-scheme-handler/http text/html application/xhtml+xml\n")
+            wait_state(lambda v: "browser=zyxtest.desktop" in v["pills"][0]["defaults"], "browser re-queried to the chosen app")
+            # Gaming: the switch writes gaming.autoGameMode and unknown keys are kept.
+            click_at("section:gaming", "Gaming")
+            click_at("autoGameMode", "Game Mode follows games switch")
+            data = wait_settings(lambda d: d.get("gaming", {}).get("autoGameMode") is False, "gaming.autoGameMode written")
+            assert data["custom"] == {"keep": [1, 2]} and data["appearance"]["layout"] == "frame", data
+            click_at("autoGameMode", "switch again")
+            wait_settings(lambda d: d.get("gaming", {}).get("autoGameMode") is True, "gaming.autoGameMode restored")
+            assert ipc("pill", "close").returncode == 0
+            wait_pill(lambda v: v["state"] == "rest", "closed")
+
             # Collapse delay setting: global, per monitor, invalid values fall back.
             configure({"appearance": {"layout": "frame"}, "pill": {"collapseDelayMs": 1500}},
                       lambda v: v["pills"] and v["pills"][0]["collapseMs"] == 1500, "global delay")
@@ -911,6 +984,9 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
             print("PASS: settings (6.5a): opened from System's link, 920x560 clamped; real clicks on rest")
             print("      style, animations, lock/suspend timeouts, temperature and the from stepper write")
             print("      settings.json (unknown keys kept) and take effect; a malformed file is never overwritten")
+            print("PASS: settings (6.5b): displays (both monitors, sorted, read-only), sound empty state + link,")
+            print("      network/bluetooth links, default apps (the exact xdg-mime default command, the row")
+            print("      re-queried), Game Mode auto toggle written to settings.json (unknown keys kept)")
             print("PASS: layers, per-surface namespaces, keyboard focus only for an open surface (static; Xvfb has no layer shell)")
             print("NOT TESTED: live Wayland exclusive zones, click-through, direct scanout or VRR")
         except Exception:

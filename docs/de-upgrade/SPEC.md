@@ -764,6 +764,45 @@ HDMI-A-1 stays readable (no inactive dimming), and everything is restored on exi
 - Writing monitor layout from the shell (use nwg-displays).
 
 ## Change log
+- 2026-09-29 - Phase 6.5b (Settings: displays, sound, network/bluetooth links, default apps,
+  gaming), deployed live with a backup and verified (config loaded, polkit agent registered,
+  hyprsunset still running). Backup `phase6-settings-b-20260929-133109` (`files/`, the live
+  `settings.json` and `mimeapps.list`, `new-files.txt`).
+  - Five new Settings sections, in order: Displays, Sound, Network & Bluetooth, Default apps,
+    Gaming. Displays is read-only (parsed from `hyprctl monitors -j`, sorted by x, with a hint
+    to edit hypr/modules/monitors.lua). Sound lists the PipeWire sinks and sources as selectable
+    rows (the default device persists via WirePlumber, not settings.json) and links to the
+    Volume surface. Network & Bluetooth are status rows whose buttons open their surfaces.
+  - Default apps sets the browser, file manager, text editor and image viewer through
+    `xdg-mime default` (the generic backend rewrites the live mimeapps.list in place, keeping
+    comments, other keys and sections). The current default comes from `xdg-mime query default`;
+    candidates come from every `applications/mimeinfo.cache` under XDG_DATA_HOME/XDG_DATA_DIRS,
+    resolved through DesktopEntries.byId (hidden/unknown apps dropped); the current default is
+    always offered first. Each category is an inline chooser (a button that expands to a
+    candidate list; no popup window).
+  - Gaming shows read-only status (the /usr/local/bin/switch-to-gaming helper, the gamemoded
+    daemon, and whether a game is active now) plus a "Game Mode follows games" switch persisted
+    as `gaming.autoGameMode` (default true = the old behaviour). Desktop's desiredGameMode
+    binding now calls a pure wantGameMode(override, auto, active) function; a manual off still
+    wins, and turning the auto toggle off only stops a game from auto-enabling it.
+  - Deviations from the SPEC, both Suraj's call: no "Open nwg-displays" button (he doesn't use
+    it, and it would save a hyprland.conf monitors.conf that this Lua config never loads), and
+    no Default-apps terminal row (Ghostty is the only terminal, hardcoded in binds.lua and the
+    shell, and xdg-terminal-exec is not installed; a MIME default for a terminal does not exist
+    anyway).
+  - Tests: unit tests for parseMonitors (both real monitors, sorted, 164.9 -> 165 Hz, invalid
+    JSON), the xdg-mime defaults/candidates parsers, the gaming status parser and the
+    wantGameMode truth table; phase4 with fake hyprctl/xdg-mime: both monitors listed, the sound
+    empty state and link, the network/bluetooth links, the exact
+    `xdg-mime default <id> <types...>` command and the row re-query, and the Game Mode auto
+    toggle landing in settings.json (unknown keys kept). test_desktop_controller.js now also
+    loads wantGameMode (the binding calls it) and stubs Config.gaming.autoGameMode. Rendered
+    previews in `~/.cache/pill-preview/settings-b-{displays,sound,connections,defaults,gaming}.png`.
+  - Not tested: a shell restart with `gaming.autoGameMode` false. It is read by the same
+    Config path as `appearance.animations`, which phase4 checks at startup; the live check
+    is Suraj's. Review fixes before commit: Displays cards right-align the mode/scale lines,
+    the Sound link button says Open, and a second default-app pick is ignored while
+    `xdg-mime` is still running.
 - 2026-09-27 - Phase 6.5a (Settings surface: appearance, power & idle, night light, keybinds,
   about), deployed and committed with Suraj's approval (live: settings survive a restart,
   handle rest style opens on the rest-only monitor, Caffeine remembered). Backup `phase6-settings-20260927-214601`
