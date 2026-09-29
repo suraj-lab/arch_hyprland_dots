@@ -764,6 +764,27 @@ HDMI-A-1 stays readable (no inactive dimming), and everything is restored on exi
 - Writing monitor layout from the shell (use nwg-displays).
 
 ## Change log
+- 2026-09-29 - Lock screen guard, deployed and live-tested with Suraj. Backup
+  `lock-guard-20260929-172414` (`files/`, `new-files.txt`, `v1/` = the first guard version).
+  - Found: after a long idle (lock at 10 min, screens off at 30 min) Hyprland showed "lockscreen
+    app died" and Suraj had to power off. No core dump, and nothing in the journal; hyprlock's
+    output went to the shell's log in /run, lost on reboot. Matches the known hyprlock death when
+    a monitor powers off (hyprlock#375, #953); DP-2 is a QD-OLED that goes into deep standby.
+    Keeping screens on while locked was rejected (OLED burn-in).
+  - `quickshell/scripts/lock.sh` runs hyprlock and starts it again at once if it exits without
+    an unlock (quick repeated failures back off 1-4 s, then it gives up, so a broken hyprlock
+    can't loop). flock keeps one guard; output goes to the journal (`journalctl -t hyprlock`,
+    `-t hyprlock-guard`). `misc.allow_session_lock_restore = true` lets the new hyprlock take the
+    existing lock.
+  - Every lock path uses it: the shell's idle lock, launcher Lock and the classic session menu
+    start it detached (the idle lock used to be a shell-owned child, killed by any shell
+    restart), and hypridle's `lock_cmd` (lock-session, before sleep). Ctrl+Alt+L still runs plain
+    hyprlock (frozen keybind).
+  - Tests: `scripts/tests/test_lock_guard.py` (fake hyprlock: crash restarts in under 1 s, unlock
+    ends, broken hyprlock gives up after 5, one guard, locked elsewhere), run by phase0. Live:
+    `pkill -9 hyprlock` while locked was replaced in 44 ms (Hyprland's placeholder shows for a
+    frame; the session stays locked) and the password worked; a 30 s DPMS off/on while locked did
+    not kill hyprlock, so the long-standby trigger is still unconfirmed.
 - 2026-09-29 - Phase 6.5b (Settings: displays, sound, network/bluetooth links, default apps,
   gaming), deployed live with a backup and verified (config loaded, polkit agent registered,
   hyprsunset still running). Backup `phase6-settings-b-20260929-133109` (`files/`, the live

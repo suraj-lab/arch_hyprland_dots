@@ -53,6 +53,8 @@ hl.config({
 		mouse_move_enables_dpms = true,
 		enable_swallow = true,
 		swallow_regex = "^(ghostty)$",
+		-- A new hyprlock may take over a lock whose hyprlock died (quickshell/scripts/lock.sh).
+		allow_session_lock_restore = true,
 	},
 
 	render = {

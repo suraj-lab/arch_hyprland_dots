@@ -72,6 +72,7 @@ for file in qml:
 print(f"PASS: Lua/Bash/Python syntax and Qt 6 parsing ({len(qml)} QML files)")
 print(run("python3", "scripts/tests/test_desktop_gamemode.py").strip())
 print(run("node", "scripts/tests/test_desktop_controller.js").strip())
+print(run("python3", "scripts/tests/test_lock_guard.py").strip())
 
 # Only the toast component runs, offscreen, without access to the session bus.
 with tempfile.TemporaryDirectory(prefix="qt-check-", dir=ROOT / "scripts/tests") as tmp:

@@ -171,7 +171,9 @@ Item {
     }
 
     // ── Idle chain ────────────────────────────────────────────────────────
-    Process { id: lockProc;    command: ["bash", "-c", "pidof hyprlock >/dev/null || hyprlock"] }
+    // Detached through the guard (scripts/lock.sh): a shell restart must never kill the lock,
+    // and a hyprlock that dies while locked is started again.
+    function lock() { Quickshell.execDetached([Quickshell.shellDir + "/scripts/lock.sh"]) }
     Process { id: dpmsOffProc; command: ["hyprctl", "dispatch", "hl.dsp.dpms({ action = \"off\" })"] }
     Process { id: dpmsOnProc;  command: ["hyprctl", "dispatch", "hl.dsp.dpms({ action = \"on\" })"] }
     Process { id: suspendProc; command: ["systemctl", "suspend"] }
@@ -180,7 +182,7 @@ Item {
         enabled: root.idleEnabled && root.lockTimeout > 0
         timeout: root.lockTimeout
         respectInhibitors: true
-        onIsIdleChanged: if (isIdle) lockProc.running = true
+        onIsIdleChanged: if (isIdle) root.lock()
     }
 
     IdleMonitor {

@@ -99,7 +99,6 @@ ShellRoot {
     }
 
 
-    Process { id: pLock;    command: ["hyprlock"]                            }
     Process { id: pSuspend; command: ["systemctl", "suspend"]               }
     Process { id: pReboot;  command: ["systemctl", "reboot"]                }
     Process { id: pOff;     command: ["systemctl", "poweroff"]              }
@@ -117,7 +116,7 @@ ShellRoot {
         case "cheatsheet": { const p = focusedPill(); if (p) p.openSurface("cheatsheet", false); break }
         case "settings": { const p = focusedPill(); if (p) p.openSurface("settings", false); break }
         case "screenshot": screenshotIpc.area(); break
-        case "lock": pLock.running = true; break
+        case "lock": Desktop.lock(); break
         case "suspend": pSuspend.running = true; break
         case "logout": Hypr.dispatch("hl.dsp.exit()"); break
         case "reboot": pReboot.running = true; break
@@ -585,7 +584,7 @@ ShellRoot {
                                 scale: h1.containsMouse ? 1.07 : 1.0
                                 Behavior on color { ColorAnimation { duration: 150 } }
                                 Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutBack } }
-                                MouseArea { id: h1; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { pLock.running = true; sessionOpen = false } }
+                                MouseArea { id: h1; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { Desktop.lock(); sessionOpen = false } }
                                 ColumnLayout { anchors.centerIn: parent; spacing: 5
                                     Text { text: "\uf023"; color: h1.containsMouse ? Theme.accent : Theme.textDimmer; font.pixelSize: 26; font.family: Theme.fontFamily; Layout.alignment: Qt.AlignHCenter; Behavior on color { ColorAnimation { duration: 150 } } }
                                     Text { text: "Lock"; color: h1.containsMouse ? Theme.accent : Theme.textDim; font.pixelSize: Theme.fontSm; font.bold: true; font.family: Theme.fontFamily; Layout.alignment: Qt.AlignHCenter; Behavior on color { ColorAnimation { duration: 150 } } }
