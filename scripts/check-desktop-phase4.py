@@ -15,7 +15,7 @@ import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
-for command in ("Xvfb", "qs", "magick", "xdotool", "lua", "dbus-run-session"):
+for command in ("Xvfb", "xvfb-run", "xauth", "qs", "magick", "xdotool", "lua", "dbus-run-session"):
     if not shutil.which(command):
         raise SystemExit(f"Missing test dependency: {command} (nothing installed)")
 
@@ -134,20 +134,26 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
                 "SESSION_MANAGER", "SWAYSOCK", "I3SOCK", "PIPEWIRE_REMOTE", "PIPEWIRE_RUNTIME_DIR",
                 "PULSE_SERVER"):
         env.pop(key, None)
-    # A private display is needed: Quickshell has no offscreen PanelWindow backend.
-    read_fd, write_fd = os.pipe()
+    # -displayfd can steal Hyprland's filesystem socket when its abstract socket is
+    # disabled. xvfb-run -a respects display locks (do not replace -a with -d).
+    sockets = {p: p.lstat().st_ino for p in Path("/tmp/.X11-unix").glob("*")}
     shell = None
-    with (home / "xvfb.log").open("w+") as xlog, (home / "shell.log").open("w+") as log:
-        display = subprocess.Popen(["Xvfb", "-displayfd", str(write_fd), "-screen", "0",
-                                    "800x600x24", "-nolisten", "tcp"],
-                                   env=env, pass_fds=(write_fd,), stdout=xlog, stderr=xlog)
-        os.close(write_fd)
+    with (home / "shell.log").open("w+") as log:
+        # Publish the private environment, then keep Xvfb alive until stdin closes.
+        # Let xvfb-run exit normally so it removes its server and temporary auth file.
+        display = subprocess.Popen(["xvfb-run", "-a", "-s", "-screen 0 800x600x24",
+                                    "-e", str(home / "xvfb.log"), "sh", "-c",
+                                    'printf "%s\\n%s\\n" "$DISPLAY" "$XAUTHORITY"; cat >/dev/null'],
+                                   env=dict(env, TMPDIR=tmp), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                   stderr=log, text=True, start_new_session=True)
         try:
-            if not select.select([read_fd], [], [], 5)[0]:
+            if not select.select([display.stdout], [], [], 10)[0]:
                 raise AssertionError("Private Xvfb did not start")
-            number = os.read(read_fd, 32).decode().strip()
-            assert number.isdigit(), "Xvfb did not return a private display number"
-            env["DISPLAY"] = ":" + number
+            env["DISPLAY"] = display.stdout.readline().strip()
+            env["XAUTHORITY"] = display.stdout.readline().strip()
+            assert env["DISPLAY"].startswith(":") and env["DISPLAY"][1:].isdigit(), "Invalid private display"
+            assert env["DISPLAY"] != os.environ.get("DISPLAY"), "Xvfb must not use the desktop display"
+            assert Path(env["XAUTHORITY"]).is_file(), "Missing private X authority file"
             shell = subprocess.Popen(["qs", "--no-color", "--path", str(fixture)],
                                      cwd=ROOT, env=env, stdout=log, stderr=log)
 
@@ -909,21 +915,33 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
             print("NOT TESTED: live Wayland exclusive zones, click-through, direct scanout or VRR")
         except Exception:
             log.flush()
+            print((home / "xvfb.log").read_text()[-2000:])
             print((home / "shell.log").read_text()[-6000:])
             raise
         finally:
-            os.close(read_fd)
-            for proc in (shell, display):
-                if proc is not None:
-                    if getattr(proc, "group", False):
+            try:
+                if shell is not None:
+                    if getattr(shell, "group", False):
                         try:
-                            os.killpg(proc.pid, signal.SIGTERM)
+                            os.killpg(shell.pid, signal.SIGTERM)
                         except ProcessLookupError:
                             pass
                     else:
-                        proc.terminate()
+                        shell.terminate()
                     try:
-                        proc.wait(timeout=5)
+                        shell.wait(timeout=5)
                     except subprocess.TimeoutExpired:
-                        proc.kill()
-                        proc.wait()
+                        shell.kill()
+                        shell.wait()
+            finally:
+                display.stdin.close()
+                try:
+                    display.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    os.killpg(display.pid, signal.SIGKILL)
+                    display.wait()
+                finally:
+                    display.stdout.close()
+                assert all(p.exists() and p.lstat().st_ino == inode for p, inode in sockets.items()), \
+                    "Private Xvfb changed an existing X11 socket"
+                assert display.returncode == 0, "xvfb-run failed to shut down cleanly"
