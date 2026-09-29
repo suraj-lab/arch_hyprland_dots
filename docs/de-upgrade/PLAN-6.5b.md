@@ -52,7 +52,7 @@ light, Default apps, Gaming, Keybinds, About. Keys: `displays`, `sound`, `connec
 `\uf53f` rendering as tofu). Known-good in this repo: `\uf108` desktop, `\uf028` volume,
 `\uf1eb` wifi, `\uf1de` sliders, `\uf11b` gamepad. Verify each in the render preview.
 
-With 10 sections the left list must still fit 560 px tall; check it in the render (§5.3). If it
+With 10 sections the left list must still fit 560 px tall; check it in the render (§4.3). If it
 does not fit, reduce the entry height/spacing, do not add scrolling to the list.
 
 ### 2.1 Displays (read-only)
@@ -96,10 +96,14 @@ one whose candidates are offered; setting a category writes **all** its types in
 | Files | `inode/directory` |
 | Text editor | `text/plain`, `text/markdown`, `text/x-python`, `text/x-csrc`, `text/x-chdr`, `text/x-lua`, `application/x-shellscript`, `application/json`, `application/xml`, `application/toml`, `application/x-yaml` |
 | Images | `image/png`, `image/jpeg`, `image/gif`, `image/bmp`, `image/tiff`, `image/svg+xml` |
-| Terminal | read-only, see **Decision D2** |
 
 (Types mirror the repo's `.config/mimeapps.list`; `application/pdf` stays with the browser file
 entry and is deliberately not touched.)
+
+**No terminal row** (SPEC lists one; deliberate deviation, Suraj's call: Ghostty is his only
+terminal, and there is no MIME default for terminals anyway: it is hardcoded as `ghostty` in
+`binds.lua` (frozen), `services/Net.qml` and `services/Updates.qml`, and `xdg-terminal-exec` is
+not installed). Record the deviation in the SPEC change-log entry.
 
 - **Current default:** `xdg-mime query default <firstType>` per category (one `Process` per
   query, run sequentially or in a single `sh -c` that prints `type=value` lines; parse with a pure
@@ -142,14 +146,7 @@ entry and is deliberately not touched.)
 - Button **"Enter Gaming Mode"**: do **not** add one (not in SPEC; the key bind and launcher
   entry already exist).
 
-## 3. Decision for Suraj (implement the default; list it in the final report)
-
-- **D2, terminal has no MIME default.** The terminal is `ghostty`, hardcoded in
-  `binds.lua` (`local terminal = "ghostty"`, frozen), `services/Net.qml` and
-  `services/Updates.qml`; `xdg-terminal-exec` is not installed. Default: a read-only row
-  "Terminal: Ghostty (set in hypr binds)". Do not add a setting.
-
-## 4. Files expected to change
+## 3. Files expected to change
 
 - `components/pill/surfaces/SettingsPanel.qml`: new sections, pure helpers, processes.
   If it grows past ~700 lines, move **only** the Default apps section into a new
@@ -165,9 +162,9 @@ entry and is deliberately not touched.)
   6.5a entry's style; mark "deployed; not yet committed").
 - **Not** `shell.qml`, `PillOverlay.qml`, `Theme.qml` unless a real need appears.
 
-## 5. Tests (all must pass before deploy)
+## 4. Tests (all must pass before deploy)
 
-### 5.1 Unit (`node scripts/tests/test_shell_services.js`)
+### 4.1 Unit (`node scripts/tests/test_shell_services.js`)
 
 The loader (`load(file, names)`) extracts `function name(...) {` by regex and needs **exactly
 one space before `{`**. Add one `PASS:` line covering:
@@ -180,7 +177,7 @@ Real monitors on this host (fixture):
 `DP-2 3440x1440@164.89999 scale 1 vrr false pos 1920,-400 "Dell Inc. AW3423DWF 70742S3"`,
 `HDMI-A-1 1920x1080@74.973 scale 1 vrr false pos 0,0 "ViewSonic Corporation VX2476 Series UPA213310203"`.
 
-### 5.2 Integration (`python3 scripts/check-desktop-phase4.py`)
+### 4.2 Integration (`python3 scripts/check-desktop-phase4.py`)
 
 Private Xvfb, fake `$HOME`, command stubs in a dict near the top (see `"hyprctl"`,
 `"udisksctl"`, `"thunar"`). Required stub changes:
@@ -222,21 +219,21 @@ Harness quirks: use `LC_ALL=C.UTF-8` (already set); pointer must be over the win
 `activeFocus` is unreliable; after the run, `pgrep -af 'Xvfb|fake_mpris|dbus-run-session'`
 must be empty.
 
-### 5.3 Visual check
+### 4.3 Visual check
 
 Render the Settings surface for every new section to `~/.cache/pill-preview/settings-b-<section>.png`
 using the phase4 sandbox (there is prior art for screenshots in this workflow: `import -window root`
 or `xwd` on the private Xvfb display). Look at each image: no tofu glyphs, controls
 right-aligned, nothing clipped, section list fits.
 
-### 5.4 Full regression
+### 4.4 Full regression
 
 `node scripts/tests/test_shell_services.js`, `python3 scripts/check-desktop-phase0.py`,
 `python3 scripts/check-desktop-phase3.py`, `python3 scripts/check-desktop-phase4.py` all exit 0,
 twice for phase4 (it has timing-sensitive steps). `git diff --check` clean. `qmllint` shows no
 new warnings in touched files compared with HEAD.
 
-## 6. Live deploy (only after section 5 passes)
+## 5. Live deploy (only after section 4 passes)
 
 Follow the established procedure exactly (see the 6.5a deploy in the session history / SPEC):
 1. Preflight: for every file to be copied, live `~/.config/quickshell/<f>` == `git show HEAD:...`;
@@ -251,16 +248,16 @@ Follow the established procedure exactly (see the 6.5a deploy in the session his
    (ignore icon/qt.svg noise); live == repo for copied files; polkit agent still registered.
 6. Do not change any default app live yourself. Tell Suraj what to try.
 
-## 7. Report back to Suraj
+## 6. Report back to Suraj
 
-Plain, short: what each section does, how to open it, the D2 outcome, exact live test steps (switch browser and back via Settings,
+Plain, short: what each section does, how to open it, exact live test steps (switch browser and back via Settings,
 confirm `xdg-mime query default x-scheme-handler/https`; switch output device; toggle
 "Game Mode follows games" and restart the shell), backup path, and the proposed commit message.
 Then wait.
 
-## 8. Done when
+## 7. Done when
 
-- All five SPEC 6.5b areas present and behaving as above (Displays without nwg-displays);
-  D2 default implemented.
-- Section 5 green (phase4 twice), no stray processes, diff check clean.
+- All five SPEC 6.5b areas present and behaving as above (Displays without nwg-displays,
+  Default apps without a terminal row).
+- Section 4 green (phase4 twice), no stray processes, diff check clean.
 - Deployed live with backup; SPEC change-log entry written; nothing committed.
