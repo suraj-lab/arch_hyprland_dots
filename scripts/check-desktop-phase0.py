@@ -42,6 +42,10 @@ old, _, added = current.partition(NEW_BINDS)
 WOFI_CLIPBOARD = "killall wofi || cliphist list | wofi --dmenu | cliphist decode | wl-copy"
 expected = run("git", "show", f"{BASE}:{binds}").replace("qs msg ", "qs ipc call ")
 assert expected.count(WOFI_CLIPBOARD) == 1, "base Super+V bind not found"
+# Ctrl+Alt+L locks through the guard, which restarts a hyprlock that dies while locked.
+PLAIN_LOCK = 'hl.dsp.exec_cmd("hyprlock")'
+assert expected.count(PLAIN_LOCK) == 1, "base Ctrl+Alt+L bind not found"
+expected = expected.replace(PLAIN_LOCK, 'hl.dsp.exec_cmd("~/.config/quickshell/scripts/lock.sh")')
 # Description labels (the cheatsheet, SPEC 5.2) are metadata: drop them before comparing,
 # so the keys and commands themselves must still match byte for byte.
 DESC = r'"[^"]*"(?: \.\. \w+)?'

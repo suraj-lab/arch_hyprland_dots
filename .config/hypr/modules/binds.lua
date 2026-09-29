@@ -64,7 +64,7 @@ end)
 
 hl.bind(mainMod .. " + SHIFT + F", toggle_workspace_float, { description = "Windows: Float whole workspace" })
 hl.bind(mainMod .. " + SHIFT + P", hl.dsp.window.pseudo(), { description = "Windows: Pseudo-tile" })
-hl.bind("CTRL + ALT + L", hl.dsp.exec_cmd("hyprlock"), { description = "Session: Lock" })
+hl.bind("CTRL + ALT + L", hl.dsp.exec_cmd("~/.config/quickshell/scripts/lock.sh"), { description = "Session: Lock" })
 hl.bind(mainMod .. " + SHIFT + W", hl.dsp.exec_cmd("qs ipc call wallpicker toggle"), { description = "Shell: Wallpaper picker" })
 
 -- Gaming Mode: switch to Steam Big Picture in Gamescope (Deck Mode).
