@@ -147,14 +147,28 @@ Item {
         return night ? ["hyprctl", "hyprsunset", "temperature", String(settings.temperature)]
                      : ["hyprctl", "hyprsunset", "identity"]
     }
+    // Every CTM change stalls Hyprland's main thread ~30-60 ms on amdgpu (cursor/frame hitch),
+    // even when the value is unchanged, so only send a different command. A failed send is
+    // retried on the next minute tick.
+    property string _nightApplied: ""
     function applyNightLight() {
-        if (nightLight) Quickshell.execDetached(nightLightCommand(new Date(), Config.nightLight))
+        if (!nightLight || nightApplyProc.running) return
+        var cmd = nightLightCommand(new Date(), Config.nightLight)
+        if (cmd.join(" ") === _nightApplied) return
+        _nightApplied = cmd.join(" ")
+        nightApplyProc.command = cmd
+        nightApplyProc.running = true
+    }
+    Process {
+        id: nightApplyProc
+        onExited: function(code) { if (code !== 0) root._nightApplied = "" }
     }
     // Once a minute, on settings changes, and (hyprsunset needs a moment for its IPC
     // socket) shortly after it starts.
     Timer { interval: 60000; running: root.nightLight; repeat: true; onTriggered: root.applyNightLight() }
     Timer { id: nightStart; interval: 700; onTriggered: root.applyNightLight() }
-    onNightLightChanged: if (nightLight) nightStart.restart()
+    // A (re)started hyprsunset begins neutral, so forget what the old one was sent.
+    onNightLightChanged: { _nightApplied = ""; if (nightLight) nightStart.restart() }
     Connections { target: Config; function onNightLightChanged() { root.applyNightLight() } }
 
     // Reflect external starts/stops as well as our own toggles.
