@@ -764,6 +764,22 @@ HDMI-A-1 stays readable (no inactive dimming), and everything is restored on exi
 - Writing monitor layout from the shell (use nwg-displays).
 
 ## Change log
+- 2026-10-03 - Phase 8 code cleanup, approved item by item by Suraj; deployed live.
+  Backup `phase8-classic-20261003-191917` (`files/` = the live files before the change).
+  - `d51ecdc`: deleted `SessionMenu.qml` (nothing instantiated it).
+  - `241ec5c`: removed the classic layout. Gone from shell.qml: the bar, launcher overlay,
+    OSD and toast windows. Deleted: AppLauncher, BarClock, OSD, SysInfo, UnifiedPanel.
+    `appearance.layout` is no longer read (an old key is ignored). Frame lost
+    `reserveTop`/`pillShown`. Kept: NotificationToasts (the drawer reuses it) and
+    ScreenshotOverlay (one copy, in use; no duplicate existed).
+  - `43f7a64`: `polkit-kde-agent` dropped from desktop-core.txt and the README list.
+    Suraj uninstalled it at 19:20:45 (no other packages removed); the shell's agent
+    stays registered.
+  - Checks: Phase 0/3/4 (full private-Xvfb run), JS service tests, check-official.
+    Live: shell restarted with no QML errors, frame/pill/reserves per monitor, no classic
+    windows, launcher IPC opens the pill surface.
+  - Remaining Phase 8: README and bootstrap docs, deferred until after Phase 7 (uwsm) so
+    they are written once.
 - 2026-10-03 - Phase 6 live checks with Suraj. Backup `phase6-livecheck-20261003-190147`.
   - Passed: Default apps change and restore (Images to Firefox and back; only the six image
     defaults changed; mimeapps.list byte-identical to the backup afterwards). Browser could not
