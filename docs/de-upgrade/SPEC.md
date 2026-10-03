@@ -764,6 +764,18 @@ HDMI-A-1 stays readable (no inactive dimming), and everything is restored on exi
 - Writing monitor layout from the shell (use nwg-displays).
 
 ## Change log
+- 2026-10-03 - Phase 6 live checks with Suraj. Backup `phase6-livecheck-20261003-190147`.
+  - Passed: Default apps change and restore (Images to Firefox and back; only the six image
+    defaults changed; mimeapps.list byte-identical to the backup afterwards). Browser could not
+    be switched: Firefox is the only installed browser.
+  - Passed: lock and screen-off timeouts, night light temperature, Game Mode auto toggle and
+    default sink survived a Quickshell restart; polkit agent re-registered, no QML errors.
+    Restored afterwards; night light now saved as 3500 K (was the 4000 K default).
+  - Deferred by Suraj: Bluetooth pairing from scratch (no device to hand) and clean re-login
+    autostart check. Phase 6 is otherwise complete.
+  - Lian Li daemon now started from autostart (`297cde7`): it is PartOf graphical-session.target,
+    which Gaming Mode's exit stops and plain Hyprland never restarts. Verify on the next Gaming
+    Mode return. Phase 7 (uwsm) would make this line unnecessary.
 - 2026-09-30 - Gaming Mode Steam preparation: scoped freeze exception approved by Suraj;
   this is NOT approval for the Phase 7 uwsm migration. Suraj tested `--prepare-only`
   successfully and installed the first version. A subsequent full-switch test exposed
