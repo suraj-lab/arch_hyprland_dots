@@ -764,6 +764,13 @@ HDMI-A-1 stays readable (no inactive dimming), and everything is restored on exi
 - Writing monitor layout from the shell (use nwg-displays).
 
 ## Change log
+- 2026-10-03 - Phase 8 docs. README gains "The desktop": session, Hyprland Lua layout, the
+  Quickshell shell, Gaming Mode, the keybind table (from binds.lua), the official-only package
+  policy, theming (matugen) and a settings.json reference (keys and defaults from Config.qml).
+  docs/bootstrap.md: log in as Hyprland (uwsm-managed), uwsm and the shell's polkit/notification
+  roles in desktop-core, the steamos-session-select override and the autostart overrides.
+  Checks: bootstrap `--dry-run --yes` (rc 0), check-official, Phase 0, no dead component names.
+  All phases are done; the open items are listed under Phase 7 below.
 - 2026-10-03 - Phase 7 (uwsm), approved in writing by Suraj; uwsm 0.27.0 installed by Suraj.
   - Stage 1 `c104636`: `uwsm app --` for autostart, the app binds and the launcher; logout runs
     `uwsm stop` under uwsm; dropped the redundant dbus-update-activation-environment line

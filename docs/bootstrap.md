@@ -32,7 +32,7 @@ Default profile: desktop-core + daily apps + Gaming Mode + Flatpaks + dotfiles +
    reboot
    ```
 
-5. Log into Hyprland via SDDM. Run `pi` once to log in (auth is per-machine).
+5. Log in via SDDM as **Hyprland (uwsm-managed)**; plain Hyprland is a fallback. Run `pi` once to log in (auth is per-machine).
 6. Re-add data disks to fstab (see "Multiple disks" below).
 
 ## archinstall choices
@@ -91,7 +91,7 @@ Everything it replaces is backed up under `~/.local/state/suraj-bootstrap/backup
 
 Package manifests live in `packages/` (one name per line, `#` comments):
 
-- **desktop-core.txt** — official repos only (enforced by `scripts/check-official.sh` in `--dry-run`). Hyprland, hyprlock, quickshell, SDDM, PipeWire/WirePlumber stack, xdg-desktop-portal-hyprland/-gtk, polkit agent, ghostty, starship, firefox, thunar, mpv, viewnior (the default apps in `.config/mimeapps.list`), clipboard/screenshot tooling (wl-clipboard, cliphist, grim/slurp, hyprpicker), night light (hyprsunset), lock-before-sleep hooks (hypridle), wallpapers/theming (awww, matugen, nwg-look/displays, adw-gtk-theme, qt5ct/qt6ct, papirus), keyring (gnome-keyring, seahorse), devices (udisks2, udiskie, gvfs, bluez, ddcutil), fonts (noto, JetBrains Mono Nerd), networkmanager, btop, fastfetch. paru is built by the bootstrap itself.
+- **desktop-core.txt** — official repos only (enforced by `scripts/check-official.sh` in `--dry-run`). Hyprland, hyprlock, quickshell (also the notification daemon and polkit agent), uwsm (the session manager), SDDM, PipeWire/WirePlumber stack, xdg-desktop-portal-hyprland/-gtk, ghostty, starship, firefox, thunar, mpv, viewnior (the default apps in `.config/mimeapps.list`), clipboard/screenshot tooling (wl-clipboard, cliphist, grim/slurp, hyprpicker), night light (hyprsunset), lock-before-sleep hooks (hypridle), wallpapers/theming (awww, matugen, nwg-look/displays, adw-gtk-theme, qt5ct/qt6ct, papirus), keyring (gnome-keyring, seahorse), devices (udisks2, udiskie, gvfs, bluez, ddcutil), fonts (noto, JetBrains Mono Nerd), networkmanager, btop, fastfetch. paru is built by the bootstrap itself.
 - **daily-apps.txt** — shells/editors/dev (zsh, neovim, vim, vscodium, github-cli, go, php, python-pip, qmk, fd, tree), terminals/monitoring (kitty, htop, nvtop, dysk), browsers/comms/media (brave, webcord, spotify, vlc, obs-studio, libreoffice, localsend, zoom, icaclient, lmstudio), files/disks/network (file-roller, gnome-disk-utility, gvfs stack, udiskie, samba, freerdp, tigervnc, wireshark, gufw), printing/scanning (cups, hplip, simple-scan, sane), hardware/RGB/fans (openrgb, lact, fancontrol-gui, lianli-linux-git, ddcutil, fwupd, smartmontools), archives/Hackintosh utilities (7zip, testdisk, dmg2img, hfsprogs, uefitool, acpica).
 - **gaming-mode.txt** — gamescope + gamescope-session-cachyos, jupiter-hw-support, steam, proton-cachyos, gamemode, mangohud/goverlay, lutris, protontricks/protonup-qt, vulkan-radeon (+lib32s), python-evdev, udisks2.
 - **gpu-amd.txt / gpu-nvidia.txt / gpu-intel.txt** — auto-selected via `lspci` (override with `--gpu`). AMD uses RADV (`vulkan-radeon`), the driver Valve targets for Proton — with CachyOS repos enabled, mesa/vulkan/gamescope automatically resolve to CachyOS-optimized builds. NVIDIA uses `nvidia-open-dkms` (NVIDIA's recommended default for Turing/GTX 16xx+; older cards: swap to `nvidia-dkms`). Note: the Gaming Mode gamescope session is validated on AMD only — on NVIDIA expect desktop Steam to work but the SteamOS-style session may need fiddling.
@@ -108,7 +108,8 @@ Package manifests live in `packages/` (one name per line, `#` comments):
 - installs package manifests from `packages/`
 - adds Flathub and installs `packages/flatpak-apps.txt`
 - copies selected dotfiles into `$HOME`, backing up existing files under `~/.local/state/suraj-bootstrap/backups/`
-- deploys Gaming Mode root helpers from `deploy/gaming/`
+- deploys Gaming Mode root helpers from `deploy/gaming/`, including `/usr/local/bin/steamos-session-select`, which makes Steam's *Switch to Desktop* use the repo's own switch back to the desktop
+- copies `.config/autostart/` overrides that keep xwaylandvideobridge and nm-applet from autostarting (uwsm runs XDG autostart)
 - installs a scoped sudoers rule for `/usr/local/bin/gaming-session-switch`
 - clones the qylock SDDM theme pack and installs the boot-time random theme rotation service
 - installs Node.js, the pi.dev coding agent (`@earendil-works/pi-coding-agent` + `context-mode`) into `~/.npm-global`, and copies the captured pi config from `pi/` into `~/.pi/agent/` (auth is per-machine: run `pi` once and log in)

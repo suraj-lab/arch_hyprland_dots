@@ -4,6 +4,83 @@ This is my in progress dotfiles for me home config of arch. This is for hyprland
 [Demo Video][![Video](https://img.youtube.com/vi/vaMaudCnLJ8/maxresdefault.jpg)](https://www.youtube.com/watch?v=vaMaudCnLJ8)
 
 
+## The desktop
+
+- **Session:** log in through SDDM as **Hyprland (uwsm-managed)**. uwsm runs Hyprland and every
+  app as systemd units, so logout shuts them down in order. Plain **Hyprland** stays
+  selectable as a fallback.
+- **Hyprland** is configured in Lua: `.config/hypr/hyprland.lua` loads `modules/`
+  (monitors, env, autostart, binds, rules, animations, options, devices, wallpaper).
+- **Quickshell** (`.config/quickshell/`) is the whole shell: a thin frame around each monitor and
+  a pill at the bottom centre that grows into the bar row and its surfaces (dashboard,
+  launcher, clipboard, sound, notifications, network, Bluetooth, devices, updates, settings,
+  keybind cheatsheet). Toasts and the volume/brightness OSD slide in from the edges. It is also
+  the notification daemon and the polkit (password prompt) agent.
+- **Gaming Mode** (`Super+Shift+S`) switches to a SteamOS-style gamescope session and back. Steam's
+  *Switch to Desktop*, `Super+Shift+R` inside Gaming Mode, or a reboot return to the desktop.
+  See `docs/gaming-mode.md`.
+
+### Keybinds
+
+`Super+/` shows all of them in the shell, read live from Hyprland.
+
+| Keys | Action |
+|---|---|
+| `Super+Return` / `Super+E` / `Super+B` | terminal (Ghostty) / file manager (Thunar) / Firefox |
+| `Super+Space` | launcher: apps, `=` calculator, `>` actions |
+| `Super+V` | clipboard history |
+| `Super+D` | dashboard |
+| `Super` double-tap | peek the pill |
+| `Super+W` / `Super+Shift+W` | workspace overview / wallpaper picker |
+| `Super+C` | close window |
+| `Super+F` / `Super+P` / `Super+Shift+P` | fullscreen / toggle floating / pseudo-tile |
+| `Super+Shift+F` | float the whole workspace (new windows too) |
+| `Super+arrows` / `Super+Shift+arrows` | focus / move window |
+| `Super+6..0` / `Super+Shift+6..0` | go to / move window to workspace 1-5 |
+| `Super+scroll`, `Super+LMB/RMB drag` | next/previous workspace, move/resize window |
+| `Super+Shift+N` / `Alt+Shift+S` | toggle scratchpad / move window there |
+| `Alt+M` / `Alt+Return` | Spotify / terminal scratchpads |
+| `Print` / `Ctrl+Shift+S` | screenshot whole screen / area |
+| `Ctrl+Alt+L` | lock |
+| `Super+Shift+S` | Gaming Mode |
+| media keys | volume, mute, mic mute, play/pause, next/previous |
+
+### Packages
+
+`packages/desktop-core.txt` holds official-repo packages only (core/extra/multilib), checked by
+`scripts/check-official.sh packages/desktop-core.txt`. AUR and personal apps live in the other
+manifests. After editing `desktop-core.txt`, run `scripts/sync-readme-pkglist.sh`.
+
+### Theming
+
+Pick a wallpaper with `Super+Shift+W`. `extract-accent.sh` takes each monitor's accent colour
+from its wallpaper and runs matugen, which writes GTK 3/4, qt5ct/qt6ct, Ghostty and Hyprland
+colours from `.config/matugen/templates`. `apply-theme.sh` applies the GTK theme through gsettings at
+login. Icons, fonts and the cursor are left as they are.
+
+### Settings
+
+The shell's Settings surface (launcher `>settings`, or *All settings* in the System view)
+writes `~/.config/quickshell/settings.json`, which the shell reloads on every change. Missing or
+invalid values fall back to these defaults:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `idle.lockSec` / `idle.dpmsSec` / `idle.suspendSec` | 600 / 900 / 0 | lock, screens off, suspend after N seconds idle (0 = never) |
+| `idle.caffeine` | `false` | keep the session awake (remembered across restarts) |
+| `nightLight.temperature` | 4000 | colour temperature in K (1000-6500) |
+| `nightLight.from` / `nightLight.to` | `"19:30"` / `"09:00"` | night light schedule (may wrap past midnight) |
+| `appearance.animations` | `true` | pill and surface animations |
+| `pill.restStyle` | `"tab"` | pill at rest: `"tab"` (clock + workspaces) or `"handle"` |
+| `pill.hoverExpand` | `true` | grow the pill when the pointer reaches it |
+| `pill.collapseDelayMs` | 700 | delay before the pill collapses (0-5000) |
+| `monitors.<output>.pill.*` | | the same pill keys for one monitor, e.g. `monitors.HDMI-A-1` |
+| `gaming.autoGameMode` | `true` | desktop Game Mode (DND on, effects off) while a game runs |
+| `weather.location` | `""` | wttr.in location (empty: located by IP) |
+| `brightness.buses` | `{}` | DDC/CI bus per output for ddcutil, e.g. `{"DP-2": 5}` (empty: detected) |
+
+The plan and history of this setup are in `docs/de-upgrade/SPEC.md`.
+
 ## Initial installation
 This can be done manually or via archinstall. If done via archinstall, choose a minimal/Hyprland-capable install with NetworkManager and PipeWire.
 
