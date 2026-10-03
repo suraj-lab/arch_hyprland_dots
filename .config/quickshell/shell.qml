@@ -99,6 +99,16 @@ ShellRoot {
     Process { id: pSuspend; command: ["systemctl", "suspend"]               }
     Process { id: pReboot;  command: ["systemctl", "reboot"]                }
     Process { id: pOff;     command: ["systemctl", "poweroff"]              }
+    // Logout: a uwsm session must end through uwsm (ordered unit shutdown, SPEC Phase 7);
+    // the plain Hyprland session exits the compositor directly.
+    Process {
+        id: pLogout
+        command: ["systemctl", "--user", "-q", "is-active", "wayland-wm@*.service"]
+        onExited: function(code) {
+            if (code === 0) Quickshell.execDetached(["uwsm", "stop"])
+            else Hypr.dispatch("hl.dsp.exit()")
+        }
+    }
 
     // Launcher ">" actions (SPEC 5.1), run after the launcher has closed.
     function runShellAction(id) {
@@ -115,7 +125,7 @@ ShellRoot {
         case "screenshot": screenshotIpc.area(); break
         case "lock": Desktop.lock(); break
         case "suspend": pSuspend.running = true; break
-        case "logout": Hypr.dispatch("hl.dsp.exit()"); break
+        case "logout": pLogout.running = true; break
         case "reboot": pReboot.running = true; break
         case "poweroff": pOff.running = true; break
         default: console.warn("runShellAction: unknown action", id)
@@ -415,7 +425,7 @@ ShellRoot {
                                 scale: h2.containsMouse ? 1.07 : 1.0
                                 Behavior on color { ColorAnimation { duration: 150 } }
                                 Behavior on scale { NumberAnimation { duration: 120; easing.type: Easing.OutBack } }
-                                MouseArea { id: h2; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { Hypr.dispatch("hl.dsp.exit()"); sessionOpen = false } }
+                                MouseArea { id: h2; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: { pLogout.running = true; sessionOpen = false } }
                                 ColumnLayout { anchors.centerIn: parent; spacing: 5
                                     Text { text: "\uf2f5"; color: h2.containsMouse ? Theme.warning : Theme.textDimmer; font.pixelSize: 26; font.family: Theme.fontFamily; Layout.alignment: Qt.AlignHCenter; Behavior on color { ColorAnimation { duration: 150 } } }
                                     Text { text: "Logout"; color: h2.containsMouse ? Theme.warning : Theme.textDim; font.pixelSize: Theme.fontSm; font.bold: true; font.family: Theme.fontFamily; Layout.alignment: Qt.AlignHCenter; Behavior on color { ColorAnimation { duration: 150 } } }

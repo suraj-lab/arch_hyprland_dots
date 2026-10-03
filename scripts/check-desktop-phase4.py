@@ -62,6 +62,8 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
                                    'printf "%s=%s\\n" "$t" "$2" >> "$HOME/mime-defaults"; '
                                    'else exit 1; fi',
                        "hyprlock": "exit 1", "pactl": "exit 0", "curl": "exit 1",
+                       # Launcher apps go through `uwsm app --` (Phase 7): log the argv only.
+                       "uwsm": 'printf "%s\\n" "$*" >> "$HOME/uwsm-calls"',
                        "ddcutil": "exit 1",
                        # Launcher (5.1): fake calculator, clipboard history and wl-copy.
                        "qalc": 'printf "%s\\n" "$@" > "$HOME/qalc-args"; echo "\u221242"',   # real qalc: U+2212 minus
@@ -83,7 +85,7 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
         "tran": "usb", "children": [{
             "name": "sdb1", "path": "/dev/sdb1", "type": "part", "hotplug": True, "rm": True, "size": "28.9G",
             "label": "STICK", "fstype": "exfat", "mountpoints": ["/run/media/suraj/STICK"]}]}]}))
-    # Launcher (5.1): a findable app whose launch leaves a mark, and a clipboard image.
+    # Launcher (5.1): a findable app (launched through the uwsm stub), and a clipboard image.
     apps = home / ".local/share/applications"
     apps.mkdir(parents=True)
     (apps / "zyxtest.desktop").write_text("[Desktop Entry]\nType=Application\nName=Zyxtest Launcher\n"
@@ -574,7 +576,7 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
             wait_pill(lambda v: v["launcher"]["query"] == "zyxtest" and v["launcher"]["count"] == 1, "app found")
             keys(win, "Return")
             wait_pill(lambda v: v["surface"] == "", "launching closes the launcher")
-            wait_file(home / "launched", b"")
+            wait_file(home / "uwsm-calls", b"app -- zyxtest.desktop\n")
 
             _, win = open_launcher()                      # reopens empty
             assert pill()["launcher"]["query"] == ""

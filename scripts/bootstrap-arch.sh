@@ -442,7 +442,7 @@ copy_dotfiles() {
   say "Copying dotfiles into $TARGET_HOME"
   local paths=(
     .bashrc .zshrc
-    .config/environment.d .config/gamescope .config/ghostty .config/hypr .config/matugen
+    .config/autostart .config/environment.d .config/gamescope .config/ghostty .config/hypr .config/matugen
     .config/mimeapps.list .config/nvim .config/qt5ct .config/qt6ct .config/quickshell
     .config/starship.toml .config/xdg-desktop-portal
   )

@@ -55,6 +55,11 @@ assert expected.count(WOFI_CLIPBOARD) == 1, "base Super+V bind not found"
 PLAIN_LOCK = 'hl.dsp.exec_cmd("hyprlock")'
 assert expected.count(PLAIN_LOCK) == 1, "base Ctrl+Alt+L bind not found"
 expected = expected.replace(PLAIN_LOCK, 'hl.dsp.exec_cmd("~/.config/quickshell/scripts/lock.sh")')
+# Phase 7 (uwsm, approved by Suraj 2026-10-03): the app binds launch through `uwsm app --`.
+for plain in ('local terminal = "ghostty"', 'local fileManager = "thunar"', 'hl.dsp.exec_cmd("firefox")'):
+    assert expected.count(plain) == 1, f"base app bind not found: {plain}"
+    expected = expected.replace(plain, plain.replace('"', '"uwsm app -- ', 1))
+expected = expected.replace('local terminal =', '-- Apps launch through `uwsm app --`: each gets its own systemd scope (SPEC Phase 7).\nlocal terminal =', 1)
 # Description labels (the cheatsheet, SPEC 5.2) are metadata: drop them before comparing,
 # so the keys and commands themselves must still match byte for byte.
 DESC = r'"[^"]*"(?: \.\. \w+)?'

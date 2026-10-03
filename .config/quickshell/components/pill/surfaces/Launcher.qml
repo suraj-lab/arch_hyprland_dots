@@ -174,7 +174,8 @@ Item {
         if (index !== undefined) current = index
         if (current >= count) return
         if (mode === "apps") {
-            apps[current].execute()
+            // uwsm app: the app gets its own systemd scope, not the shell's (SPEC Phase 7).
+            Quickshell.execDetached(["uwsm", "app", "--", apps[current].id + ".desktop"])
             root.closeRequested()
         } else if (mode === "calc") {
             if (calcFor !== term || calcError || !calcResult) return   // no stale copies

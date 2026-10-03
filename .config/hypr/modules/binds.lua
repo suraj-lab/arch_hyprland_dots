@@ -1,6 +1,7 @@
 -- Programs
-local terminal = "ghostty"
-local fileManager = "thunar"
+-- Apps launch through `uwsm app --`: each gets its own systemd scope (SPEC Phase 7).
+local terminal = "uwsm app -- ghostty"
+local fileManager = "uwsm app -- thunar"
 
 -- MainMod key
 local mainMod = "SUPER"
@@ -23,7 +24,7 @@ hl.bind("Print", hl.dsp.exec_cmd("qs ipc call screenshot screen"), { description
 hl.bind(mainMod .. " + return", hl.dsp.exec_cmd(terminal), { description = "Apps: Terminal" })
 hl.bind(mainMod .. " + C", hl.dsp.window.close(), { description = "Windows: Close" })
 hl.bind(mainMod .. " + E", hl.dsp.exec_cmd(fileManager), { description = "Apps: File manager" })
-hl.bind(mainMod .. " + B", hl.dsp.exec_cmd("firefox"), { description = "Apps: Firefox" })
+hl.bind(mainMod .. " + B", hl.dsp.exec_cmd("uwsm app -- firefox"), { description = "Apps: Firefox" })
 hl.bind(mainMod .. " + P", hl.dsp.window.float({ action = "toggle" }), { description = "Windows: Toggle floating" })
 hl.bind(mainMod .. " + Space", hl.dsp.exec_cmd("qs ipc call launcher toggle"), { description = "Shell: Launcher (=calc, >actions)" })
 hl.bind(mainMod .. " + W", hl.dsp.exec_cmd("qs ipc call overview toggle"), { description = "Shell: Overview" })

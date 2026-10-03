@@ -1,0 +1,6 @@
+[Desktop Entry]
+# Per-user override: uwsm runs XDG autostart (SPEC Phase 7); this one stays off,
+# as in the plain Hyprland session. Delete this file to re-enable it.
+Type=Application
+Name=nm-applet
+Hidden=true
