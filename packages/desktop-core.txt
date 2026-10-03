@@ -8,6 +8,7 @@ git
 hyprland
 hyprlock
 quickshell
+uwsm
 qt6-5compat
 qt5-wayland
 qt6-wayland

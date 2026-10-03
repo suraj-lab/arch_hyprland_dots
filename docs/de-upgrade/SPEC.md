@@ -764,6 +764,33 @@ HDMI-A-1 stays readable (no inactive dimming), and everything is restored on exi
 - Writing monitor layout from the shell (use nwg-displays).
 
 ## Change log
+- 2026-10-03 - Phase 7 (uwsm), approved in writing by Suraj; uwsm 0.27.0 installed by Suraj.
+  - Stage 1 `c104636`: `uwsm app --` for autostart, the app binds and the launcher; logout runs
+    `uwsm stop` under uwsm; dropped the redundant dbus-update-activation-environment line
+    (Hyprland 0.56 imports these itself). uwsm runs XDG autostart, which started
+    xwaylandvideobridge (an uncloseable window) and nm-applet: both disabled with Hidden=true
+    overrides in `.config/autostart/`. Backup `phase7-stage1-20261003-193533`.
+  - Stage 2 `59438a3`: Gaming Mode returns to `hyprland-uwsm`; the installed 2026-07-14
+    gaming-session-switch fix (recreate state.conf) synced into the repo. Steam's "Switch to
+    Desktop" calls `steamos-session-select plasma` (gamescope-session-cachyos), never our
+    os-session-select: it pointed SDDM at plasma.desktop (not installed) and stopped the session
+    from under Steam, crashing gamescope; only the wrapper's fallback recovered (~25 s), and the
+    July login screens were that fallback not running. New `/usr/local/bin/steamos-session-select`
+    runs our switch instead. Backup `phase7-stage2-20261003-210143`.
+  - `da723f7`: switch-to-desktop ran inside the gaming login session it ends, so from
+    Super+Shift+R it died before the root helper set autologin (login screen). It now runs as
+    the transient unit switch-to-desktop.service.
+  - Live: three round trips passed (Switch to Desktop 8 s, Super+Shift+R 17 s, reboot from
+    Gaming Mode to the login screen with hyprland-uwsm preselected). Lian Li back within 1 s.
+    dunst masked (`systemctl --user mask dunst.service`): D-Bus started it at login, racing
+    the shell for org.freedesktop.Notifications.
+  - Kept: the plain `hyprland` session as a fallback, with its Lian Li start and portal-reset
+    autostart lines (no-ops under uwsm).
+  - Open: gamescope crashes on stop (harmless, after the switch); Hyprland segfaults on every
+    exit, uwsm or not; SDDM's greeter exists ~1 s during a switch; first login after boot
+    waits ~24 s for graphical.target (br0 stuck in DHCP holds NetworkManager-wait-online,
+    which smb/nmb need). uwsm added to desktop-core.txt; dunst is not in the manifest, so a
+    fresh install needs no mask.
 - 2026-10-03 - Phase 8 code cleanup, approved item by item by Suraj; deployed live.
   Backup `phase8-classic-20261003-191917` (`files/` = the live files before the change).
   - `d51ecdc`: deleted `SessionMenu.qml` (nothing instantiated it).
