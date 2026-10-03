@@ -53,7 +53,7 @@ Item {
     }
     Timer { id: osdHide; interval: Theme.osdHideDelay; onTriggered: root.osdShown = false }
 
-    // Show on a change, never on the first reading (same rules as the classic OSD).
+    // Show on a change, never on the first reading.
     property real prevVolume: -1
     property bool prevMuted: false
     function checkVolume() {

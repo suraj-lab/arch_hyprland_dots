@@ -56,9 +56,7 @@ QtObject {
 
     readonly property var appearance: {
         var values = settingsData.appearance || {}
-        // Frame is the default; only an explicit "classic" brings back the top bar.
-        return { layout: values.layout === "classic" ? "classic" : "frame",
-                 animations: values.animations !== false }
+        return { animations: values.animations !== false }
     }
 
     // Gaming (SPEC 6.5): "Game Mode follows games" is the Desktop Game Mode auto toggle.

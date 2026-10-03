@@ -12,7 +12,6 @@ ShellRoot {
     id: root
     property bool mainFullscreen: false
     property bool secondaryFullscreen: false
-    property bool classicBar: false
 
     property var monitorNames: ["DP-2", "HDMI-A-1"]
 
@@ -42,19 +41,16 @@ ShellRoot {
     }
     property var polkitFlow: null
     PolkitDialog { id: polkitDialog; flow: root.polkitFlow }
-    readonly property bool frameLayout: Config.appearance.layout === "frame"   // same guard as shell.qml
     property int frameBuilds: 0
     Variants {
         id: frames
-        model: root.frameLayout ? root.monitorNames : []
+        model: root.monitorNames
         Frame {
             required property string modelData
             Component.onCompleted: root.frameBuilds++
             screen: Quickshell.screens[0]
             monitorName: modelData
             fullscreen: modelData === "DP-2" ? root.mainFullscreen : root.secondaryFullscreen
-            reserveTop: !root.classicBar
-            pillShown: !root.classicBar
         }
     }
 
@@ -62,7 +58,7 @@ ShellRoot {
     property string lastAction: ""     // launcher ">" actions (runShellAction in the real shell)
     Variants {
         id: pills
-        model: root.frameLayout ? root.pillNames : []
+        model: root.pillNames
         PillOverlay {
             required property string modelData
             screen: Quickshell.screens[0]
@@ -168,7 +164,6 @@ ShellRoot {
             root.mainFullscreen = main
             root.secondaryFullscreen = secondary
         }
-        function classic(enabled: bool): void { root.classicBar = enabled }
         function secondary(enabled: bool): void {
             root.monitorNames = enabled ? ["DP-2", "HDMI-A-1"] : ["DP-2"]
         }
@@ -242,7 +237,7 @@ ShellRoot {
             return JSON.stringify([Math.round(c.x), Math.round(c.y)])
         }
         function status(): string {
-            return JSON.stringify({ layout: Config.appearance.layout, builds: root.frameBuilds,
+            return JSON.stringify({ builds: root.frameBuilds,
                 frames: frames.instances.map(function(frame) { return root.frameState(frame) }),
                 pills: pills.instances.map(function(p) { return root.pillState(p) }) })
         }

@@ -143,16 +143,13 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
     shell_src = (ROOT / ".config/quickshell/shell.qml").read_text()
     assert shell_src.count("PolkitAgent {") == 1 and "PolkitDialog { flow: polkitAgent.flow" in shell_src, \
         "shell.qml: exactly one polkit agent, feeding the dialog"
-    # Frame mode: no classic top bar, OSD, toast or launcher windows (the pill replaces them).
-    assert (ROOT / ".config/quickshell/shell.qml").read_text().count(
-        "model: shellRoot.frameLayout ? [] : Quickshell.screens") == 4, "classic-only windows in frame mode"
     fixture = config_dir / "shell.qml"
     fixture.write_text((ROOT / "scripts/tests/frame-shell.qml").read_text().replace(
         "../../.config/quickshell/", ""))
     settings = config_dir / "settings.json"
     # Regression: settings present at startup used to be ignored until the file changed.
-    # Classic, because frame is the default and would pass either way.
-    settings.write_text(json.dumps({"appearance": {"layout": "classic"}}))
+    # Handle, because tab is the default and would pass either way.
+    settings.write_text(json.dumps({"pill": {"restStyle": "handle"}}))
     env = dict(os.environ, LC_ALL="C.UTF-8", HOME=tmp, XDG_CONFIG_HOME=str(home / ".config"),
                XDG_CACHE_HOME=str(home / ".cache"), XDG_DATA_HOME=str(home / ".local/share"),
                XDG_STATE_HOME=str(home / ".state"), XDG_RUNTIME_DIR=str(runtime),
@@ -222,10 +219,10 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
                     assert reserve["maskEmpty"] and not reserve["focus"], reserve
                     assert reserve["anchors"] == {e: e != opposite[edge] for e in opposite}, reserve
 
-            empty = lambda v: v["layout"] == "classic" and v["frames"] == [] and v["pills"] == []
-            framed = lambda v: v["layout"] == "frame" and len(v["frames"]) >= 1 and len(v["pills"]) == 1
-            wait_state(empty, "classic read at startup: no frame windows")
-            configure({}, framed, "frame by default")
+            wait_state(lambda v: len(v["frames"]) == 2 and all(f["bottom"] == 16 for f in v["frames"]),
+                       "handle rest style read at startup")
+            configure({}, lambda v: len(v["frames"]) == 2 and all(f["bottom"] == 40 for f in v["frames"]),
+                      "tab rest style by default")
             state = configure({"appearance": {"layout": "frame"}},
                               lambda v: len(v["frames"]) == 2 and all(f["visible"] for f in v["frames"]),
                               "two frames in frame mode")
@@ -280,13 +277,6 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
                               lambda v: all(f["bottom"] == 40 for f in v["frames"]), "invalid rest-style fallback")
             for frame in state["frames"]:
                 check_frame(frame, True, 40)
-            # Preview beside the classic bar: no top reserve, bottom is frame thickness only.
-            assert ipc("classic", "true").returncode == 0
-            state = wait_state(lambda v: all(f["bottom"] == 10 for f in v["frames"]), "classic-bar preview")
-            for frame in state["frames"]:
-                check_frame(frame, True, 10, top=False)
-            assert ipc("classic", "false").returncode == 0
-            wait_state(lambda v: all(f["bottom"] == 40 for f in v["frames"]), "full frame restored")
             # ---- 4.2 pill: a real pointer (xdotool) on the private display drives hover ----
             def pointer(x, y):
                 subprocess.run(["xdotool", "mousemove", str(x), str(y)], env=env, check=True, timeout=5)
@@ -899,15 +889,11 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
             assert pill()["w"] == 696, "no morph when animations are off"
             assert ipc("pill", "close").returncode == 0
 
-            for invalid in ("invalid", True, 42, None):
-                configure({"appearance": {"layout": invalid}}, framed, "invalid layout is frame (the default)")
-            configure({}, framed, "removed sections return to frame")
-            configure({"appearance": {"layout": "classic"}}, empty, "classic only when asked for")
             log.flush()
             # ---- Media players: a second run on a private bus with fake Spotify + Firefox ----
             # (no service activation: scripts/tests/private-bus.conf; the main run has no bus)
             shell.terminate(); shell.wait(timeout=5)
-            settings.write_text(json.dumps({"appearance": {"layout": "frame"}}))   # the run above ended classic
+            settings.write_text(json.dumps({"appearance": {"layout": "frame"}}))   # reset for the second run
             for name, colour in (("spotify", "#1db954"), ("youtube", "#ff4e45")):
                 subprocess.run(["magick", "-size", "64x64", "xc:" + colour, str(home / f"{name}.png")], check=True)
             fake = ROOT / "scripts/tests/fake_mpris.py"
@@ -953,8 +939,7 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
                 word in line for word in (" ERROR", "TypeError:", "ReferenceError:", "Binding loop"))]
             assert not errors, "\n".join(errors)
             print("PASS: settings file present at startup is applied immediately; unrelated edits keep frames")
-            print("PASS: classic/frame switch, fixed reserves, empty masks, per-monitor fullscreen and hotplug")
-            print("PASS: classic-bar preview (no top reserve, no pill space)")
+            print("PASS: settings read at startup, fixed reserves, empty masks, per-monitor fullscreen and hotplug")
             print("PASS: rest-style override/reset, invalid settings, frame pixels on private Xvfb")
             print("PASS: pill rest geometry and shape pixels, edge dwell/pass-through, collapse, IPC pin/toggle,")
             print("      frame band counts as the pill, fullscreen hide + peek (hides untouched after 800 ms),")
@@ -965,7 +950,7 @@ with tempfile.TemporaryDirectory(prefix=".p4-", dir=ROOT) as tmp:
             print("PASS: dashboard: bar widens before the tier rises, 920x420 clamped, clock/media tabs, toggle, switch")
             print("PASS: edge drawers: toasts grow from the top-right corner (392 px, max 4, timeout, dismiss")
             print("      closes it, shape pixels), OSD 52x220 from the right edge (pixels, hides after 2 s, mic),")
-            print("      both hide on fullscreen; classic OSD/toast windows only in classic (static)")
+            print("      both hide on fullscreen")
             print("PASS: launcher (5.1) by keyboard: 640x470 clamped, app search + launch, calculator (qalc -t, copy),")
             print("      actions (destructive need two Enters within 3 s, run after closing), clipboard (list,")
             print("      image thumbnail, Delete, filter, copy), Super+V switch/toggle, Escape")

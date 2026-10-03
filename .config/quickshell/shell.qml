@@ -57,9 +57,6 @@ ShellRoot {
         }
     }
 
-    // ── App launcher state ──────────────────────────────────────────────────
-    property bool launcherOpen: false
-
     // ── Wallpaper picker state ─────────────────────────────────────────────
     property bool wallpickerOpen: false
 
@@ -125,12 +122,9 @@ ShellRoot {
         }
     }
 
-    // Layout switch (SPEC Phase 4): "frame" = frame + pill, "classic" = the top bar below.
-    // Classic creates no frame/pill windows; frame creates no top bar.
-    // A bool only changes on a real switch; Config rebuilds its objects on every edit.
-    readonly property bool frameLayout: Config.appearance.layout === "frame"
+    // Frame + pill per monitor (SPEC Phase 4).
     Variants {
-        model: shellRoot.frameLayout ? Quickshell.screens : []
+        model: Quickshell.screens
         Frame {
             required property ShellScreen modelData
             screen: modelData
@@ -138,7 +132,7 @@ ShellRoot {
     }
     Variants {
         id: pills
-        model: shellRoot.frameLayout ? Quickshell.screens : []
+        model: Quickshell.screens
         PillOverlay {
             required property ShellScreen modelData
             screen: modelData
@@ -149,12 +143,11 @@ ShellRoot {
         }
     }
 
-    // Caffeine in frame mode. An idle inhibitor needs a mapped surface; the frame and pill
+    // Caffeine. An idle inhibitor needs a mapped surface; the frame and pill
     // unmap on fullscreen, so it gets its own invisible 1x1 window on the Background layer
-    // (below everything, never in the way of direct scanout). Classic keeps the bar's.
+    // (below everything, never in the way of direct scanout).
     PanelWindow {
         id: inhibitorWindow
-        visible: shellRoot.frameLayout
         anchors { top: true; left: true }
         implicitWidth: 1
         implicitHeight: 1
@@ -166,7 +159,7 @@ ShellRoot {
         WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
         IdleInhibitor {
             window: inhibitorWindow
-            enabled: Desktop.caffeine && shellRoot.frameLayout
+            enabled: Desktop.caffeine
         }
     }
 
@@ -198,186 +191,11 @@ ShellRoot {
         }
     }
 
-    // ── Per-screen bar (classic layout only) ────────────────────────────────
-    Variants {
-        model: shellRoot.frameLayout ? [] : Quickshell.screens
-
-        PanelWindow {
-            id: barPanel
-            required property ShellScreen modelData
-            screen: modelData
-
-            property color screenAccent: shellRoot.accentFor(modelData.name)
-            Behavior on screenAccent { ColorAnimation { duration: 500 } }
-
-            anchors { top: true; left: true; right: true }
-            margins {
-                top:   Theme.barMarginTop
-                left:  Theme.barMarginSide
-                right: Theme.barMarginSide
-            }
-
-            implicitHeight: Theme.barHeight
-            color: "transparent"
-
-            // Caffeine: inhibit idle while enabled (needs a surface — the bar).
-            IdleInhibitor {
-                window: barPanel
-                enabled: Desktop.caffeine
-            }
-
-            Rectangle {
-                id: barRect
-                anchors { left: parent.left; right: parent.right; top: parent.top }
-                height: Theme.barHeight
-                radius: 10
-                color: Theme.barBg
-                border.color: Qt.rgba(barPanel.screenAccent.r, barPanel.screenAccent.g, barPanel.screenAccent.b, 0.25)
-                border.width: 1
-                Behavior on border.color { ColorAnimation { duration: 500 } }
-
-                // Bar startup fade-in (opacity only — anchors.fill controls position)
-                opacity: 0
-                Component.onCompleted: opacity = 1
-                Behavior on opacity { NumberAnimation { duration: 500; easing.type: Easing.OutCubic } }
-            }
-
-            Item {
-                id: barContent
-                anchors { left: parent.left; right: parent.right; top: parent.top; margins: Theme.barPadding }
-                implicitHeight: Theme.barHeight - Theme.barPadding * 2
-
-                // ── LEFT ───────────────────────────────────────────────────
-                Row {
-                    id: leftRow
-                    anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
-                    spacing: Theme.barSpacing
-                    Workspaces {
-                        id: wsChip
-                        screenName: barPanel.modelData.name
-                        barAccent: barPanel.screenAccent
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-                    SysInfo { anchors.verticalCenter: parent.verticalCenter }
-                }
-
-                // ── CENTER ─────────────────────────────────────────────────
-                BarClock {
-                    id: barClock
-                    anchors.centerIn: parent
-                    barAccent: barPanel.screenAccent
-                    parentWindow: barPanel
-                    onPopupOpenChanged: if (popupOpen) unifiedPanel.close()
-                }
-
-                // ── RIGHT ──────────────────────────────────────────────────
-                Row {
-                    anchors { right: parent.right; top: parent.top; bottom: parent.bottom }
-                    spacing: Theme.barSpacing
-                    TrayArea    { anchors.verticalCenter: parent.verticalCenter }
-                    Volume {
-                        id: volChip
-                        anchors.verticalCenter: parent.verticalCenter
-                        barAccent: barPanel.screenAccent
-                        onChipClicked: { barClock.popupOpen = false; unifiedPanel.open("sound") }
-                    }
-                    Microphone  { anchors.verticalCenter: parent.verticalCenter; barAccent: barPanel.screenAccent }
-                    Caffeine    { anchors.verticalCenter: parent.verticalCenter; barAccent: barPanel.screenAccent; active: Desktop.caffeine; onClicked: Desktop.toggleCaffeine() }
-                    GameMode    { anchors.verticalCenter: parent.verticalCenter; barAccent: barPanel.screenAccent; active: Desktop.gameMode; onClicked: Desktop.toggleGameMode() }
-
-                    NotificationCenter {
-                        id: notifChip
-                        anchors.verticalCenter: parent.verticalCenter
-                        barAccent: barPanel.screenAccent
-                        externalUnreadCount: Notifs.unreadCount
-                        dndEnabled:          Notifs.dndEnabled
-                        onChipClicked: { barClock.popupOpen = false; unifiedPanel.open("notifs") }
-                        onPanelOpened: Notifs.unreadCount = 0
-                    }
-                    ControlCenter {
-                        id: ccChip
-                        anchors.verticalCenter: parent.verticalCenter
-                        barAccent: barPanel.screenAccent
-                        onChipClicked: { barClock.popupOpen = false; unifiedPanel.open("system") }
-                    }
-                    PowerMenu {
-                        anchors.verticalCenter: parent.verticalCenter
-                        onClicked: sessionOpen = !sessionOpen
-                    }
-                }
-
-                // Unified panel — anchored to bottom-right, outside the Row
-                UnifiedPanel {
-                    id: unifiedPanel
-                    anchors { right: parent.right; bottom: parent.bottom; bottomMargin: -8 }
-                    parentWindow: barPanel
-                    barAccent: barPanel.screenAccent
-                    screenTimeTracker: stTracker
-                    desktop: Desktop
-                    notifModel:  Notifs.historyModel
-                    dndEnabled:  Notifs.dndEnabled
-                    onDismissRequested:  function(id) { Notifs.dismiss(id) }
-                    onClearAllRequested: Notifs.clearAll()
-                    onDndToggled:        Notifs.dndEnabled = !Notifs.dndEnabled
-                    onPanelOpened:       Notifs.unreadCount = 0
-                    onPanelOpenChanged:  if (panelOpen) barClock.popupOpen = false
-                }
-            }
-
-        }
-    }
-
-    // ── App launcher overlay (focused monitor only) ─────────────────────────
-    // Capture which screen was focused when launcher opens
-    property var launcherScreen: null
-
+    // ── Launcher IPC: the pill's launcher / clipboard surface on the focused monitor ──
     IpcHandler {
         target: "launcher"
-        // Frame: the pill's launcher surface on the focused monitor. Classic: the old overlay.
-        function toggle() {
-            if (shellRoot.frameLayout) {
-                var p = shellRoot.focusedPill(); if (p) p.openSurface("launcher", true)
-                return
-            }
-            if (!shellRoot.launcherOpen) {
-                // Capture focused monitor before opening
-                shellRoot.launcherScreen = Hypr.focusedMonitor != null
-                    ? Hypr.focusedMonitor.name : null
-            }
-            shellRoot.launcherOpen = !shellRoot.launcherOpen
-        }
-        // Super+V (replaces wofi). Frame layout only: classic has no clipboard view.
-        function clipboard(): void {
-            var p = shellRoot.frameLayout ? shellRoot.focusedPill() : null
-            if (p) p.openSurface("clipboard", true)
-            else console.warn("launcher clipboard: needs the frame layout")
-        }
-    }
-
-    Variants {
-        model: shellRoot.frameLayout ? [] : Quickshell.screens
-
-        PanelWindow {
-            required property ShellScreen modelData
-            screen: modelData
-            visible: shellRoot.launcherOpen
-                     && shellRoot.launcherScreen != null
-                     && modelData.name === shellRoot.launcherScreen
-
-            anchors { top: true; bottom: true; left: true; right: true }
-            color: "transparent"
-            exclusionMode: ExclusionMode.Ignore
-            WlrLayershell.layer: WlrLayer.Overlay
-            WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
-            WlrLayershell.namespace: "quickshell-launcher"
-
-            AppLauncher {
-                anchors.fill: parent
-                barAccent: shellRoot.accentFor(shellRoot.launcherScreen || "")
-                launcherVisible: shellRoot.launcherOpen
-                onCloseRequested: shellRoot.launcherOpen = false
-            }
-        }
+        function toggle() { var p = shellRoot.focusedPill(); if (p) p.openSurface("launcher", true) }
+        function clipboard(): void { var p = shellRoot.focusedPill(); if (p) p.openSurface("clipboard", true) }
     }
 
     // ── Wallpaper picker overlay (focused monitor only) ──────────────────────
@@ -658,65 +476,6 @@ ShellRoot {
                         }
                     }
                 }
-            }
-        }
-    }
-
-    // ── Per-screen OSD overlay (classic; frame mode has the edge drawers) ──
-    Variants {
-        model: shellRoot.frameLayout ? [] : Quickshell.screens
-
-        PanelWindow {
-            required property ShellScreen modelData
-            screen: modelData
-
-            anchors { bottom: true; left: true; right: true }
-            implicitHeight: 160
-            color: "transparent"
-            exclusionMode: ExclusionMode.Ignore
-            WlrLayershell.layer: WlrLayer.Overlay
-
-            visible: osdItem.osdVisible
-                     && Hypr.focusedMonitor !== null
-                     && Hypr.focusedMonitor.name === modelData.name
-
-            OSD {
-                id: osdItem
-                barAccent: shellRoot.accentFor(modelData.name)
-            }
-        }
-    }
-
-    // ── Per-screen notification toasts (classic; frame: PillOverlay drawer) ─
-    Variants {
-        model: shellRoot.frameLayout ? [] : Quickshell.screens
-
-        PanelWindow {
-            required property ShellScreen modelData
-            screen: modelData
-
-            anchors { top: true; right: true }
-            implicitHeight: Theme.barHeight + Theme.barMarginTop + 4 * 90
-            implicitWidth:  360 + 32
-
-            color: "transparent"
-            exclusionMode: ExclusionMode.Ignore
-            WlrLayershell.layer: WlrLayer.Overlay
-
-            // Shown only while a toast is up (Notifs.hasToasts)
-            visible: Notifs.hasToasts
-
-            NotificationToasts {
-                id: toastsItem
-                anchors {
-                    top:      parent.top
-                    right:    parent.right
-                    topMargin: Theme.barHeight + Theme.barMarginTop + 8
-                }
-                width:  parent.width
-                height: parent.height - (Theme.barHeight + Theme.barMarginTop + 8)
-                toastModel:  Notifs.toastModel
-                dismissFunc: function(id) { Notifs.dismiss(id) }
             }
         }
     }

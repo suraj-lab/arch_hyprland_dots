@@ -104,17 +104,17 @@ au.setDefaultSource('mic'); assert.equal(pw.preferredDefaultAudioSource, mic);
 au.setDefaultSink('gone'); assert.equal(pw.preferredDefaultAudioSink, hdmi);   // unknown name: unchanged
 console.log('PASS: Audio device/app lists (pactl-compatible shapes), state labels, volume clamps, default device');
 
-// OSD: show on change after the first reading, as the 500 ms wpctl poll did.
+// OSD (edge drawer): show on change after the first reading, as the 500 ms wpctl poll did.
 const fakeAudio = {ready: false, volume: 0, muted: false};
 let shown = 0;
-const osd = load('components/OSD.qml', ['check'], {Audio: fakeAudio});
-Object.assign(osd, {root: osd, prevVolume: -1, prevMuted: false, showOSD: () => shown++});
-osd.check(); assert.equal(shown, 0);                                  // not ready: ignored
-Object.assign(fakeAudio, {ready: true, volume: 0.29}); osd.check(); assert.equal(shown, 0);  // first reading
-fakeAudio.volume = 0.293; osd.check(); assert.equal(shown, 0);        // below 0.5%: no popup
-fakeAudio.volume = 0.34; osd.check(); assert.equal(shown, 1);
-fakeAudio.muted = true; osd.check(); assert.equal(shown, 2);
-osd.check(); assert.equal(shown, 2);                                  // no change, no popup
+const osd = load('components/pill/Drawers.qml', ['checkVolume'], {Audio: fakeAudio});
+Object.assign(osd, {prevVolume: -1, prevMuted: false, showOsd: () => shown++});
+osd.checkVolume(); assert.equal(shown, 0);                            // not ready: ignored
+Object.assign(fakeAudio, {ready: true, volume: 0.29}); osd.checkVolume(); assert.equal(shown, 0);  // first reading
+fakeAudio.volume = 0.293; osd.checkVolume(); assert.equal(shown, 0);  // below 0.5%: no popup
+fakeAudio.volume = 0.34; osd.checkVolume(); assert.equal(shown, 1);
+fakeAudio.muted = true; osd.checkVolume(); assert.equal(shown, 2);
+osd.checkVolume(); assert.equal(shown, 2);                            // no change, no popup
 console.log('PASS: OSD appears only on real volume/mute changes');
 
 // Net: the real functions with fake NetworkManager networks.

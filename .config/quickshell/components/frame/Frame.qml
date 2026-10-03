@@ -10,15 +10,11 @@ PanelWindow {
     id: root
     property string monitorName: screen ? screen.name : ""
     property bool fullscreen: Hypr.isFullscreen(monitorName)
-    // Both true in the real layout; the test fixture exercises them off.
-    property bool reserveTop: true
-    property bool pillShown: true
-    readonly property int bottomReserve: Theme.frameThickness + (!pillShown ? 0
-        : Config.pillFor(monitorName).restStyle === "handle"
-            ? Theme.pillRestHandleHeight : Theme.pillRestTabHeight)
+    readonly property int bottomReserve: Theme.frameThickness
+        + (Config.pillFor(monitorName).restStyle === "handle" ? Theme.pillRestHandleHeight : Theme.pillRestTabHeight)
 
     property alias outline: outline
-    visible: Config.appearance.layout === "frame" && !fullscreen
+    visible: !fullscreen
     anchors { top: true; bottom: true; left: true; right: true }
     exclusionMode: ExclusionMode.Ignore // draw at physical screen edges, outside all reserves
     color: "transparent"
@@ -27,7 +23,7 @@ PanelWindow {
     WlrLayershell.namespace: "quickshell-frame"
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
-    Reserve { screen: root.screen; edge: "top"; visible: root.visible && root.reserveTop }
+    Reserve { screen: root.screen; edge: "top"; visible: root.visible }
     Reserve { screen: root.screen; edge: "left"; visible: root.visible }
     Reserve { screen: root.screen; edge: "right"; visible: root.visible }
     Reserve { screen: root.screen; edge: "bottom"; thickness: root.bottomReserve; visible: root.visible }
