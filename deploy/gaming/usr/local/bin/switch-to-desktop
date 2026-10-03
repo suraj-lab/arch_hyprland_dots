@@ -5,6 +5,13 @@ set -u
 
 # Guard: only meaningful inside an active gaming session
 [[ -f /tmp/.gaming-session-active ]] || exit 0
+
+# Leave the gaming session first. Stopping gamescope below ends that login session, and its
+# processes go with it: started from the Super+Shift+R monitor, this script died in the
+# sleep before the root helper ran, leaving SDDM on its login screen (2026-10-03).
+if [[ "$(cat /proc/self/cgroup)" != */switch-to-desktop.service ]]; then
+    exec systemd-run --user --collect --unit=switch-to-desktop /usr/local/bin/switch-to-desktop
+fi
 rm -f /tmp/.gaming-session-active
 
 # Marker for gaming-desktop-restore (portal/pipewire recovery on Hyprland start)
