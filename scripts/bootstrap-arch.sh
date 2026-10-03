@@ -475,6 +475,7 @@ install_gaming_deploy() {
     /usr/local/bin/gaming-session-switch /usr/local/bin/switch-to-gaming \
     /usr/local/bin/switch-to-desktop /usr/local/bin/gamescope-session-wrapper \
     /usr/local/bin/gaming-keybind-monitor /usr/local/bin/gaming-desktop-restore \
+    /usr/local/bin/steamos-session-select \
     /usr/lib/os-session-select /usr/share/wayland-sessions/gamescope-gaming.desktop \
     /usr/share/applications/gaming-mode.desktop \
     /etc/systemd/system/sddm-boot-cleanup.service /etc/pacman.d/hooks/gamescope-setcap.hook \
@@ -489,6 +490,7 @@ install_gaming_deploy() {
   sudo_run install -Dm755 "$deploy/usr/local/bin/gamescope-session-wrapper" /usr/local/bin/gamescope-session-wrapper
   sudo_run install -Dm755 "$deploy/usr/local/bin/gaming-keybind-monitor" /usr/local/bin/gaming-keybind-monitor
   sudo_run install -Dm755 "$deploy/usr/local/bin/gaming-desktop-restore" /usr/local/bin/gaming-desktop-restore
+  sudo_run install -Dm755 "$deploy/usr/local/bin/steamos-session-select" /usr/local/bin/steamos-session-select
   sudo_run install -Dm755 "$deploy/usr/lib/os-session-select" /usr/lib/os-session-select
   sudo_run install -Dm644 "$deploy/usr/share/wayland-sessions/gamescope-gaming.desktop" /usr/share/wayland-sessions/gamescope-gaming.desktop
   sudo_run install -Dm644 "$deploy/usr/share/applications/gaming-mode.desktop" /usr/share/applications/gaming-mode.desktop

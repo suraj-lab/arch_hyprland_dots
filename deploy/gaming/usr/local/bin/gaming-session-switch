@@ -22,7 +22,9 @@ CONF="/etc/sddm.conf.d/zz-gaming-session.conf"
 # rewrites it on each desktop login, is masked user-side.)
 STEAMOS_CONF="/etc/sddm.conf.d/zz-steamos-autologin.conf"
 GAMING_SESSION="gamescope-gaming"
-DESKTOP_SESSION="hyprland"
+# The desktop runs under uwsm (DE upgrade Phase 7). The plain "hyprland" session stays
+# selectable at the login screen as a fallback.
+DESKTOP_SESSION="hyprland-uwsm"
 LOGIN_USER="suraj"
 SLEEP_TARGETS="sleep.target suspend.target hibernate.target hybrid-sleep.target"
 
@@ -93,7 +95,12 @@ reap_gaming_procs() {
 # Gaming Mode by surprise (observed 2026-07-04 09:08). Reset it.
 reset_sddm_last_session() {
     local state="/var/lib/sddm/state.conf"
-    [[ -f "$state" ]] && sed -i "s|^Session=.*|Session=/usr/share/wayland-sessions/${DESKTOP_SESSION}.desktop|" "$state" 2>/dev/null || true
+    if [[ -f "$state" ]]; then
+        sed -i "s|^Session=.*|Session=/usr/share/wayland-sessions/${DESKTOP_SESSION}.desktop|" "$state" 2>/dev/null || true
+    else
+        printf '[Last]\nSession=/usr/share/wayland-sessions/%s.desktop\n' "$DESKTOP_SESSION" > "$state"
+        chown sddm:sddm "$state" 2>/dev/null || true
+    fi
 }
 
 write_conf() {

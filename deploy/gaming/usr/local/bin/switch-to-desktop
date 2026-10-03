@@ -19,6 +19,12 @@ touch /tmp/.returned-from-gaming 2>/dev/null || true
 systemctl --user stop steam-launcher.service 2>/dev/null || true
 timeout 20 steam -shutdown 2>/dev/null || true
 systemctl --user stop gamescope-session.target gamescope-session.service 2>/dev/null || true
+# uwsm refuses to start the desktop while any graphical session is still active, which
+# would leave SDDM on its login screen. Wait (up to 10 s) for gamescope's to stop.
+for _ in $(seq 20); do
+    systemctl --user -q is-active graphical-session.target || break
+    sleep 0.5
+done
 sleep 1
 
 sudo -n /usr/local/bin/gaming-session-switch desktop

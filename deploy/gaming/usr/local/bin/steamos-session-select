@@ -1,0 +1,13 @@
+#!/bin/bash
+# steamos-session-select override. Steam's Power > "Switch to Desktop" runs
+# `steamos-session-select plasma` by bare name through PATH, so this copy in /usr/local/bin
+# wins over the gamescope-session-cachyos one in /usr/bin. That one points SDDM's autologin at
+# plasma.desktop (not installed) and stops the session from under Steam: gamescope crashes,
+# and the desktop only comes back through the session wrapper's fallback, about 20 s later
+# (or not at all, leaving the login screen). Here "plasma" runs our own switch instead.
+# It runs in its own transient unit because switch-to-desktop stops steam-launcher.service,
+# which would kill a child of Steam halfway through. Every other mode is unchanged.
+if [[ "${1:-}" == plasma ]]; then
+    exec systemd-run --user --collect --unit=switch-to-desktop /usr/local/bin/switch-to-desktop
+fi
+exec /usr/bin/steamos-session-select "$@"

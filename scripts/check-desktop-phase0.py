@@ -28,8 +28,18 @@ frozen = ["deploy/gaming", ".config/environment.d/99-gaming-session.conf", ".con
           "packages/gaming-mode.txt", "packages/daily-apps.txt"]
 # Suraj approved only Steam preparation/progress changes on 2026-09-30, not Phase 7.
 gaming_switch = "deploy/gaming/usr/local/bin/switch-to-gaming"
-run("git", "diff", "--exit-code", BASE, "--", *frozen, f":(exclude){gaming_switch}")
-assert not run("git", "ls-files", "--others", "--exclude-standard", "--", *frozen).strip(), "new frozen files"
+# Phase 7 (uwsm, approved by Suraj 2026-10-03): the session switch returns to hyprland-uwsm.
+# The installed copy also carried an unsynced 2026-07-14 fix (state.conf recreated if missing).
+session_switch = "deploy/gaming/usr/local/bin/gaming-session-switch"
+phase7 = [session_switch, "deploy/gaming/usr/local/bin/switch-to-desktop",
+          "deploy/gaming/usr/local/bin/steamos-session-select"]   # Steam's Switch to Desktop
+run("git", "diff", "--exit-code", BASE, "--", *frozen, f":(exclude){gaming_switch}",
+    *[f":(exclude){p}" for p in phase7])
+assert not set(run("git", "ls-files", "--others", "--exclude-standard", "--", *frozen).split()) - set(phase7), "new frozen files"
+for p in phase7:
+    run("bash", "-n", p)
+assert 'printf \'[Last]\\nSession=' in Path(session_switch).read_text(), "state.conf recreation fix lost"
+assert '\nDESKTOP_SESSION="hyprland-uwsm"\n' in Path(session_switch).read_text(), "desktop session is not uwsm"
 gaming_base = run("git", "show", f"{BASE}:{gaming_switch}")
 gaming_current = Path(gaming_switch).read_text()
 # Dependency checks, monitor handling and the privileged session switch stay frozen.
