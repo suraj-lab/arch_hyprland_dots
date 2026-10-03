@@ -26,8 +26,17 @@ def run(*command, env=ENV):
 frozen = ["deploy/gaming", ".config/environment.d/99-gaming-session.conf", ".config/gamescope",
           "scripts/install-gaming-mode.sh", "docs/gaming-mode.md",
           "packages/gaming-mode.txt", "packages/daily-apps.txt"]
-run("git", "diff", "--exit-code", BASE, "--", *frozen)
+# Suraj approved only Steam preparation/progress changes on 2026-09-30, not Phase 7.
+gaming_switch = "deploy/gaming/usr/local/bin/switch-to-gaming"
+run("git", "diff", "--exit-code", BASE, "--", *frozen, f":(exclude){gaming_switch}")
 assert not run("git", "ls-files", "--others", "--exclude-standard", "--", *frozen).strip(), "new frozen files"
+gaming_base = run("git", "show", f"{BASE}:{gaming_switch}")
+gaming_current = Path(gaming_switch).read_text()
+# Dependency checks, monitor handling and the privileged session switch stay frozen.
+for marker, part in [("notify() {", 0), ("# Kill leftovers from any previous gaming session.", 2)]:
+    assert gaming_base.count(marker) == gaming_current.count(marker) == 1
+    assert gaming_base.partition(marker)[part] == gaming_current.partition(marker)[part], "gaming session switch changed outside preflight"
+run("bash", "-n", gaming_switch)
 # Only the Gaming Mode restore line of autostart.lua is frozen (SPEC "Don't touch Gaming Mode").
 restore = '\thl.exec_cmd("/usr/local/bin/gaming-desktop-restore")\n'
 assert restore in Path(".config/hypr/modules/autostart.lua").read_text(), "gaming-desktop-restore line changed"
@@ -77,6 +86,7 @@ print(f"PASS: Lua/Bash/Python syntax and Qt 6 parsing ({len(qml)} QML files)")
 print(run("python3", "scripts/tests/test_desktop_gamemode.py").strip())
 print(run("node", "scripts/tests/test_desktop_controller.js").strip())
 print(run("python3", "scripts/tests/test_lock_guard.py").strip())
+print(run("python3", "scripts/tests/test_gaming_preflight.py").strip())
 
 # Only the toast component runs, offscreen, without access to the session bus.
 with tempfile.TemporaryDirectory(prefix="qt-check-", dir=ROOT / "scripts/tests") as tmp:

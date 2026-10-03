@@ -764,6 +764,41 @@ HDMI-A-1 stays readable (no inactive dimming), and everything is restored on exi
 - Writing monitor layout from the shell (use nwg-displays).
 
 ## Change log
+- 2026-09-30 - Gaming Mode Steam preparation: scoped freeze exception approved by Suraj;
+  this is NOT approval for the Phase 7 uwsm migration. Suraj tested `--prepare-only`
+  successfully and installed the first version. A subsequent full-switch test exposed
+  a readiness-parser bug. The corrected helper was installed (identical to the repo) and
+  a full round-trip passed on 2026-10-03 (switch 18:33, back to Hyprland 18:41).
+  Original installed helper backed up under
+  `~/.local/state/dotfiles-backups/gaming-preflight-20260930-132342/switch-to-gaming`;
+  it matched HEAD before backup. Nothing committed yet.
+  - Full-switch attempt at 14:02 stayed in Hyprland: Steam emitted Verification complete,
+    then an asynchronous Set status message: Verifying installation. The parser incorrectly
+    reset readiness and kept waiting; no SDDM switch or monitor-disable step ran. Corrected
+    readiness to ignore UI status messages (still usable for progress), with failing-then-
+    passing regression coverage and a check that UI-only completion cannot authorize a switch.
+  - Successful Gaming Mode round-trip reported. The fresh desktop on return is expected:
+    the existing helper restarts SDDM rather than preserving the old Hyprland session.
+  - Black-screen delay traced to Steam changing from desktop stable to `steamdeck_stable`
+    at 12:15:05, downloading 148361 KB and finishing installation at 12:23:18. Desktop Steam
+    changed back at 13:12:39 but reported Nothing to do (the channels then shared a version).
+    Channel changes are confirmed; a download on every switch is not. The old wrapper's
+    gaming-ready message is a fixed 20-second suspend-unmask timer, not Steam UI readiness.
+  - `switch-to-gaming` now cleanly stops existing Steam and prepares a fresh launch with
+    the same four options as CachyOS's steam-launcher. Replaces one progress notification;
+    captures this launch's console output in `~/.local/state/gaming-mode/steam-preflight.log`
+    (or XDG_STATE_HOME). Steam's native bootstrap log remains available. Required updates
+    are moved before the session switch, not disabled or guaranteed to disappear.
+  - Requires fresh verification, no updater and a running web helper over three polls;
+    startup/update/shutdown failures stay on the desktop. This is a readiness heuristic,
+    not proof that every Steam window has rendered. Timeout leaves Steam available to
+    finish on the desktop. Concurrent requests are rejected with flock. `--prepare-only`
+    performs preparation and clean shutdown without touching monitors or SDDM.
+  - Phase0 permits changes only to this helper's preparation portion; dependency checks,
+    monitor/session-switch tail and all other Gaming Mode files remain frozen. New isolated
+    test covers existing/cold Steam, update/restart, stale logs, missing helper, startup and
+    shutdown failures, timeout, cancellation, concurrency and prepare-only. No live switch
+    or channel changes were performed by the assistant.
 - 2026-09-29 - Lock screen guard, deployed and live-tested with Suraj. Backup
   `lock-guard-20260929-172414` (`files/`, `new-files.txt`, `v1/` = the first guard version).
   - Found: after a long idle (lock at 10 min, screens off at 30 min) Hyprland showed "lockscreen

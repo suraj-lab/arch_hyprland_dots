@@ -22,57 +22,110 @@ steam_update_running() {
     pgrep -u "$(id -u)" -f -- '-child-update-ui' >/dev/null 2>&1
 }
 
-steam_preflight() {
-    [[ "${GAMING_STEAM_PREFLIGHT:-1}" == "0" ]] && return 0
+# Match /usr/lib/steamos/steam-launcher (gamescope-session-cachyos).
+steam_args=(-steamos3 -steampal -steamdeck -gamepadui)
+notification_id=0
+progress() {
+    local id
+    id=$(notify-send -p -r "$notification_id" -u critical -t 20000 "Gaming Mode" "$1" 2>/dev/null) || return 0
+    [[ "$id" =~ ^[0-9]+$ ]] && notification_id=$id
+    return 0
+}
 
-    local timeout_s="${GAMING_STEAM_PREFLIGHT_TIMEOUT:-900}"
-    local start now last_notice=0
-    start=$(date +%s)
-
-    notify -t 3000 "Gaming Mode" "Preparing Steam on the desktop first..."
-
-    if ! steam_any_running; then
-        steam >/dev/null 2>&1 &
-        sleep 5
-    fi
-
-    # Steam regularly validates/extracts/updates at launch. Do that while the
-    # desktop is still visible instead of after SDDM has switched to the
-    # SteamOS-style gamescope session, where it looks like a black screen.
-    while steam_update_running; do
-        now=$(date +%s)
-        if (( now - start > timeout_s )); then
-            notify -u critical -t 8000 "Gaming Mode" \
-                "Steam is still updating/validating. Leaving you on the desktop; try Gaming Mode again after Steam finishes."
-            return 1
-        fi
-        if (( now - last_notice >= 30 )); then
-            notify -t 4000 "Gaming Mode" "Steam is updating/validating; waiting before switching..."
-            last_notice=$now
-        fi
-        sleep 5
-    done
-
-    # Let desktop Steam settle, then shut it down cleanly so the gamescope
-    # session owns the next Steam launch. Do not hard-kill here; a hard kill is
-    # what causes the next launch to schedule another immediate update check.
-    sleep 3
-    timeout 30 steam -shutdown >/dev/null 2>&1 || true
-
-    start=$(date +%s)
+steam_stop() {
+    steam_any_running || return 0
+    timeout 30 steam "${steam_args[@]}" -shutdown >/dev/null 2>&1 || true
+    local start=$SECONDS
     while steam_any_running; do
-        now=$(date +%s)
-        if (( now - start > 60 )); then
-            notify -u critical -t 8000 "Gaming Mode" \
-                "Steam did not exit cleanly. Leaving you on the desktop; exit Steam manually and try again."
+        if (( SECONDS - start >= 60 )); then
+            progress "Steam did not exit cleanly. Staying on the desktop; close Steam and try again."
             return 1
         fi
         sleep 2
     done
 }
 
+steam_preflight() {
+    [[ "${GAMING_STEAM_PREFLIGHT:-1}" == "0" ]] && return 0
+    local timeout_s="${GAMING_STEAM_PREFLIGHT_TIMEOUT:-900}"
+    if [[ ! "$timeout_s" =~ ^[1-9][0-9]{0,4}$ ]]; then
+        progress "Invalid GAMING_STEAM_PREFLIGHT_TIMEOUT (expected seconds, 1-99999). Staying on the desktop."
+        return 1
+    fi
+    # Do not let two hotkey presses shut down each other's preparation.
+    umask 077
+    [[ -n "${XDG_RUNTIME_DIR:-}" ]] || return 1
+    exec 9>"$XDG_RUNTIME_DIR/gaming-preflight.lock" || return 1
+    flock -n 9 || return 1
+
+    progress "Closing desktop Steam before preparing the Gaming Mode client..."
+    steam_stop || return 1
+
+    local state="${XDG_STATE_HOME:-$HOME/.local/state}/gaming-mode"
+    mkdir -p "$state" || return 1
+    local log="$state/steam-preflight.log"
+    # This launch gets a fresh log, never yesterday's successful verification. Steam's
+    # bootstrap_log.txt still exists; only console output is redirected here instead
+    # of through its console-linux.txt logger during preparation.
+    : > "$log" || return 1
+    progress "Checking Gaming Mode Steam on the desktop. Updates will finish here before switching."
+    STEAM_RUNTIME_LOGGER=0 steam "${steam_args[@]}" >"$log" 2>&1 9>&- &
+    local launcher=$! start=$SECONDS ready=0 last_notice=-10 message="" previous=""
+    local -a status
+    while (( SECONDS - start < timeout_s )); do
+        # ponytail: scan this launch's log every 2 s; use incremental reads if logs grow large.
+        # A verification BEFORE a download is not success: the restarted client must verify.
+        # UI status messages arrive asynchronously; they must not change readiness.
+        mapfile -t status < <(awk '
+            !/Set status message:/ {
+                if (/Startup - Steam Client launched|Downloading update|Verifying installation|Installing update|Update complete, launching Steam/) verified=0
+                if (/Verification complete/) verified=1
+            }
+            /Checking for available updates|Downloading update|Verifying installation|Extracting package|Installing update|Update complete, launching Steam/ {
+                message=$0; sub(/^.*\] /, "", message); sub(/^Set status message: /, "", message)
+            }
+            END { print verified+0; print message }
+        ' "$log")
+        message="${status[1]:-Waiting for Steam to start...}"
+        if (( SECONDS - last_notice >= 5 )) && { [[ "$message" != "$previous" ]] || (( SECONDS - last_notice >= 15 )); }; then
+            progress "$message — preparing on the desktop"
+            previous=$message
+            last_notice=$SECONDS
+        fi
+        # ponytail: verified client + stable webhelper presence is a readiness heuristic;
+        # use a Steam-provided readiness API if one becomes available.
+        if [[ "${status[0]:-0}" == 1 ]] && ! steam_update_running &&
+                pgrep -u "$(id -u)" -x steamwebhelper >/dev/null 2>&1; then
+            (( ++ready ))
+            if (( ready >= 3 )); then
+                progress "Steam is prepared. Closing it before the session switch..."
+                steam_stop || return 1
+                return 0
+            fi
+        else
+            ready=0
+        fi
+        if ! kill -0 "$launcher" 2>/dev/null && ! steam_any_running; then
+            progress "Steam exited before preparation finished. Staying on the desktop. See $log"
+            return 1
+        fi
+        sleep 2
+    done
+    progress "Steam preparation timed out. Staying on the desktop; let Steam finish and retry. Log: $log"
+    return 1
+}
+
+if (( $# > 1 )) || [[ -n "${1:-}" && "$1" != "--prepare-only" ]]; then
+    printf 'Usage: %s [--prepare-only]\n' "$0" >&2
+    exit 2
+fi
 notify -t 2000 "Gaming Mode" "Preparing Steam Big Picture..."
 steam_preflight || exit 1
+if [[ "${1:-}" == "--prepare-only" ]]; then
+    progress "Steam preparation complete. Staying on the desktop (prepare-only)."
+    exit 0
+fi
+progress "Switching to Gaming Mode..."
 
 # Kill leftovers from any previous gaming session. This runs only after Steam
 # update/bootstrap has completed or timed out visibly on the desktop.
