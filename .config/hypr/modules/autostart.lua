@@ -15,7 +15,9 @@ hl.on("hyprland.start", function()
 	hl.exec_cmd("uwsm app -- hyprsunset --identity") -- the shell applies the schedule (settings.json nightLight)
 	hl.exec_cmd("uwsm app -- hypridle") -- lock on lock-session/before sleep; idle timers stay in the shell
 	hl.exec_cmd("~/.config/quickshell/scripts/apply-theme.sh")
-	hl.exec_cmd("mozillavpn activate")
+	-- Bound to the `proton` WireGuard interface (NetworkManager, autoconnect) in qBittorrent.conf:
+	-- no VPN, no torrent traffic (kill switch). proton-portforward.service keeps its listen port synced.
+	hl.exec_cmd("uwsm app -- qbittorrent")
 	-- lianli-daemon is PartOf=graphical-session.target, so leaving any session (e.g. Gaming Mode)
 	-- stops it, and this plain Hyprland session never starts that target again. No-op if running.
 	hl.exec_cmd("systemctl --user start lianli-daemon.service")
