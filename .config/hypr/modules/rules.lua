@@ -5,6 +5,10 @@ for _, class in ipairs({ "^steam_app_.*", "^gamescope$" }) do
 	hl.window_rule({ match = { class = class }, immediate = true })
 end
 
+-- BBE RDP (bbe-rdp): fullscreen per monitor, but low/variable frame rate makes
+-- the OLED flicker with VRR (DP-2 vrr = 2 engages it for fullscreen apps).
+hl.window_rule({ match = { class = "^com\\.freerdp\\.client\\.sdl3$" }, no_vrr = true })
+
 -- Spotify window rules
 hl.window_rule({ match = { class = "Spotify" }, workspace = "special:spotify silent" })
 hl.window_rule({ match = { class = "Spotify" }, float = true })

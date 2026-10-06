@@ -10,8 +10,9 @@ set -euo pipefail
 # works if your browser saves a new file as launch(1).rdp or launch (1).rdp.
 #
 # Optional overrides:
-#   bbe-rdp --24                 # use 24-bit color instead of 16-bit
-#   bbe-rdp --size 2560x1440     # lower resolution for smoother perf
+#   bbe-rdp --single             # one window instead of all monitors
+#   bbe-rdp --single --size 2560x1440
+#   BBE_RDP_GFX=AVC444 bbe-rdp   # sharper coloured text, more bandwidth
 #   bbe-rdp --camera             # enable camera redirection when needed
 #   bbe-rdp --file /path/file.rdp
 #   BBE_RDP_NETWORK=broadband-high bbe-rdp
@@ -19,7 +20,11 @@ set -euo pipefail
 RDP_FILE=""
 RDP_FILE_EXPLICIT=0
 SIZE="${BBE_RDP_SIZE:-3440x1440}"
+# 16bpp is the known-good default; 32bpp enables server-side H.264, which made
+# the session unusable in testing (try: bbe-rdp --24 or BBE_RDP_BPP=32).
 BPP="${BBE_RDP_BPP:-16}"
+GFX="${BBE_RDP_GFX:-AVC420}"
+MULTIMON="${BBE_RDP_MULTIMON:-1}"
 NETWORK="${BBE_RDP_NETWORK:-wan}"
 CLIPBOARD="+clipboard"
 CAMERA="${BBE_RDP_CAMERA:-0}"
@@ -30,7 +35,8 @@ Usage: bbe-rdp [options]
 
 Options:
   --file PATH        RDP file to launch (default: newest ~/Downloads/launch*.rdp)
-  --size WxH         Session size (default: ${SIZE})
+  --single           Original single-window xfreerdp3 setup (known good)
+  --size WxH         Session size with --single (default: ${SIZE})
   --16              Use 16-bit color (default)
   --24              Use 24-bit color
   --network NAME     FreeRDP network profile (default: ${NETWORK})
@@ -41,8 +47,7 @@ Options:
 
 Examples:
   bbe-rdp
-  bbe-rdp --24
-  bbe-rdp --size 2560x1440
+  bbe-rdp --single --size 2560x1440
 EOF
 }
 
@@ -52,6 +57,10 @@ while [[ $# -gt 0 ]]; do
       RDP_FILE="${2:-}"
       RDP_FILE_EXPLICIT=1
       shift 2
+      ;;
+    --single)
+      MULTIMON="0"
+      shift
       ;;
     --size)
       SIZE="${2:-}"
@@ -117,8 +126,8 @@ if [[ -z "$RDP_FILE" || ! -f "$RDP_FILE" ]]; then
   exit 1
 fi
 
-if ! command -v xfreerdp3 >/dev/null 2>&1; then
-  echo "xfreerdp3 not found. Install FreeRDP first, e.g. sudo pacman -S freerdp" >&2
+if ! command -v sdl-freerdp3 >/dev/null 2>&1; then
+  echo "sdl-freerdp3 not found. Install FreeRDP first, e.g. sudo pacman -S freerdp" >&2
   exit 1
 fi
 
@@ -148,13 +157,29 @@ awk -v bpp="$BPP" -v camera="$CAMERA" '
   }
 ' "$RDP_FILE" > "$TMP"
 
-echo "Launching BBE RDP: ${SIZE}, ${BPP}-bit, network=${NETWORK}, camera=$([[ "$CAMERA" == "1" ]] && echo on || echo off)"
+if [[ "$MULTIMON" == "1" ]]; then
+  # Park each monitor on its own workspace first; the session's fullscreen
+  # windows land there. SUPER+R returns to them, SUPER+6..0 back to the desktop.
+  hyprctl eval 'hl.dispatch(hl.dsp.focus({ monitor = "HDMI-A-1" })) hl.dispatch(hl.dsp.focus({ workspace = "name:rdp-side" })) hl.dispatch(hl.dsp.focus({ monitor = "DP-2" })) hl.dispatch(hl.dsp.focus({ workspace = "name:rdp-main" }))' >/dev/null
+  # sdl-freerdp3: native Wayland, one fullscreen window per monitor (xfreerdp3
+  # via XWayland gets the layout wrong). FREERDP_WLROOTS_HACK=force: otherwise
+  # the monitor probe reads 64x64 dummy windows on Hyprland.
+  # -grab-keyboard keeps Hyprland shortcuts working. Escapes: SUPER+SHIFT+R kills
+  # the client; Ctrl+Alt+D disconnects (hotkey mod set in ~/.config/freerdp/sdl-freerdp.json).
+  CLIENT=(env FREERDP_WLROOTS_HACK=force sdl-freerdp3)
+  DISPLAY_ARGS=(/f /multimon -grab-keyboard)
+  LAYOUT="all monitors (SUPER+R: session, SUPER+SHIFT+R: kill, Ctrl+Alt+D: disconnect)"
+else
+  CLIENT=(xfreerdp3)
+  DISPLAY_ARGS=(/size:"$SIZE" +dynamic-resolution +decorations)
+  LAYOUT="$SIZE"
+fi
 
-exec xfreerdp3 "$TMP" \
-  /size:"$SIZE" \
-  +dynamic-resolution \
-  +decorations \
-  /gfx:AVC420:on,AVC444:off,progressive:off \
+echo "Launching BBE RDP: ${LAYOUT}, ${BPP}-bit, gfx=${GFX}, network=${NETWORK}, camera=$([[ "$CAMERA" == "1" ]] && echo on || echo off)"
+
+exec "${CLIENT[@]}" "$TMP" \
+  "${DISPLAY_ARGS[@]}" \
+  /gfx:"$GFX" \
   /network:"$NETWORK" \
   /bpp:"$BPP" \
   /audio-mode:none \
