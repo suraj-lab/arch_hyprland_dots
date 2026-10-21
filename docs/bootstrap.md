@@ -127,6 +127,10 @@ Gaming Mode defaults target the current machine. Override when hardware changes:
   --gaming-vk-device 1002:7550
 ```
 
+## pi on Windows
+
+Install Node.js 22.19+ and Git for Windows, clone this repo, then run `powershell -ExecutionPolicy Bypass -File scripts\setup-pi-windows.ps1`. It copies `pi/` to `%USERPROFILE%\.pi\agent` (skipping `AGENTS.md`, Linux-only skills and `mcp-monitor.sh`), clones `ai-tutor` for the `quiz`/`teach` skills, and installs the packages from `settings.json`. Then run `pi` once and log in.
+
 ## Keeping the repo in sync
 
 - `./scripts/capture-pi-config.sh` — re-capture `~/.pi/agent` (AGENTS.md, settings, models, skills, prompts, themes; never auth.json) into `pi/`
