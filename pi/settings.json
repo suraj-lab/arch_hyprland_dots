@@ -1,13 +1,14 @@
 {
-  "defaultProvider": "anthropic",
-  "defaultModel": "claude-fable-5",
-  "lastChangelogVersion": "0.80.3",
+  "defaultProvider": "deepseek",
+  "defaultModel": "deepseek-v4-pro",
+  "lastChangelogVersion": "1.3.0",
   "packages": [
     "npm:pi-web-access",
-    "npm:pi-mcp-adapter",
     "npm:context-mode",
     "npm:pi-subagents",
-    "git:github.com/DietrichGebert/ponytail"
+    "git:github.com/DietrichGebert/ponytail",
+    "npm:@quintinshaw/pi-dynamic-workflows",
+    "npm:@juicesharp/rpiv-ask-user-question"
   ],
   "defaultThinkingLevel": "high",
   "hideThinkingBlock": false,

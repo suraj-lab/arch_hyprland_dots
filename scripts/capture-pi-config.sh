@@ -9,10 +9,14 @@ DST="$REPO_DIR/pi"
 
 mkdir -p "$DST"
 cp -f "$SRC/AGENTS.md" "$SRC/SYSTEM.md" "$SRC/settings.json" \
-      "$SRC/models.json" "$SRC/mcp.json" "$DST/"
+      "$SRC/models.json" "$SRC/mcp.json" \
+      "$SRC/mcp-monitor.sh" "$DST/"
 rsync -a --delete "$SRC/skills/" "$DST/skills/"
 rsync -a --delete "$SRC/prompts/" "$DST/prompts/"
 rsync -a --delete "$SRC/themes/" "$DST/themes/"
+rsync -a --delete "$SRC/agents/" "$DST/agents/"
+# node_modules is rebuilt on the target with `npm install` in each extension dir.
+rsync -a --delete --exclude node_modules "$SRC/extensions/" "$DST/extensions/"
 
 # Never ship credentials.
 if grep -rlE '"(sk-[A-Za-z0-9]|ant-api|ghp_)' "$DST" >/dev/null 2>&1; then

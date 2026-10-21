@@ -559,9 +559,12 @@ install_pi() {
   sudo_run install -d -o "$TARGET_UID" -g "$TARGET_GID" "$pi_dst"
   as_user cp -rf "$pi_src/." "$pi_dst/"
   # mcp.json carries an absolute home path; rewrite for the target user.
-  if [[ -f "$pi_dst/mcp.json" ]]; then
-    as_user sed -i "s|/home/suraj|$TARGET_HOME|g" "$pi_dst/mcp.json"
-  fi
+  local f
+  [[ -f "$pi_dst/mcp.json" ]] && as_user sed -i "s|/home/suraj|$TARGET_HOME|g" "$pi_dst/mcp.json"
+  # Extensions ship without node_modules; packages from settings.json are installed by pi.
+  for f in "$pi_dst"/extensions/*/package.json; do
+    [[ -f "$f" ]] && as_user npm install --prefix "$(dirname "$f")" --omit=dev
+  done
   sudo_run chown -R "$TARGET_UID:$TARGET_GID" "$TARGET_HOME/.pi"
   ok "pi installed; auth is per-machine: run 'pi' once and log in"
 }

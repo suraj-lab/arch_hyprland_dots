@@ -1,9 +1,10 @@
 {
   "mcpServers": {
-    "context-mode": {
-      "command": "node",
-      "args": ["/home/suraj/.npm-global/bin/context-mode"],
-      "directTools": true
+    "rea": {
+      "command": "npx",
+      "args": ["-y", "rea-agents@6.4.0", "mcp"],
+      "exposure": "deferred",
+      "description": "Reverse engineering: decompile and analyze binaries, Electron apps, firmware"
     }
   }
 }
