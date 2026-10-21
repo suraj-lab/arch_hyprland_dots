@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
+umask 077   # logs and the temp .rdp copy are private
+ulimit -c 0 # a crash must not dump session memory (screen data, token) to disk
 
 # BBE RDP launcher for FreeRDP on Linux/Hyprland.
 # Default workflow:
@@ -11,11 +13,106 @@ set -euo pipefail
 #
 # Optional overrides:
 #   bbe-rdp --single             # one window instead of all monitors
+#   bbe-rdp --windowed           # one normal window per monitor (patched FreeRDP)
+#   bbe-rdp --native             # use the file's own colour/network/audio/effects
 #   bbe-rdp --single --size 2560x1440
 #   BBE_RDP_GFX=AVC444 bbe-rdp   # sharper coloured text, more bandwidth
-#   bbe-rdp --camera             # enable camera redirection when needed
+#   bbe-rdp --no-camera          # override the portal's camera preference
+#   bbe-rdp --keep               # don't delete the downloaded .rdp after launch
 #   bbe-rdp --file /path/file.rdp
 #   BBE_RDP_NETWORK=broadband-high bbe-rdp
+
+LOG_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/bbe-rdp"
+
+# bbe-rdp --stats [LOG...]: summarise session logs (default: the last 6).
+if [[ "${1:-}" == "--stats" ]]; then
+  shift
+  if [[ $# -eq 0 ]]; then
+    mapfile -t logs < <(ls -1t "$LOG_DIR"/*.log 2>/dev/null | head -6 | tac)
+    set -- "${logs[@]}"
+  fi
+  [[ $# -gt 0 ]] || { echo "No session logs in $LOG_DIR" >&2; exit 1; }
+  for f in "$@"; do
+    awk -v name="$(basename "$f" .log)" '
+      NR == 1 && /^# / { sub(/^# Launching BBE RDP: /, ""); profile = $0 }
+      / stats: [0-9.]+s fps=/ {
+        for (i = 1; i <= NF; i++) {
+          if ($i ~ /^fps=/) { split($i, a, "="); fps = a[2] }
+          if ($i ~ /^kB\/s=/) { split($i, a, "="); kbs = a[2] }
+          if ($i == "decode_ms") { split($(i+1), a, "="); dec = a[2]; split($(i+2), a, "="); decmax = a[2] }
+          if ($i == "frame_ms") { split($(i+1), a, "="); frm = a[2]; split($(i+2), a, "="); frmmax = a[2] }
+          if ($i == "input_ms") {
+            split($(i+1), a, "="); inn = a[2]; split($(i+2), a, "="); p50 = a[2]; split($(i+3), a, "="); p90 = a[2]
+            if (inn > 0) { tin += inn; sp50 += p50 * inn; sp90 += p90 * inn }   # weighted by samples
+          }
+          if ($i ~ /=[0-9]+$/ && $i ~ /^RDPGFX_CODECID_/) { split($i, a, "="); sub(/RDPGFX_CODECID_/, "", a[1]); codec[a[1]] += a[2] }
+        }
+        if (fps < 1) next   # idle intervals say nothing about smoothness
+        n++; sfps += fps; skbs += kbs; sdec += dec; sfrm += frm
+        if (decmax > mdec) mdec = decmax
+        if (frmmax > mfrm) mfrm = frmmax
+      }
+      / stats: server network:/ {
+        for (i = 1; i <= NF; i++) if ($i ~ /^averageRTT=/) { split($i, a, "="); sub(/ms/, "", a[2]); if (a[2] > 0) { r++; srtt += a[2] } }
+      }
+      END {
+        printf "%s  %s\n", name, profile
+        if (!n) { print "  no active stats intervals"; exit }
+        printf "  active intervals=%d  fps=%.1f  kB/s=%.0f  decode_ms avg=%.2f max=%.2f  frame_ms avg=%.2f max=%.2f  server_rtt=%s\n",
+          n, sfps/n, skbs/n, sdec/n, mdec, sfrm/n, mfrm, (r ? sprintf("%.0fms", srtt/r) : "n/a")
+        if (tin) printf "  input->frame (key/click) n=%d  p50~%.0fms  p90~%.0fms\n", tin, sp50/tin, sp90/tin
+        line = "  codecs:"; for (c in codec) line = line " " c "=" codec[c]; print line
+      }' "$f"
+  done
+  exit 0
+fi
+
+# bbe-rdp --stalls [LOG]: explain each freeze ("stall:" lines from the patched client)
+# with the kernel's view of the client's sockets during it (LOG's .net file).
+if [[ "${1:-}" == "--stalls" ]]; then
+  f="${2:-$(ls -1t "$LOG_DIR"/*.log 2>/dev/null | head -1)}"
+  [[ -f "$f" ]] || { echo "No session log found" >&2; exit 1; }
+  net="${f%.log}.net"
+  [[ -f "$net" ]] || net=/dev/null
+  echo "$(basename "$f" .log)"
+  # ponytail: wall-clock HH:MM:SS only, a stall spanning midnight is misplaced.
+  awk '
+    function ms(t, a) { gsub(/[][]/, "", t); split(t, a, ":"); return ((a[1] * 60 + a[2]) * 60 + a[3]) * 1000 + a[4] }
+    function val(k, i) { for (i = 1; i <= NF; i++) if (index($i, k "=") == 1) return substr($i, length(k) + 2) + 0; return 0 }
+    FILENAME == ARGV[1] { if ($2 == "net:") { n++; T[n] = ms($1); S[n] = val("sockets"); RX[n] = val("rx"); RQ[n] = val("rq")
+                  RET[n] = val("retrans"); RTT[n] = val("rtt"); LR[n] = val("lastrcv") }; next }
+    / stall: / {
+      end = ms($1); kind = (/ stall: input / ? "input" : "frame")
+      span = (kind == "input" ? val("input_wait_ms") : val("frame_ms")); start = end - span
+      # samples inside the window, plus the last one before it as the baseline
+      first = 0; last = 0; rq = 0; rtt = 0; lr = 0; down = 0
+      for (i = 1; i <= n; i++) {
+        if (T[i] <= start) first = i
+        if (T[i] > start && T[i] <= end) { if (!first) first = i; last = i
+          if (RQ[i] > rq) rq = RQ[i]; if (RTT[i] > rtt) rtt = RTT[i]; if (LR[i] > lr) lr = LR[i]; if (S[i] == 0) down = 1 }
+      }
+      line = sprintf("  %s %-5s %6.0f ms", substr($1, 2, 8), kind, span)
+      if (kind == "frame") line = line sprintf(" (decode %s, endframe %s, waiting %s ms)", val("decode_ms"), val("endframe_ms"), val("wait_ms"))
+      if (!last) { verdict = "NO DATA: no socket samples in this window (no .net file?)"; rx = -1 }
+      else {
+        rx = RX[last] - RX[first]; rt = RET[last] - RET[first]
+        if (kind == "frame" && val("decode_ms") + val("endframe_ms") > val("wait_ms")) verdict = "LOCAL: decode/EndFrame took the time"
+        else if (down) verdict = "DISCONNECTED: no client socket for part of it"
+        else if (rq > 32768) verdict = "LOCAL: data sat unread in the socket (client busy/blocked)"
+        else if (rx < 2048 && rt > 0) verdict = "NETWORK: retransmissions, nothing delivered"
+        else if (rx < 2048) verdict = "REMOTE: nothing sent by gateway/laptop (link healthy)"
+        else verdict = "DATA ARRIVED without a frame: client processing or non-graphics traffic"
+        line = line sprintf(" | rx=%.0fKB max_recvq=%d retrans+%d max_rtt=%sms max_silence=%sms", rx / 1024, rq, rt, rtt, lr)
+      }
+      print line; print "      -> " verdict
+      count[substr(verdict, 1, index(verdict, ":") - 1)]++; total += span; stalls++
+    }
+    END {
+      if (!stalls) { print "  no stalls (>=1s) recorded"; exit }
+      printf "  %d stalls, %.1f s total:", stalls, total / 1000; for (v in count) printf " %s=%d", v, count[v]; print ""
+    }' "$net" "$f"
+  exit 0
+fi
 
 RDP_FILE=""
 RDP_FILE_EXPLICIT=0
@@ -24,10 +121,18 @@ SIZE="${BBE_RDP_SIZE:-3440x1440}"
 # the session unusable in testing (try: bbe-rdp --24 or BBE_RDP_BPP=32).
 BPP="${BBE_RDP_BPP:-16}"
 GFX="${BBE_RDP_GFX:-AVC420}"
+# Defaults = best measured setup (2026-10-06, session D): one window per monitor,
+# the file's own settings, mixed-mode codecs without H.264. See bbe-rdp --stats.
+NATIVE="${BBE_RDP_NATIVE:-1}"
 MULTIMON="${BBE_RDP_MULTIMON:-1}"
+WINDOWED="${BBE_RDP_WINDOWED:-1}"
+H264="${BBE_RDP_H264:-0}"
+# Locally patched FreeRDP (~/Projects/freerdp-bbe, bbe/build.sh)
+BBE_SDL="$HOME/.local/opt/freerdp-bbe/bin/sdl-freerdp3"
 NETWORK="${BBE_RDP_NETWORK:-wan}"
 CLIPBOARD="+clipboard"
-CAMERA="${BBE_RDP_CAMERA:-0}"
+CAMERA="${BBE_RDP_CAMERA:-}" # empty = keep the portal's camerastoredirect
+KEEP=0
 
 usage() {
   cat <<EOF
@@ -35,13 +140,22 @@ Usage: bbe-rdp [options]
 
 Options:
   --file PATH        RDP file to launch (default: newest ~/Downloads/launch*.rdp)
-  --single           Original single-window xfreerdp3 setup (known good)
+  (default)          One resizable window per monitor, the file's own colour depth,
+                     network type, audio and effects (patched FreeRDP)
+  --h264             Also offer H.264 (AVC444/AVC420); with AVC444ModePreferred on the
+                     laptop this becomes full-screen video encoding (measured worse)
+  --fullscreen       Borderless fullscreen per monitor instead of windows
+  --single           Original single-window xfreerdp3 setup
+  --throttled        Old overrides: 16-bit, gfx=${GFX}, network=${NETWORK}, no audio/effects
   --size WxH         Session size with --single (default: ${SIZE})
-  --16              Use 16-bit color (default)
-  --24              Use 24-bit color
-  --network NAME     FreeRDP network profile (default: ${NETWORK})
-  --camera          Enable camera redirection
-  --no-camera       Disable camera redirection (default)
+  --16 / --24        Colour depth with --throttled
+  --network NAME     FreeRDP network profile with --throttled
+  --stats [LOG...]   Summarise session logs (default: the last 6)
+  FREERDP_HWDEC=1    (env) GPU H.264 decoding; only matters with --h264
+  --camera           Redirect all cameras (default: the portal's preference)
+  --no-camera        Disable camera redirection
+  --keep             Keep the downloaded .rdp (default: delete it once copied;
+                     its token only works ~120s after download anyway)
   --no-clipboard    Disable clipboard redirection
   -h, --help         Show this help
 
@@ -57,6 +171,21 @@ while [[ $# -gt 0 ]]; do
       RDP_FILE="${2:-}"
       RDP_FILE_EXPLICIT=1
       shift 2
+      ;;
+    --windowed | --native)
+      shift # defaults now; accepted so old commands keep working
+      ;;
+    --fullscreen)
+      WINDOWED="0"
+      shift
+      ;;
+    --throttled)
+      NATIVE="0"
+      shift
+      ;;
+    --h264)
+      H264="1"
+      shift
       ;;
     --single)
       MULTIMON="0"
@@ -84,6 +213,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --no-camera)
       CAMERA="0"
+      shift
+      ;;
+    --keep)
+      KEEP="1"
       shift
       ;;
     --no-clipboard)
@@ -126,19 +259,30 @@ if [[ -z "$RDP_FILE" || ! -f "$RDP_FILE" ]]; then
   exit 1
 fi
 
+# BBE gateway tokens are only valid for a first connect within 120s of download.
+age=$(( $(date +%s) - $(stat -c %Y -- "$RDP_FILE") ))
+if (( age > 110 )); then
+  echo "Warning: $RDP_FILE is ${age}s old; its gateway token only works for ~120s after" >&2
+  echo "download. If the connection is rejected, click Connect in the BBE portal again." >&2
+fi
+
 if ! command -v sdl-freerdp3 >/dev/null 2>&1; then
   echo "sdl-freerdp3 not found. Install FreeRDP first, e.g. sudo pacman -S freerdp" >&2
   exit 1
 fi
 
 TMP="$(mktemp --suffix=.rdp)"
+NET_PID=""
 cleanup() {
+  [[ -n "$NET_PID" ]] && kill "$NET_PID" 2>/dev/null
   rm -f "$TMP"
 }
 trap cleanup EXIT
 
 # Copy the downloaded BBE file but override settings that hurt Linux/Hyprland performance.
 # Keep gateway/cookie/auth fields intact.
+# --native: leave session bpp as the file has it.
+[[ "$NATIVE" == "1" ]] && BPP=""
 awk -v bpp="$BPP" -v camera="$CAMERA" '
   BEGIN {
     seen_screen=0; seen_smart=0; seen_bpp=0; seen_camera=0;
@@ -146,16 +290,28 @@ awk -v bpp="$BPP" -v camera="$CAMERA" '
   }
   /^screen mode id:i:/ { print "screen mode id:i:1"; seen_screen=1; next }
   /^smart sizing:i:/ { print "smart sizing:i:0"; seen_smart=1; next }
-  /^session bpp:i:/ { print "session bpp:i:" bpp; seen_bpp=1; next }
-  /^camerastoredirect:s:/ { print "camerastoredirect:s:" camera_value; seen_camera=1; next }
+  /^session bpp:i:/ { print (bpp == "" ? $0 : "session bpp:i:" bpp); seen_bpp=1; next }
+  /^camerastoredirect:s:/ { print (camera == "" ? $0 : "camerastoredirect:s:" camera_value); seen_camera=1; next }
   { print }
   END {
     if (!seen_screen) print "screen mode id:i:1";
     if (!seen_smart) print "smart sizing:i:0";
-    if (!seen_bpp) print "session bpp:i:" bpp;
-    if (!seen_camera) print "camerastoredirect:s:" camera_value;
+    if (!seen_bpp && bpp != "") print "session bpp:i:" bpp;
+    if (!seen_camera && camera != "") print "camerastoredirect:s:" camera_value;
   }
 ' "$RDP_FILE" > "$TMP"
+
+# The download holds a single-use token; remove it once copied. Only a regular
+# file (never a symlink) of ours sitting directly in ~/Downloads.
+if [[ "$KEEP" == "0" && ! -L "$RDP_FILE" && -f "$RDP_FILE" && -O "$RDP_FILE" &&
+      "$(cd -- "$(dirname -- "$RDP_FILE")" && pwd -P)" == "$(cd -- "$HOME/Downloads" 2>/dev/null && pwd -P)" ]]; then
+  rm -f -- "$RDP_FILE"
+fi
+
+# The gateway allows reconnects for ~120s after a drop. sdl-freerdp3 waits
+# TcpConnectTimeout (15s) between attempts and each can take 15s more, so 6
+# covers the window (FreeRDP's default 20 would retry for 5-10 min in vain).
+RECONNECT_ARGS=(+auto-reconnect /auto-reconnect-max-retries:6)
 
 if [[ "$MULTIMON" == "1" ]]; then
   # Park each monitor on its own workspace first; the session's fullscreen
@@ -169,22 +325,87 @@ if [[ "$MULTIMON" == "1" ]]; then
   CLIENT=(env FREERDP_WLROOTS_HACK=force sdl-freerdp3)
   DISPLAY_ARGS=(/f /multimon -grab-keyboard)
   LAYOUT="all monitors (SUPER+R: session, SUPER+SHIFT+R: kill, Ctrl+Alt+D: disconnect)"
+  if [[ "$WINDOWED" == "1" ]]; then
+    if [[ ! -x "$BBE_SDL" ]]; then
+      echo "--windowed needs the patched FreeRDP: run ~/Projects/freerdp-bbe/bbe/build.sh" >&2
+      exit 1
+    fi
+    # No /f: each monitor gets a normal window whose size becomes that remote
+    # monitor's size. Hyprland places them by title (rules.lua).
+    CLIENT=("$BBE_SDL")
+    DISPLAY_ARGS=(/multimon +dynamic-resolution -grab-keyboard)
+    LAYOUT="windowed, all monitors (SUPER+R: session, SUPER+SHIFT+R: kill, Ctrl+Alt+D: disconnect)"
+  fi
 else
   CLIENT=(xfreerdp3)
+  RECONNECT_ARGS=(+auto-reconnect /auto-reconnect-max-retries:10) # 5s retry delay
   DISPLAY_ARGS=(/size:"$SIZE" +dynamic-resolution +decorations)
   LAYOUT="$SIZE"
 fi
 
-echo "Launching BBE RDP: ${LAYOUT}, ${BPP}-bit, gfx=${GFX}, network=${NETWORK}, camera=$([[ "$CAMERA" == "1" ]] && echo on || echo off)"
+if [[ "$NATIVE" == "1" ]]; then
+  # Colour depth, connection type + autodetect, audio and effects come from the file.
+  # Plain /gfx offers no H.264 (FreeRDP only adds it for /network:auto), so the
+  # laptop uses mixed mode: ClearCodec for text, progressive RemoteFX for images.
+  # Measured best for office work; --h264 offers AVC444/AVC420 as well.
+  PERF_ARGS=(/gfx)
+  PROFILE="native (file's colour/network/audio/effects)"
+  if [[ "$H264" == "1" ]]; then
+    PERF_ARGS=(/gfx:AVC444,AVC420,progressive,RFX)
+    PROFILE="native + H.264"
+  fi
+else
+  PERF_ARGS=(/gfx:"$GFX" /network:"$NETWORK" /bpp:"$BPP" /audio-mode:none
+    -wallpaper -themes -menu-anims -window-drag)
+  PROFILE="${BPP}-bit, gfx=${GFX}, network=${NETWORK}"
+fi
 
-exec "${CLIENT[@]}" "$TMP" \
+LAUNCH="Launching BBE RDP: ${LAYOUT}, ${PROFILE}, camera=$(case "$CAMERA" in 1) echo on ;; 0) echo off ;; *) echo portal ;; esac), hwdec=${FREERDP_HWDEC:-auto}"
+
+# Every session logs to $LOG_DIR with a stats line every 5s (patched client);
+# compare sessions with: bbe-rdp --stats
+mkdir -p "$LOG_DIR"
+chmod 700 "$LOG_DIR"
+LOG="$LOG_DIR/$(date +%Y%m%d-%H%M%S).log"
+echo "# $LAUNCH" > "$LOG"
+echo "$LAUNCH (log: $LOG)"
+
+# Kernel view of the client's sockets every 250 ms (bbe-rdp --stalls): bytes received,
+# unread data (rq), retransmits, RTT and time since the last packet. No payload.
+# ponytail: ~10 MB per 8 h session; sample only around stalls if logs grow too big.
+net_trace() {
+  while sleep 0.25; do
+    ss -tinpOH state established 2>/dev/null | awk -v ts="$(date +%H:%M:%S:%3N)" '
+      /freerdp3",pid=/ {
+        s++; rq += $1; sq += $2
+        for (i = 3; i <= NF; i++) {
+          split($i, kv, ":")
+          if (kv[1] == "bytes_received") rx += kv[2]
+          else if (kv[1] == "retrans") { split(kv[2], r, "/"); rt += r[2] }
+          else if (kv[1] == "rtt") { split(kv[2], r, "/"); if (r[1] > rtt) rtt = r[1] }
+          else if (kv[1] == "lastrcv" && (lr == "" || kv[2] < lr)) lr = kv[2]
+        }
+      }
+      END { printf "[%s] net: sockets=%d rx=%.0f rq=%d sq=%d retrans=%d rtt=%.1f lastrcv=%d\n", ts, s, rx, rq, sq, rt, rtt, lr }'
+  done
+}
+net_trace > "${LOG%.log}.net" 2>/dev/null &
+NET_PID=$!
+
+# Not exec: the cleanup trap must still remove $TMP (it holds the access token).
+status=0
+# Camera: Windows asks for one frame at a time and its per-frame cost grows with size;
+# 720p measured ~3.7 fps vs ~2.5 at 1080p (2026-10-07). 0 = offer every camera size.
+FREERDP_GFX_STATS=1 FREERDP_SDL_STATS="${FREERDP_SDL_STATS:-1}" \
+  FREERDP_ECAM_MAX_HEIGHT="${FREERDP_ECAM_MAX_HEIGHT:-720}" "${CLIENT[@]}" "$TMP" \
   "${DISPLAY_ARGS[@]}" \
-  /gfx:"$GFX" \
-  /network:"$NETWORK" \
-  /bpp:"$BPP" \
-  /audio-mode:none \
-  -wallpaper \
-  -themes \
-  -menu-anims \
+  "${PERF_ARGS[@]}" \
+  "${RECONNECT_ARGS[@]}" \
   "$CLIPBOARD" \
-  /cert:tofu
+  /cert:tofu 2>&1 | tee -a "$LOG" || status=$?
+
+if grep -qE 'E_PROXY_COOKIE_AUTHENTICATION_ACCESS_DENIED|RPC_S_ACCESS_DENIED' "$LOG"; then
+  echo "The gateway rejected the access token (already used, older than ~2 min, or your" >&2
+  echo "public IP changed). Click Connect in the BBE portal again; retrying this file won't work." >&2
+fi
+exit "$status"

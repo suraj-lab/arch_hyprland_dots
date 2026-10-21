@@ -8,6 +8,25 @@ end
 -- BBE RDP (bbe-rdp): fullscreen per monitor, but low/variable frame rate makes
 -- the OLED flicker with VRR (DP-2 vrr = 2 engages it for fullscreen apps).
 hl.window_rule({ match = { class = "^com\\.freerdp\\.client\\.sdl3$" }, no_vrr = true })
+-- The remote desktop repaints constantly: no inactive transparency (and the
+-- full-size re-blur behind it), no shadow/rounding/animations to composite.
+hl.window_rule({
+	match = { class = "^com\\.freerdp\\.client\\.sdl3$" },
+	opacity = "1.0 override 1.0 override",
+	no_blur = true,
+	no_shadow = true,
+	no_dim = true,
+	no_anim = true,
+	rounding = 0,
+})
+-- bbe-rdp --windowed (patched FreeRDP): titles end in "[<display name> (<output>)]"
+hl.window_rule({ match = { initial_title = "^FreeRDP: .*\\(DP-2\\)\\]$" }, workspace = "name:rdp-main" })
+hl.window_rule({ match = { initial_title = "^FreeRDP: .*\\(HDMI-A-1\\)\\]$" }, workspace = "name:rdp-side" })
+
+-- Zoom: behave like on a floating desktop. Every Zoom window (meeting, video panel,
+-- share toolbar) floats where it opens, so none can tile into rdp-main/rdp-side
+-- (shrinking the RDP window would resize the remote desktop).
+hl.window_rule({ match = { class = "^zoom$" }, float = true })
 
 -- Spotify window rules
 hl.window_rule({ match = { class = "Spotify" }, workspace = "special:spotify silent" })

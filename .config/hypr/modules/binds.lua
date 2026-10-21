@@ -108,6 +108,33 @@ hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true, descr
 
 -- Native scratchpad keybinds
 hl.bind("ALT + M", hl.dsp.workspace.toggle_special("spotify"), { description = "Workspaces: Toggle Spotify" })
+
+-- ALT+Z: hide every Zoom window (meeting, video panel, share toolbar) or bring them all
+-- back, floating over the workspace you are looking at. Only ever touches Zoom, and
+-- never moves keyboard focus (typing into the RDP session keeps working).
+local function toggle_zoom()
+	local wins = hl.get_windows({ class = "zoom" })
+	local shown = false
+	for _, w in ipairs(wins) do
+		if w.workspace and w.workspace.name ~= "special:zoom-hidden" then
+			shown = true
+		end
+	end
+	local ws = hl.get_active_workspace()
+	if not shown and not ws then
+		return
+	end
+	-- named workspaces (rdp-main, ...) have negative ids; select them by name
+	local here = ws and ((ws.id > 0) and ws.id or ("name:" .. ws.name))
+	for _, w in ipairs(wins) do
+		hl.dispatch(hl.dsp.window.move({
+			workspace = shown and "special:zoom-hidden" or here,
+			follow = false,
+			window = w,
+		}))
+	end
+end
+hl.bind("ALT + Z", toggle_zoom, { description = "Zoom: Hide / show all Zoom windows" })
 hl.bind("ALT + return", hl.dsp.workspace.toggle_special("term"), { description = "Workspaces: Toggle the terminal scratchpad" })
 
 -- New binds added by the DE upgrade (SPEC §4.2); the lines above stay exactly as they were,
